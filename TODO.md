@@ -1,0 +1,2 @@
+- [ ] Fix invalid role 'student' to 'instructor' in the cancel button of the user form
+- [ ] Refactor the sorting logic in UserManagement to use a type-safe helper function instead of unsafe casting
