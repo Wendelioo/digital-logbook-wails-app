@@ -930,15 +930,8 @@ function ViewLogs() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   
-  // Column-level filters
-  const [filters, setFilters] = useState({
-    user_name: '',
-    user_type: '',
-    pc_number: '',
-    time_in: '',
-    time_out: '',
-    date: ''
-  });
+  // Date filter only
+  const [dateFilter, setDateFilter] = useState('');
 
   useEffect(() => {
     loadLogs();
@@ -962,20 +955,9 @@ function ViewLogs() {
     }
   };
 
-  const onFilterChange = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
   const clearFilters = () => {
     setSearchQuery('');
-    setFilters({
-      user_name: '',
-      user_type: '',
-      pc_number: '',
-      time_in: '',
-      time_out: '',
-      date: ''
-    });
+    setDateFilter('');
   };
 
   // Apply filters to logs
@@ -995,24 +977,9 @@ function ViewLogs() {
       timeOut.toLowerCase().includes(searchLower);
     
     // Date filter
-    const matchesDate = filters.date === '' || logDate === filters.date;
+    const matchesDate = dateFilter === '' || logDate === dateFilter;
     
-    // Name filter
-    const matchesName = log.user_name.toLowerCase().includes(filters.user_name.toLowerCase());
-    
-    // User type filter
-    const matchesType = filters.user_type === '' || log.user_type.toLowerCase() === filters.user_type.toLowerCase();
-    
-    // PC Number filter
-    const matchesPCNumber = (log.pc_number || '').toLowerCase().includes(filters.pc_number.toLowerCase());
-    
-    // Time In filter
-    const matchesTimeIn = timeIn.toLowerCase().includes(filters.time_in.toLowerCase());
-    
-    // Time Out filter
-    const matchesTimeOut = timeOut.toLowerCase().includes(filters.time_out.toLowerCase());
-    
-    return matchesSearch && matchesDate && matchesName && matchesType && matchesPCNumber && matchesTimeIn && matchesTimeOut;
+    return matchesSearch && matchesDate;
   });
 
   if (loading) {
@@ -1041,7 +1008,6 @@ function ViewLogs() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search logs by name, user type, PC number, date, or time..."
               className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
             {searchQuery && (
@@ -1063,13 +1029,13 @@ function ViewLogs() {
           >
             <Filter className="h-5 w-5" />
             Filters
-            {(filters.user_name || filters.user_type || filters.pc_number || filters.time_in || filters.time_out || filters.date) && (
+            {dateFilter && (
               <span className="ml-1 px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">
-                {[filters.user_name, filters.user_type, filters.pc_number, filters.time_in, filters.time_out, filters.date].filter(Boolean).length}
+                1
               </span>
             )}
           </button>
-          {(searchQuery || filters.user_name || filters.user_type || filters.pc_number || filters.time_in || filters.time_out || filters.date) && (
+          {(searchQuery || dateFilter) && (
             <button
               onClick={clearFilters}
               className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -1082,70 +1048,22 @@ function ViewLogs() {
         {/* Advanced Filters Panel */}
         {showFilters && (
           <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
-                <input
-                  type="text"
-                  value={filters.user_name}
-                  onChange={(e) => onFilterChange('user_name', e.target.value)}
-                  placeholder="Search name..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">User Type</label>
-                <select
-                  value={filters.user_type}
-                  onChange={(e) => onFilterChange('user_type', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              {dateFilter && (
+                <button
+                  onClick={() => setDateFilter('')}
+                  className="text-sm text-gray-600 hover:text-gray-900 underline"
                 >
-                  <option value="">All Types</option>
-                  <option value="student">Student</option>
-                  <option value="working_student">Working Student</option>
-                  <option value="instructor">Instructor</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">PC Number</label>
-                <input
-                  type="text"
-                  value={filters.pc_number}
-                  onChange={(e) => onFilterChange('pc_number', e.target.value)}
-                  placeholder="Search PC..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time-In</label>
-                <input
-                  type="text"
-                  value={filters.time_in}
-                  onChange={(e) => onFilterChange('time_in', e.target.value)}
-                  placeholder="Search time..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time-Out</label>
-                <input
-                  type="text"
-                  value={filters.time_out}
-                  onChange={(e) => onFilterChange('time_out', e.target.value)}
-                  placeholder="Search time..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input
-                  type="date"
-                  value={filters.date}
-                  onChange={(e) => onFilterChange('date', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
+                  Clear date filter
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1259,7 +1177,7 @@ function ViewLogs() {
           <div className="text-sm text-gray-700">
             Showing <span className="font-medium">{filteredLogs.length}</span> of <span className="font-medium">{logs.length}</span> logs
           </div>
-          {(searchQuery || filters.user_name || filters.user_type || filters.pc_number || filters.time_in || filters.time_out || filters.date) && (
+          {(searchQuery || dateFilter) && (
             <div className="text-sm text-gray-500 flex items-center gap-1">
               <Search className="h-4 w-4" />
               <span>Search/Filters active</span>
@@ -1280,18 +1198,8 @@ function Reports() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   
-  // Date filter (separate from column filters)
+  // Date filter only
   const [dateFilter, setDateFilter] = useState('');
-  
-  // Column-level filters
-  const [filters, setFilters] = useState({
-    student_name: '',
-    student_id: '',
-    pc_number: '',
-    time_in: '',
-    time_out: '',
-    report: ''
-  });
 
   useEffect(() => {
     loadReports();
@@ -1315,21 +1223,9 @@ function Reports() {
     }
   };
 
-  const onFilterChange = (key: string, value: string) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
-
   const clearFilters = () => {
     setSearchQuery('');
     setDateFilter('');
-    setFilters({
-      student_name: '',
-      student_id: '',
-      pc_number: '',
-      time_in: '',
-      time_out: '',
-      report: ''
-    });
   };
 
   // Apply filters to reports
@@ -1347,18 +1243,10 @@ function Reports() {
       report.comment.toLowerCase().includes(searchLower) ||
       (report.date && report.date.toLowerCase().includes(searchLower));
     
-    // Date filter (only filter, not displayed)
+    // Date filter
     const matchesDate = dateFilter === '' || (report.date && report.date.startsWith(dateFilter));
-    
-    // Column filters
-    const matchesName = report.student_name.toLowerCase().includes(filters.student_name.toLowerCase());
-    const matchesStudentID = report.student_id_str.toLowerCase().includes(filters.student_id.toLowerCase());
-    const matchesPCNumber = report.pc_number.toLowerCase().includes(filters.pc_number.toLowerCase());
-    const matchesTimeIn = report.time_in.toLowerCase().includes(filters.time_in.toLowerCase());
-    const matchesTimeOut = report.time_out.toLowerCase().includes(filters.time_out.toLowerCase());
-    const matchesReport = report.comment.toLowerCase().includes(filters.report.toLowerCase());
 
-    return matchesSearch && matchesDate && matchesName && matchesStudentID && matchesPCNumber && matchesTimeIn && matchesTimeOut && matchesReport;
+    return matchesSearch && matchesDate;
   });
 
   if (loading) {
@@ -1387,7 +1275,6 @@ function Reports() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search reports by name, ID, PC number, time, equipment, condition, or report..."
               className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
             />
             {searchQuery && (
@@ -1409,13 +1296,13 @@ function Reports() {
           >
             <Filter className="h-5 w-5" />
             Filters
-            {(dateFilter || filters.student_name || filters.student_id || filters.pc_number || filters.time_in || filters.time_out || filters.report) && (
+            {dateFilter && (
               <span className="ml-1 px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">
-                {[dateFilter, filters.student_name, filters.student_id, filters.pc_number, filters.time_in, filters.time_out, filters.report].filter(Boolean).length}
+                1
               </span>
             )}
           </button>
-          {(searchQuery || dateFilter || filters.student_name || filters.student_id || filters.pc_number || filters.time_in || filters.time_out || filters.report) && (
+          {(searchQuery || dateFilter) && (
             <button
               onClick={clearFilters}
               className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -1428,76 +1315,22 @@ function Reports() {
         {/* Advanced Filters Panel */}
         {showFilters && (
           <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Student Name</label>
-                <input
-                  type="text"
-                  value={filters.student_name}
-                  onChange={(e) => onFilterChange('student_name', e.target.value)}
-                  placeholder="Filter name..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Student ID</label>
-                <input
-                  type="text"
-                  value={filters.student_id}
-                  onChange={(e) => onFilterChange('student_id', e.target.value)}
-                  placeholder="Filter ID..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">PC Number</label>
-                <input
-                  type="text"
-                  value={filters.pc_number}
-                  onChange={(e) => onFilterChange('pc_number', e.target.value)}
-                  placeholder="Filter PC..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time In</label>
-                <input
-                  type="text"
-                  value={filters.time_in}
-                  onChange={(e) => onFilterChange('time_in', e.target.value)}
-                  placeholder="Filter time..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Time Out</label>
-                <input
-                  type="text"
-                  value={filters.time_out}
-                  onChange={(e) => onFilterChange('time_out', e.target.value)}
-                  placeholder="Filter time..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Report</label>
-                <input
-                  type="text"
-                  value={filters.report}
-                  onChange={(e) => onFilterChange('report', e.target.value)}
-                  placeholder="Filter report..."
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                />
-              </div>
+            <div className="flex items-center gap-4">
+              <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
+              <input
+                type="date"
+                value={dateFilter}
+                onChange={(e) => setDateFilter(e.target.value)}
+                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              />
+              {dateFilter && (
+                <button
+                  onClick={() => setDateFilter('')}
+                  className="text-sm text-gray-600 hover:text-gray-900 underline"
+                >
+                  Clear date filter
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -1602,7 +1435,7 @@ function Reports() {
           <div className="text-sm text-gray-600">
             Showing <span className="font-medium">{filteredReports.length}</span> of <span className="font-medium">{reports.length}</span> reports
           </div>
-          {(searchQuery || dateFilter || filters.student_name || filters.student_id || filters.pc_number || filters.time_in || filters.time_out || filters.report) && (
+          {(searchQuery || dateFilter) && (
             <div className="text-sm text-gray-500 flex items-center gap-1">
               <Search className="h-4 w-4" />
               <span>Search/Filters active</span>
