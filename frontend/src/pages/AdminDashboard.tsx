@@ -17,7 +17,9 @@ import {
   CreateUser, 
   UpdateUser, 
   DeleteUser,
-  ExportUsersCSV 
+  ExportUsersCSV,
+  GetAllLogs,
+  GetFeedback
 } from '../../wailsjs/go/main/App';
 
 interface DashboardStats {
@@ -32,9 +34,40 @@ interface User {
   username: string;
   email?: string;
   name: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  gender?: string;
   role: string;
+  employee_id?: string;
+  student_id?: string;
   year?: string;
+  photo_url?: string;
   created: string;
+}
+
+interface LoginLog {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_type: string;
+  pc_number?: string;
+  login_time: string;
+  logout_time?: string;
+}
+
+interface Feedback {
+  id: number;
+  student_id: number;
+  student_name: string;
+  student_id_str: string;
+  pc_number: string;
+  time_in: string;
+  time_out: string;
+  equipment: string;
+  condition: string;
+  comment: string;
+  date: string;
 }
 
 function DashboardOverview() {
@@ -164,11 +197,17 @@ function UserManagement() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [userTypeFilter, setUserTypeFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
     name: '',
+    firstName: '',
+    middleName: '',
+    lastName: '',
+    gender: '',
     role: 'instructor',
     year: ''
   });
@@ -263,9 +302,9 @@ function UserManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      let first_name = '';
-      let middle_name = '';
-      let last_name = '';
+      // Build name from lastName, firstName, middleName
+      const fullName = `${formData.lastName}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName : ''}`;
+      
       let employee_id = '';
       let student_id = '';
       let email_to_pass = formData.email;
@@ -275,23 +314,25 @@ function UserManagement() {
       if (formData.role === 'working_student') {
         student_id = formData.username;
         email_to_pass = '';
-        password_to_pass = formData.username;
+        password_to_pass = formData.username; // Default password is student ID
       } else if (formData.role === 'instructor') {
         employee_id = formData.username;
-      } // for admin, username is username
+        password_to_pass = formData.username; // Default password is employee ID
+      } // for admin, username is username and password must be provided
 
       if (editingUser) {
-        await UpdateUser(editingUser.id, username_to_pass, email_to_pass, password_to_pass, formData.name, first_name, middle_name, last_name, formData.role, employee_id, student_id);
+        await UpdateUser(editingUser.id, username_to_pass, email_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, employee_id, student_id, formData.year);
       } else {
-        await CreateUser(username_to_pass, email_to_pass, password_to_pass, formData.name, first_name, middle_name, last_name, formData.role, employee_id, student_id, formData.year);
+        await CreateUser(username_to_pass, email_to_pass, password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, employee_id, student_id, formData.year);
       }
       
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ username: '', email: '', password: '', name: '', role: 'instructor', year: '' });
+      setFormData({ username: '', email: '', password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'instructor', year: '' });
       loadUsers();
     } catch (error) {
       console.error('Failed to save user:', error);
+      alert('Failed to save user. Please check the console for errors.');
     }
   };
 
@@ -302,6 +343,10 @@ function UserManagement() {
       email: user.email || '',
       password: '',
       name: user.name,
+      firstName: user.first_name || '',
+      middleName: user.middle_name || '',
+      lastName: user.last_name || '',
+      gender: user.gender || '',
       role: user.role,
       year: user.year || ''
     });
@@ -338,6 +383,26 @@ function UserManagement() {
 
   // Derived table data (filters, sort, pagination)
   const filteredUsers = users.filter((u) => {
+    // User type filter
+    if (userTypeFilter && u.role !== userTypeFilter) {
+      return false;
+    }
+
+    // Global search term (searches across multiple fields)
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      const matchesName = u.name.toLowerCase().includes(term);
+      const matchesStudentID = (u.student_id || '').toLowerCase().includes(term);
+      const matchesEmployeeID = (u.employee_id || '').toLowerCase().includes(term);
+      const matchesGender = (u.gender || '').toLowerCase().includes(term);
+      const matchesCreated = u.created.toLowerCase().includes(term);
+      
+      if (!matchesName && !matchesStudentID && !matchesEmployeeID && !matchesGender && !matchesCreated) {
+        return false;
+      }
+    }
+
+    // Column-specific filters
     const inName = u.name.toLowerCase().includes(filters.name.toLowerCase());
     const inUsername = u.username.toLowerCase().includes(filters.username.toLowerCase());
     const inRole = u.role.toLowerCase().includes(filters.role.toLowerCase());
@@ -416,6 +481,39 @@ function UserManagement() {
         </div>
       </div>
 
+      {/* Filters Section */}
+      <div className="bg-white shadow rounded-lg p-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Filter by User Type
+            </label>
+            <select
+              value={userTypeFilter}
+              onChange={(e) => setUserTypeFilter(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="">All</option>
+              <option value="instructor">Instructor</option>
+              <option value="student">Student</option>
+              <option value="working_student">Working Student</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Search (Name, Student ID, Employee ID, Gender, Date)
+            </label>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Search users..."
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+            />
+          </div>
+        </div>
+      </div>
+
       {/* User Form Modal */}
       {showForm && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
@@ -437,7 +535,7 @@ function UserManagement() {
                         role: newRole,
                         // Clear fields that might not be relevant for the new role
                         email: newRole === 'working_student' ? '' : formData.email,
-                        year: '' // Clear year field since it's not used for admin roles
+                        year: ''
                       });
                     }}
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
@@ -445,7 +543,6 @@ function UserManagement() {
                   >
                     <option value="instructor">Instructor</option>
                     <option value="working_student">Working Student</option>
-                    <option value="admin">Admin</option>
                   </select>
                   <p className="mt-1 text-xs text-gray-500">
                     Note: Student registration is handled by Working Students
@@ -454,7 +551,7 @@ function UserManagement() {
 
                 {/* Role-specific fields */}
                 {formData.role === 'working_student' ? (
-                  // Working Student Form: Only Student ID and Name
+                  // Working Student Form: Student ID, First/Middle/Last Name, Gender
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Student ID</label>
@@ -471,35 +568,53 @@ function UserManagement() {
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                      <label className="block text-sm font-medium text-gray-700">Last Name</label>
                       <input
                         type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Enter full name"
+                        value={formData.lastName}
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        placeholder="e.g., Santos"
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
                       />
                     </div>
-                    {!editingUser && (
-                      <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-                        <div className="flex">
-                          <div className="flex-shrink-0">
-                            <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                            </svg>
-                          </div>
-                          <div className="ml-3">
-                            <p className="text-sm text-blue-700">
-                              Password will be automatically set to the Student ID
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">First Name</label>
+                      <input
+                        type="text"
+                        value={formData.firstName}
+                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                        placeholder="e.g., Juan"
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Middle Name (Optional)</label>
+                      <input
+                        type="text"
+                        value={formData.middleName}
+                        onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
+                        placeholder="e.g., Miguel"
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Gender</label>
+                      <select
+                        value={formData.gender}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        required
+                      >
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                      </select>
+                    </div>
                   </>
                 ) : formData.role === 'instructor' ? (
-                  // Instructor Form: Employee ID, Name, Email
+                  // Instructor Form: Employee ID, First/Middle/Last Name, Gender (No Email)
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Employee ID</label>
@@ -511,99 +626,64 @@ function UserManagement() {
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
                       />
+                      <p className="mt-1 text-xs text-gray-500">
+                        This will also be used as the default password
+                      </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Full Name</label>
+                      <label className="block text-sm font-medium text-gray-700">Last Name</label>
                       <input
                         type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Enter full name"
+                        value={formData.lastName}
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        placeholder="e.g., Reyes"
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Email</label>
+                      <label className="block text-sm font-medium text-gray-700">First Name</label>
                       <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="instructor@university.edu"
+                        type="text"
+                        value={formData.firstName}
+                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                        placeholder="e.g., Juan"
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
                       />
                     </div>
-                    {!editingUser && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Password</label>
-                        <input
-                          type="password"
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                          required
-                        />
-                      </div>
-                    )}
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Middle Name (Optional)</label>
+                      <input
+                        type="text"
+                        value={formData.middleName}
+                        onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
+                        placeholder="e.g., Miguel"
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">Gender</label>
+                      <select
+                        value={formData.gender}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        required
+                      >
+                        <option value="">Select Gender</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                      </select>
+                    </div>
                   </>
-                ) : (
-                  // Admin Form: Username, Name, Email
-                  <>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Username</label>
-                      <input
-                        type="text"
-                        value={formData.username}
-                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                        placeholder="admin username"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Full Name</label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                        placeholder="Enter full name"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Email</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        placeholder="admin@university.edu"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                        required
-                      />
-                    </div>
-                    {!editingUser && (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">Password</label>
-                        <input
-                          type="password"
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                          required
-                        />
-                      </div>
-                    )}
-                  </>
-                )}
+                ) : null}
                 <div className="flex justify-end space-x-3">
                   <button
                     type="button"
                     onClick={() => {
                       setShowForm(false);
                       setEditingUser(null);
-                      setFormData({ username: '', email: '', password: '', name: '', role: 'instructor', year: '' });
+                      setFormData({ username: '', email: '', password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'instructor', year: '' });
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
@@ -839,19 +919,568 @@ function UserManagement() {
 }
 
 function ViewLogs() {
+  const [logs, setLogs] = useState<LoginLog[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  
+  // Column-level filters
+  const [filters, setFilters] = useState({
+    user_name: '',
+    user_type: '',
+    pc_number: '',
+    time_in: '',
+    time_out: '',
+    date: ''
+  });
+
+  useEffect(() => {
+    loadLogs();
+  }, []);
+
+  const loadLogs = async () => {
+    try {
+      const data = await GetAllLogs();
+      if (data && Array.isArray(data)) {
+        setLogs(data);
+      } else {
+        setLogs([]);
+      }
+      setError('');
+    } catch (error) {
+      console.error('Failed to load logs:', error);
+      setError('Failed to load logs. Please check your database connection or use mock data mode.');
+      setLogs([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onFilterChange = (key: string, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setFilters({
+      user_name: '',
+      user_type: '',
+      pc_number: '',
+      time_in: '',
+      time_out: '',
+      date: ''
+    });
+  };
+
+  // Apply filters to logs
+  const filteredLogs = logs.filter((log) => {
+    // Date filter
+    const logDate = log.login_time ? new Date(log.login_time).toISOString().split('T')[0] : '';
+    const matchesDate = filters.date === '' || logDate === filters.date;
+    
+    // Name filter
+    const matchesName = log.user_name.toLowerCase().includes(filters.user_name.toLowerCase());
+    
+    // User type filter
+    const matchesType = filters.user_type === '' || log.user_type.toLowerCase() === filters.user_type.toLowerCase();
+    
+    // PC Number filter
+    const matchesPCNumber = (log.pc_number || '').toLowerCase().includes(filters.pc_number.toLowerCase());
+    
+    // Time In filter
+    const timeIn = log.login_time ? new Date(log.login_time).toLocaleTimeString() : '';
+    const matchesTimeIn = timeIn.toLowerCase().includes(filters.time_in.toLowerCase());
+    
+    // Time Out filter
+    const timeOut = log.logout_time ? new Date(log.logout_time).toLocaleTimeString() : '';
+    const matchesTimeOut = timeOut.toLowerCase().includes(filters.time_out.toLowerCase());
+    
+    return matchesDate && matchesName && matchesType && matchesPCNumber && matchesTimeIn && matchesTimeOut;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">System Logs</h2>
-      <p className="text-gray-600">Attendance and login logs will be displayed here.</p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">View Logs</h2>
+          <p className="text-gray-600">Monitor user login and logout activities</p>
+        </div>
+        <button 
+          onClick={clearFilters} 
+          className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-primary-500"
+        >
+          Clear All Filters
+        </button>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Logs Table with Column Filters */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                {/* Header Row */}
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                    Full Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                    User Type
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                    PC Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                    Time-In
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                    Time-Out
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-b border-gray-200">
+                    Date
+                  </th>
+                </tr>
+                {/* Filter Row */}
+                <tr className="bg-gray-50">
+                  <th className="px-6 py-2">
+                    <input
+                      type="text"
+                      value={filters.user_name}
+                      onChange={(e) => onFilterChange('user_name', e.target.value)}
+                      placeholder="Search name..."
+                      className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </th>
+                  <th className="px-6 py-2">
+                    <select
+                      value={filters.user_type}
+                      onChange={(e) => onFilterChange('user_type', e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    >
+                      <option value="">All Types</option>
+                      <option value="student">Student</option>
+                      <option value="working_student">Working Student</option>
+                      <option value="instructor">Instructor</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                  </th>
+                  <th className="px-6 py-2">
+                    <input
+                      type="text"
+                      value={filters.pc_number}
+                      onChange={(e) => onFilterChange('pc_number', e.target.value)}
+                      placeholder="Search PC..."
+                      className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </th>
+                  <th className="px-6 py-2">
+                    <input
+                      type="text"
+                      value={filters.time_in}
+                      onChange={(e) => onFilterChange('time_in', e.target.value)}
+                      placeholder="Search time..."
+                      className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </th>
+                  <th className="px-6 py-2">
+                    <input
+                      type="text"
+                      value={filters.time_out}
+                      onChange={(e) => onFilterChange('time_out', e.target.value)}
+                      placeholder="Search time..."
+                      className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </th>
+                  <th className="px-6 py-2">
+                    <input
+                      type="date"
+                      value={filters.date}
+                      onChange={(e) => onFilterChange('date', e.target.value)}
+                      className="w-full border border-gray-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    />
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredLogs.length > 0 ? (
+                  filteredLogs.map((log) => (
+                    <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {log.user_name}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-primary-100 text-primary-800">
+                          {log.user_type.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {log.pc_number || <span className="text-gray-400">N/A</span>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {log.login_time ? new Date(log.login_time).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit', 
+                          second: '2-digit',
+                          hour12: true 
+                        }) : '-'}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {log.logout_time ? (
+                          new Date(log.logout_time).toLocaleTimeString('en-US', { 
+                            hour: '2-digit', 
+                            minute: '2-digit', 
+                            second: '2-digit',
+                            hour12: true 
+                          })
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {log.login_time ? new Date(log.login_time).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        }) : '-'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <div className="flex flex-col items-center justify-center text-gray-500">
+                        <svg className="w-12 h-12 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p className="text-sm font-medium">No logs found</p>
+                        <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
+          <div className="text-sm text-gray-700">
+            Showing <span className="font-medium">{filteredLogs.length}</span> of <span className="font-medium">{logs.length}</span> logs
+          </div>
+          {(filters.user_name || filters.user_type || filters.pc_number || filters.time_in || filters.time_out || filters.date) && (
+            <div className="text-sm text-gray-500">
+              <span className="mr-2">🔍 Filters active</span>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
 function Reports() {
+  const [reports, setReports] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  
+  // Date filter (separate from column filters)
+  const [dateFilter, setDateFilter] = useState('');
+  
+  // Column-level filters
+  const [filters, setFilters] = useState({
+    student_name: '',
+    student_id: '',
+    pc_number: '',
+    time_in: '',
+    time_out: '',
+    report: ''
+  });
+
+  useEffect(() => {
+    loadReports();
+  }, []);
+
+  const loadReports = async () => {
+    try {
+      const data = await GetFeedback();
+      if (data && Array.isArray(data)) {
+        setReports(data);
+      } else {
+        setReports([]);
+      }
+      setError('');
+    } catch (error) {
+      console.error('Failed to load reports:', error);
+      setError('Failed to load reports. Please check your database connection or use mock data mode.');
+      setReports([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const onFilterChange = (key: string, value: string) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const clearFilters = () => {
+    setDateFilter('');
+    setFilters({
+      student_name: '',
+      student_id: '',
+      pc_number: '',
+      time_in: '',
+      time_out: '',
+      report: ''
+    });
+  };
+
+  // Apply filters to reports
+  const filteredReports = reports.filter((report) => {
+    // Date filter (only filter, not displayed)
+    const matchesDate = dateFilter === '' || (report.date && report.date.startsWith(dateFilter));
+    
+    // Column filters
+    const matchesName = report.student_name.toLowerCase().includes(filters.student_name.toLowerCase());
+    const matchesStudentID = report.student_id_str.toLowerCase().includes(filters.student_id.toLowerCase());
+    const matchesPCNumber = report.pc_number.toLowerCase().includes(filters.pc_number.toLowerCase());
+    const matchesTimeIn = report.time_in.toLowerCase().includes(filters.time_in.toLowerCase());
+    const matchesTimeOut = report.time_out.toLowerCase().includes(filters.time_out.toLowerCase());
+    const matchesReport = report.comment.toLowerCase().includes(filters.report.toLowerCase());
+
+    return matchesDate && matchesName && matchesStudentID && matchesPCNumber && matchesTimeIn && matchesTimeOut && matchesReport;
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 mb-4">Reports</h2>
-      <p className="text-gray-600">Export and generate reports will be available here.</p>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Equipment Reports</h2>
+          <p className="text-gray-600">View student-submitted equipment condition reports</p>
+        </div>
+      </div>
+
+      {/* Date Filter */}
+      <div className="mb-4 bg-white shadow rounded-lg p-4">
+        <div className="flex items-center gap-4">
+          <label htmlFor="date-filter" className="text-sm font-medium text-gray-700">
+            Filter by Date:
+          </label>
+          <input
+            id="date-filter"
+            type="date"
+            value={dateFilter}
+            onChange={(e) => setDateFilter(e.target.value)}
+            className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          />
+          {dateFilter && (
+            <button
+              onClick={() => setDateFilter('')}
+              className="text-sm text-gray-600 hover:text-gray-900 underline"
+            >
+              Clear date filter
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+          <div className="flex">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3">
+              <p className="text-sm text-yellow-700">{error}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reports Table with Column Filters */}
+      <div className="bg-white shadow rounded-lg overflow-x-auto">
+        <div className="max-h-[70vh] overflow-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50 sticky top-0 z-10">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Student ID
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  PC Number
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Time In
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Time Out
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Equipment
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Condition
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Report
+                </th>
+              </tr>
+              <tr>
+                <th className="px-6 py-2">
+                  <input
+                    type="text"
+                    value={filters.student_name}
+                    onChange={(e) => onFilterChange('student_name', e.target.value)}
+                    placeholder="Filter name"
+                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </th>
+                <th className="px-6 py-2">
+                  <input
+                    type="text"
+                    value={filters.student_id}
+                    onChange={(e) => onFilterChange('student_id', e.target.value)}
+                    placeholder="Filter ID"
+                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </th>
+                <th className="px-6 py-2">
+                  <input
+                    type="text"
+                    value={filters.pc_number}
+                    onChange={(e) => onFilterChange('pc_number', e.target.value)}
+                    placeholder="Filter PC"
+                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </th>
+                <th className="px-6 py-2">
+                  <input
+                    type="text"
+                    value={filters.time_in}
+                    onChange={(e) => onFilterChange('time_in', e.target.value)}
+                    placeholder="Filter time"
+                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </th>
+                <th className="px-6 py-2">
+                  <input
+                    type="text"
+                    value={filters.time_out}
+                    onChange={(e) => onFilterChange('time_out', e.target.value)}
+                    placeholder="Filter time"
+                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </th>
+                <th className="px-6 py-2">
+                  {/* No filter for equipment column */}
+                </th>
+                <th className="px-6 py-2">
+                  {/* No filter for condition column */}
+                </th>
+                <th className="px-6 py-2">
+                  <input
+                    type="text"
+                    value={filters.report}
+                    onChange={(e) => onFilterChange('report', e.target.value)}
+                    placeholder="Filter report"
+                    className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
+                  />
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {filteredReports.map((report) => (
+                <tr key={report.id}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.student_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.student_id_str}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.pc_number}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.time_in}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.time_out}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.equipment}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      report.condition === 'Good' 
+                        ? 'bg-green-100 text-green-800' 
+                        : report.condition === 'Fair' 
+                        ? 'bg-yellow-100 text-yellow-800'
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {report.condition}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {report.comment}
+                  </td>
+                </tr>
+              ))}
+              {filteredReports.length === 0 && (
+                <tr>
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                    No reports found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="p-3 border-t border-gray-200 flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            Showing {filteredReports.length} of {reports.length} reports
+          </div>
+          <button 
+            onClick={clearFilters} 
+            className="text-sm text-primary-600 hover:text-primary-900 underline"
+          >
+            Clear all filters
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

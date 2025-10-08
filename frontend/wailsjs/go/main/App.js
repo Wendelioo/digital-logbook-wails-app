@@ -10,24 +10,24 @@ export function CreateAdmin(arg1, arg2, arg3, arg4, arg5) {
   return window['go']['main']['App']['CreateAdmin'](arg1, arg2, arg3, arg4, arg5);
 }
 
-export function CreateInstructor(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['CreateInstructor'](arg1, arg2, arg3, arg4, arg5);
+export function CreateInstructor(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['CreateInstructor'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
-export function CreateStudent(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['CreateStudent'](arg1, arg2, arg3, arg4);
+export function CreateStudent(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreateStudent'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function CreateSubject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateSubject'](arg1, arg2, arg3, arg4);
 }
 
-export function CreateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
-  return window['go']['main']['App']['CreateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+export function CreateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) {
+  return window['go']['main']['App']['CreateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
 }
 
-export function CreateWorkingStudent(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['CreateWorkingStudent'](arg1, arg2, arg3, arg4);
+export function CreateWorkingStudent(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreateWorkingStudent'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function DeleteUser(arg1) {
@@ -46,12 +46,20 @@ export function GetAdminDashboard() {
   return window['go']['main']['App']['GetAdminDashboard']();
 }
 
+export function GetAllLogs() {
+  return window['go']['main']['App']['GetAllLogs']();
+}
+
 export function GetFeedback() {
   return window['go']['main']['App']['GetFeedback']();
 }
 
 export function GetInstructorDashboard(arg1) {
   return window['go']['main']['App']['GetInstructorDashboard'](arg1);
+}
+
+export function GetLogsByUserType(arg1) {
+  return window['go']['main']['App']['GetLogsByUserType'](arg1);
 }
 
 export function GetStudentDashboard(arg1) {
@@ -70,6 +78,10 @@ export function GetUsers() {
   return window['go']['main']['App']['GetUsers']();
 }
 
+export function GetUsersByType(arg1) {
+  return window['go']['main']['App']['GetUsersByType'](arg1);
+}
+
 export function GetWorkingStudentDashboard() {
   return window['go']['main']['App']['GetWorkingStudentDashboard']();
 }
@@ -82,6 +94,10 @@ export function LoginByEmail(arg1, arg2) {
   return window['go']['main']['App']['LoginByEmail'](arg1, arg2);
 }
 
+export function LoginByEmployeeID(arg1, arg2) {
+  return window['go']['main']['App']['LoginByEmployeeID'](arg1, arg2);
+}
+
 export function LoginByStudentID(arg1, arg2) {
   return window['go']['main']['App']['LoginByStudentID'](arg1, arg2);
 }
@@ -90,10 +106,30 @@ export function RecordAttendance(arg1, arg2, arg3) {
   return window['go']['main']['App']['RecordAttendance'](arg1, arg2, arg3);
 }
 
-export function SubmitFeedback(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['SubmitFeedback'](arg1, arg2, arg3, arg4);
+export function RecordLogin(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['RecordLogin'](arg1, arg2, arg3, arg4);
 }
 
-export function UpdateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
-  return window['go']['main']['App']['UpdateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+export function RecordLogout(arg1) {
+  return window['go']['main']['App']['RecordLogout'](arg1);
+}
+
+export function SearchLogs(arg1, arg2) {
+  return window['go']['main']['App']['SearchLogs'](arg1, arg2);
+}
+
+export function SearchUsers(arg1, arg2) {
+  return window['go']['main']['App']['SearchUsers'](arg1, arg2);
+}
+
+export function SubmitFeedback(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['SubmitFeedback'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+}
+
+export function UpdateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) {
+  return window['go']['main']['App']['UpdateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
+}
+
+export function UpdateUserPhoto(arg1, arg2) {
+  return window['go']['main']['App']['UpdateUserPhoto'](arg1, arg2);
 }

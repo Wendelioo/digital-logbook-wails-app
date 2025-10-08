@@ -6,15 +6,15 @@ export function ChangePassword(arg1:number,arg2:string,arg3:string):Promise<void
 
 export function CreateAdmin(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
-export function CreateInstructor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
+export function CreateInstructor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
 
-export function CreateStudent(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+export function CreateStudent(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function CreateSubject(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
-export function CreateUser(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;
+export function CreateUser(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string):Promise<void>;
 
-export function CreateWorkingStudent(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
+export function CreateWorkingStudent(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function DeleteUser(arg1:number):Promise<void>;
 
@@ -24,9 +24,13 @@ export function ExportUsersCSV():Promise<string>;
 
 export function GetAdminDashboard():Promise<main.AdminDashboard>;
 
+export function GetAllLogs():Promise<Array<main.LoginLog>>;
+
 export function GetFeedback():Promise<Array<main.Feedback>>;
 
 export function GetInstructorDashboard(arg1:string):Promise<main.InstructorDashboard>;
+
+export function GetLogsByUserType(arg1:string):Promise<Array<main.LoginLog>>;
 
 export function GetStudentDashboard(arg1:number):Promise<main.StudentDashboard>;
 
@@ -36,16 +40,30 @@ export function GetUserByID(arg1:number):Promise<main.User>;
 
 export function GetUsers():Promise<Array<main.User>>;
 
+export function GetUsersByType(arg1:string):Promise<Array<main.User>>;
+
 export function GetWorkingStudentDashboard():Promise<main.WorkingStudentDashboard>;
 
 export function Login(arg1:string,arg2:string):Promise<main.User>;
 
 export function LoginByEmail(arg1:string,arg2:string):Promise<main.User>;
 
+export function LoginByEmployeeID(arg1:string,arg2:string):Promise<main.User>;
+
 export function LoginByStudentID(arg1:string,arg2:string):Promise<main.User>;
 
 export function RecordAttendance(arg1:number,arg2:number,arg3:string):Promise<void>;
 
-export function SubmitFeedback(arg1:number,arg2:string,arg3:string,arg4:string):Promise<void>;
+export function RecordLogin(arg1:number,arg2:string,arg3:string,arg4:string):Promise<number>;
 
-export function UpdateUser(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;
+export function RecordLogout(arg1:number):Promise<void>;
+
+export function SearchLogs(arg1:string,arg2:string):Promise<Array<main.LoginLog>>;
+
+export function SearchUsers(arg1:string,arg2:string):Promise<Array<main.User>>;
+
+export function SubmitFeedback(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string):Promise<void>;
+
+export function UpdateUser(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string):Promise<void>;
+
+export function UpdateUserPhoto(arg1:number,arg2:string):Promise<void>;

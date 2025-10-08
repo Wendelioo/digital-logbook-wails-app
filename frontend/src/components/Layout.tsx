@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { UpdateUserPhoto } from '../../wailsjs/go/main/App';
 import { 
   LayoutDashboard, 
   User,
@@ -25,12 +26,43 @@ interface NavigationItem {
 function Layout({ children, navigationItems, title }: LayoutProps) {
   const { user, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string>(user?.photo_url || '');
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPhotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPhotoPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handlePhotoSave = async () => {
+    if (!photoFile || !user) return;
+    
+    try {
+      // In a real app, you would upload the file to a server
+      // For now, we'll just save the data URL
+      await UpdateUserPhoto(user.id, photoPreview);
+      alert('Photo updated successfully!');
+      setShowProfileModal(false);
+    } catch (error) {
+      console.error('Failed to update photo:', error);
+      alert('Failed to update photo. Make sure you are connected to the database.');
+    }
   };
 
   // Close dropdown when clicking outside
@@ -128,9 +160,17 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                     aria-haspopup="true"
                   >
                     <div className="flex items-center space-x-3">
-                      <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                        <User className="h-5 w-5 text-blue-600" />
-                      </div>
+                      {user?.photo_url || photoPreview ? (
+                        <img 
+                          src={photoPreview || user?.photo_url} 
+                          alt="Profile" 
+                          className="h-8 w-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
+                          <User className="h-5 w-5 text-blue-600" />
+                        </div>
+                      )}
                       <div className="text-left">
                         <p className="text-sm font-medium text-gray-700">{user?.name || 'User'}</p>
                         <p className="text-xs text-gray-500 capitalize">{user?.role?.replace('_', ' ') || 'Role'}</p>
@@ -145,18 +185,13 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                     <button
                       type="button"
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
-                      onClick={() => setProfileDropdownOpen(false)}
+                      onClick={() => {
+                        setShowProfileModal(true);
+                        setProfileDropdownOpen(false);
+                      }}
                     >
                       <User className="h-4 w-4 mr-3" />
-                      Profile
-                    </button>
-                    <button
-                      type="button"
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
-                      onClick={() => setProfileDropdownOpen(false)}
-                    >
-                      <Settings className="h-4 w-4 mr-3" />
-                      Settings
+                      Profile (Upload Photo)
                     </button>
                     <button
                       type="button"
@@ -182,6 +217,72 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
           </div>
         </main>
       </div>
+
+      {/* Profile Photo Upload Modal */}
+      {showProfileModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative bg-white rounded-lg shadow-xl p-8 w-96">
+            <h3 className="text-xl font-semibold text-gray-900 mb-6">Update Profile Photo</h3>
+            
+            <div className="flex flex-col items-center space-y-4">
+              {photoPreview ? (
+                <img 
+                  src={photoPreview} 
+                  alt="Preview" 
+                  className="h-32 w-32 rounded-full object-cover border-4 border-blue-200"
+                />
+              ) : (
+                <div className="h-32 w-32 rounded-full bg-blue-100 flex items-center justify-center border-4 border-blue-200">
+                  <User className="h-16 w-16 text-blue-600" />
+                </div>
+              )}
+              
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handlePhotoChange}
+                className="hidden"
+              />
+              
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+              >
+                Choose Photo
+              </button>
+              
+              <div className="text-sm text-gray-500 text-center">
+                <p>Supported formats: JPG, PNG, GIF</p>
+                <p>Maximum size: 5MB</p>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowProfileModal(false);
+                  setPhotoFile(null);
+                  setPhotoPreview(user?.photo_url || '');
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handlePhotoSave}
+                disabled={!photoFile}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Save Photo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

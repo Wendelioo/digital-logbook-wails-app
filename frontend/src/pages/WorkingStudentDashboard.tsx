@@ -160,6 +160,7 @@ function RegisterStudent() {
     firstName: '',
     middleName: '',
     lastName: '',
+    gender: '',
     year: ''
   });
   const [loading, setLoading] = useState(false);
@@ -171,16 +172,20 @@ function RegisterStudent() {
     setMessage('');
 
     try {
+      // Build full name from lastName, firstName, middleName
+      const fullName = `${formData.lastName}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName : ''}`;
+      
       // Use student ID as the default password
       const password = formData.username;
       await CreateUser(
         formData.username, 
         formData.email, 
         password, 
-        formData.name, 
+        fullName, 
         formData.firstName, 
         formData.middleName, 
         formData.lastName, 
+        formData.gender,
         'student', 
         '', // employeeID - empty for students
         formData.username, // studentID - same as username
@@ -194,6 +199,7 @@ function RegisterStudent() {
         firstName: '', 
         middleName: '', 
         lastName: '', 
+        gender: '',
         year: '' 
       });
     } catch (error) {
@@ -303,6 +309,23 @@ function RegisterStudent() {
                 placeholder="e.g., student@university.edu"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
+            </div>
+
+            <div>
+              <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-2">
+                Gender
+              </label>
+              <select
+                id="gender"
+                value={formData.gender}
+                onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select Gender</option>
+                <option value="Male">Male</option>
+                <option value="Female">Female</option>
+              </select>
             </div>
 
             <div>

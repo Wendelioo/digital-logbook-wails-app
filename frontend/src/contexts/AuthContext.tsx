@@ -1,13 +1,20 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Login, LoginByEmail, LoginByStudentID } from '../../wailsjs/go/main/App';
+import { Login, LoginByEmail, LoginByEmployeeID, LoginByStudentID } from '../../wailsjs/go/main/App';
 
 interface User {
   id: number;
   username: string;
   email?: string;
   name: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  gender?: string;
   role: string;
+  employee_id?: string;
+  student_id?: string;
   year?: string;
+  photo_url?: string;
   created: string;
 }
 
@@ -15,6 +22,7 @@ interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<User | null>;
   loginByEmail: (email: string, password: string) => Promise<User | null>;
+  loginByEmployeeID: (employeeID: string, password: string) => Promise<User | null>;
   loginByStudentID: (studentID: string, password: string) => Promise<User | null>;
   logout: () => void;
   loading: boolean;
@@ -59,6 +67,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const loginByEmployeeID = async (employeeID: string, password: string): Promise<User | null> => {
+    try {
+      const userData = await LoginByEmployeeID(employeeID, password);
+      setUser(userData);
+      localStorage.setItem('user', JSON.stringify(userData));
+      return userData;
+    } catch (error) {
+      console.error('Login by employee ID failed:', error);
+      return null;
+    }
+  };
+
   const loginByStudentID = async (studentID: string, password: string): Promise<User | null> => {
     try {
       const userData = await LoginByStudentID(studentID, password);
@@ -81,6 +101,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     login,
     loginByEmail,
+    loginByEmployeeID,
     loginByStudentID,
     logout,
     loading

@@ -18,7 +18,7 @@ function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { login, loginByEmail, loginByStudentID } = useAuth();
+  const { login, loginByEmail, loginByEmployeeID, loginByStudentID } = useAuth();
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -37,13 +37,12 @@ function LoginPage() {
       // Use appropriate login method based on selected role
       switch (selectedRole) {
         case 'admin':
+          // For admin, use username login
+          userData = await login(username, password);
+          break;
         case 'instructor':
-          // For admin and instructor, try email login first, then username login
-          if (username.includes('@')) {
-            userData = await loginByEmail(username, password);
-          } else {
-            userData = await login(username, password);
-          }
+          // For instructor, use employee ID login
+          userData = await loginByEmployeeID(username, password);
           break;
         case 'student':
         case 'working_student':
@@ -79,10 +78,11 @@ function LoginPage() {
       case 'working_student':
         return 'Student ID';
       case 'instructor':
+        return 'Employee ID';
       case 'admin':
-        return 'Email / Username';
+        return 'Username';
       default:
-        return 'Username / Email';
+        return 'Username';
     }
   };
 
@@ -91,13 +91,13 @@ function LoginPage() {
       case 'student':
         return 'Enter your Student ID';
       case 'working_student':
-        return 'Enter your Working Student ID';
+        return 'Enter your Student ID';
       case 'instructor':
-        return 'Enter your Email or Username';
+        return 'Enter your Employee ID';
       case 'admin':
-        return 'Enter your Email or Username';
+        return 'Enter your Username';
       default:
-        return 'Enter your Student ID or Email';
+        return 'Enter your credentials';
     }
   };
 

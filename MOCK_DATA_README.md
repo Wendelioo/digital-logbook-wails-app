@@ -8,30 +8,25 @@ The application is configured to use mock data by default. Simply run the applic
 
 ## Mock Login Credentials
 
-### Admin Users
+### Admin Users (Login with Username)
 - **Username:** `admin`, **Password:** `admin`
 - **Username:** `admin2`, **Password:** `admin2`
-- **Email:** `admin@university.edu`, **Password:** `admin`
-- **Email:** `admin2@university.edu`, **Password:** `admin2`
 
-### Instructor Users
-- **Username:** `instructor1`, **Password:** `instructor1`
-- **Username:** `instructor2`, **Password:** `instructor2`
-- **Username:** `instructor3`, **Password:** `instructor3`
-- **Email:** `mreyes@university.edu`, **Password:** `instructor1`
-- **Email:** `sgarcia@university.edu`, **Password:** `instructor2`
-- **Email:** `jtorres@university.edu`, **Password:** `instructor3`
+### Instructor Users (Login with Employee ID)
+- **Employee ID:** `EMP-001`, **Password:** `EMP-001` (Miguel Reyes)
+- **Employee ID:** `EMP-002`, **Password:** `EMP-002` (Sofia Garcia)
+- **Employee ID:** `EMP-003`, **Password:** `EMP-003` (Juan Torres)
 
-### Student Users
-- **Student ID:** `2025-1234`, **Password:** `2025-1234`
-- **Student ID:** `2025-5678`, **Password:** `2025-5678`
-- **Student ID:** `2025-9012`, **Password:** `2025-9012`
-- **Student ID:** `2025-3456`, **Password:** `2025-3456`
-- **Student ID:** `2025-7890`, **Password:** `2025-7890`
+### Student Users (Login with Student ID)
+- **Student ID:** `2025-1234`, **Password:** `2025-1234` (Juan Santos)
+- **Student ID:** `2025-5678`, **Password:** `2025-5678` (Maria Cruz)
+- **Student ID:** `2025-9012`, **Password:** `2025-9012` (Carlos Lopez)
+- **Student ID:** `2025-3456`, **Password:** `2025-3456` (Ana Martinez)
+- **Student ID:** `2025-7890`, **Password:** `2025-7890` (Luis Rodriguez)
 
-### Working Student Users
-- **Student ID:** `working1`, **Password:** `working1`
-- **Student ID:** `working2`, **Password:** `working2`
+### Working Student Users (Login with Student ID)
+- **Student ID:** `2025-WS01`, **Password:** `2025-WS01` (Jose Rivera)
+- **Student ID:** `2025-WS02`, **Password:** `2025-WS02` (Pedro Gonzalez)
 
 ## Configuration
 
@@ -78,7 +73,12 @@ DB_DATABASE=logbookdb
 
 ## Notes
 
-- In mock mode, passwords should match the username/student ID
+- In mock mode, passwords match the credential ID (Username for Admin, Employee ID for Instructors, Student ID for Students/Working Students)
 - All dashboard data is pre-populated with realistic mock data
 - The application will automatically fall back to mock mode if database connection fails
 - Mock credentials are printed to the console when the application starts in mock mode
+- **Login Form Labels:**
+  - Admin: Username, Password
+  - Instructor: Employee ID, Password
+  - Student: Student ID, Password
+  - Working Student: Student ID, Password

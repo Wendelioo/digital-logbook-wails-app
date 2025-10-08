@@ -42,35 +42,35 @@ func NewMockDataService() *MockDataService {
 			// Instructor users
 			{
 				ID:         3,
-				Username:   "instructor1",
+				Username:   "EMP-001",
 				Email:      "mreyes@university.edu",
 				Name:       "Reyes, Miguel",
 				FirstName:  "Miguel",
 				LastName:   "Reyes",
 				Role:       RoleInstructor,
-				EmployeeID: "instructor1",
+				EmployeeID: "EMP-001",
 				Created:    time.Now().Format("2006-01-02 15:04:05"),
 			},
 			{
 				ID:         4,
-				Username:   "instructor2",
+				Username:   "EMP-002",
 				Email:      "sgarcia@university.edu",
 				Name:       "Garcia, Sofia",
 				FirstName:  "Sofia",
 				LastName:   "Garcia",
 				Role:       RoleInstructor,
-				EmployeeID: "instructor2",
+				EmployeeID: "EMP-002",
 				Created:    time.Now().Format("2006-01-02 15:04:05"),
 			},
 			{
 				ID:         5,
-				Username:   "instructor3",
+				Username:   "EMP-003",
 				Email:      "jtorres@university.edu",
 				Name:       "Torres, Juan",
 				FirstName:  "Juan",
 				LastName:   "Torres",
 				Role:       RoleInstructor,
-				EmployeeID: "instructor3",
+				EmployeeID: "EMP-003",
 				Created:    time.Now().Format("2006-01-02 15:04:05"),
 			},
 
@@ -134,22 +134,22 @@ func NewMockDataService() *MockDataService {
 			// Working Student users
 			{
 				ID:        11,
-				Username:  "working1",
-				Name:      "Working Student 1",
-				FirstName: "Working",
-				LastName:  "Student",
+				Username:  "2025-WS01",
+				Name:      "Rivera, Jose",
+				FirstName: "Jose",
+				LastName:  "Rivera",
 				Role:      RoleWorkingStudent,
-				StudentID: "working1",
+				StudentID: "2025-WS01",
 				Created:   time.Now().Format("2006-01-02 15:04:05"),
 			},
 			{
 				ID:        12,
-				Username:  "working2",
+				Username:  "2025-WS02",
 				Name:      "Gonzalez, Pedro",
 				FirstName: "Pedro",
 				LastName:  "Gonzalez",
 				Role:      RoleWorkingStudent,
-				StudentID: "working2",
+				StudentID: "2025-WS02",
 				Created:   time.Now().Format("2006-01-02 15:04:05"),
 			},
 		},
@@ -181,15 +181,32 @@ func (m *MockDataService) MockLogin(username, password string) (User, error) {
 	return User{}, fmt.Errorf("user not found")
 }
 
-// MockLoginByEmail authenticates admin and instructor users using email
+// MockLoginByEmail authenticates admin users using email (for backward compatibility)
 func (m *MockDataService) MockLoginByEmail(email, password string) (User, error) {
-	// Simple password validation - in mock mode, password should match username
 	for _, user := range m.users {
-		if user.Email == email && (user.Role == RoleAdmin || user.Role == RoleInstructor) {
+		if user.Email == email && user.Role == RoleAdmin {
 			// For mock mode, password should match username
 			if password != user.Username {
 				return User{}, fmt.Errorf("invalid credentials")
 			}
+			// Clear password from response
+			user.Password = ""
+			return user, nil
+		}
+	}
+
+	return User{}, fmt.Errorf("invalid credentials")
+}
+
+// MockLoginByEmployeeID authenticates instructor users using Employee ID
+func (m *MockDataService) MockLoginByEmployeeID(employeeID, password string) (User, error) {
+	// Simple password validation - in mock mode, password should match employee ID
+	if password != employeeID {
+		return User{}, fmt.Errorf("invalid credentials")
+	}
+
+	for _, user := range m.users {
+		if user.EmployeeID == employeeID && user.Role == RoleInstructor {
 			// Clear password from response
 			user.Password = ""
 			return user, nil
@@ -326,35 +343,30 @@ func (m *MockDataService) PrintMockCredentials() {
 	fmt.Println("Use these credentials for testing without database connection:")
 	fmt.Println()
 
-	fmt.Println("ADMIN USERS:")
+	fmt.Println("ADMIN USERS (Login with Username):")
 	fmt.Println("  Username: admin, Password: admin")
 	fmt.Println("  Username: admin2, Password: admin2")
-	fmt.Println("  Email: admin@university.edu, Password: admin")
-	fmt.Println("  Email: admin2@university.edu, Password: admin2")
 	fmt.Println()
 
-	fmt.Println("INSTRUCTOR USERS:")
-	fmt.Println("  Username: instructor1, Password: instructor1")
-	fmt.Println("  Username: instructor2, Password: instructor2")
-	fmt.Println("  Username: instructor3, Password: instructor3")
-	fmt.Println("  Email: mreyes@university.edu, Password: instructor1")
-	fmt.Println("  Email: sgarcia@university.edu, Password: instructor2")
-	fmt.Println("  Email: jtorres@university.edu, Password: instructor3")
+	fmt.Println("INSTRUCTOR USERS (Login with Employee ID):")
+	fmt.Println("  Employee ID: EMP-001, Password: EMP-001  (Miguel Reyes)")
+	fmt.Println("  Employee ID: EMP-002, Password: EMP-002  (Sofia Garcia)")
+	fmt.Println("  Employee ID: EMP-003, Password: EMP-003  (Juan Torres)")
 	fmt.Println()
 
-	fmt.Println("STUDENT USERS:")
-	fmt.Println("  Student ID: 2025-1234, Password: 2025-1234")
-	fmt.Println("  Student ID: 2025-5678, Password: 2025-5678")
-	fmt.Println("  Student ID: 2025-9012, Password: 2025-9012")
-	fmt.Println("  Student ID: 2025-3456, Password: 2025-3456")
-	fmt.Println("  Student ID: 2025-7890, Password: 2025-7890")
+	fmt.Println("STUDENT USERS (Login with Student ID):")
+	fmt.Println("  Student ID: 2025-1234, Password: 2025-1234  (Juan Santos)")
+	fmt.Println("  Student ID: 2025-5678, Password: 2025-5678  (Maria Cruz)")
+	fmt.Println("  Student ID: 2025-9012, Password: 2025-9012  (Carlos Lopez)")
+	fmt.Println("  Student ID: 2025-3456, Password: 2025-3456  (Ana Martinez)")
+	fmt.Println("  Student ID: 2025-7890, Password: 2025-7890  (Luis Rodriguez)")
 	fmt.Println()
 
-	fmt.Println("WORKING STUDENT USERS:")
-	fmt.Println("  Student ID: working1, Password: working1")
-	fmt.Println("  Student ID: working2, Password: working2")
+	fmt.Println("WORKING STUDENT USERS (Login with Student ID):")
+	fmt.Println("  Student ID: 2025-WS01, Password: 2025-WS01  (Jose Rivera)")
+	fmt.Println("  Student ID: 2025-WS02, Password: 2025-WS02  (Pedro Gonzalez)")
 	fmt.Println()
 
-	fmt.Println("NOTE: In mock mode, password should match the username/student ID")
+	fmt.Println("NOTE: In mock mode, password matches the credential ID")
 	fmt.Println("=====================================\n")
 }

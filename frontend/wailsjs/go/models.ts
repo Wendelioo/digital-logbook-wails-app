@@ -45,6 +45,11 @@ export namespace main {
 	export class Feedback {
 	    id: number;
 	    student_id: number;
+	    student_name: string;
+	    student_id_str: string;
+	    pc_number: string;
+	    time_in: string;
+	    time_out: string;
 	    equipment: string;
 	    condition: string;
 	    comment: string;
@@ -58,6 +63,11 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.student_id = source["student_id"];
+	        this.student_name = source["student_name"];
+	        this.student_id_str = source["student_id_str"];
+	        this.pc_number = source["pc_number"];
+	        this.time_in = source["time_in"];
+	        this.time_out = source["time_out"];
 	        this.equipment = source["equipment"];
 	        this.condition = source["condition"];
 	        this.comment = source["comment"];
@@ -116,6 +126,30 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class LoginLog {
+	    id: number;
+	    user_id: number;
+	    user_name: string;
+	    user_type: string;
+	    pc_number?: string;
+	    login_time: string;
+	    logout_time: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new LoginLog(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.user_id = source["user_id"];
+	        this.user_name = source["user_name"];
+	        this.user_type = source["user_type"];
+	        this.pc_number = source["pc_number"];
+	        this.login_time = source["login_time"];
+	        this.logout_time = source["logout_time"];
+	    }
+	}
 	export class StudentDashboard {
 	    attendance: Attendance[];
 	    today_log?: Attendance;
@@ -158,10 +192,12 @@ export namespace main {
 	    first_name?: string;
 	    middle_name?: string;
 	    last_name?: string;
+	    gender?: string;
 	    role: string;
 	    employee_id?: string;
 	    student_id?: string;
 	    year?: string;
+	    photo_url?: string;
 	    created: string;
 	
 	    static createFrom(source: any = {}) {
@@ -178,10 +214,12 @@ export namespace main {
 	        this.first_name = source["first_name"];
 	        this.middle_name = source["middle_name"];
 	        this.last_name = source["last_name"];
+	        this.gender = source["gender"];
 	        this.role = source["role"];
 	        this.employee_id = source["employee_id"];
 	        this.student_id = source["student_id"];
 	        this.year = source["year"];
+	        this.photo_url = source["photo_url"];
 	        this.created = source["created"];
 	    }
 	}

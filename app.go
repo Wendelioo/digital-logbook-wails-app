@@ -106,10 +106,12 @@ type User struct {
 	FirstName  string `json:"first_name,omitempty"`
 	MiddleName string `json:"middle_name,omitempty"`
 	LastName   string `json:"last_name,omitempty"`
+	Gender     string `json:"gender,omitempty"`
 	Role       string `json:"role"`
 	EmployeeID string `json:"employee_id,omitempty"`
 	StudentID  string `json:"student_id,omitempty"`
 	Year       string `json:"year,omitempty"`
+	PhotoURL   string `json:"photo_url,omitempty"`
 	Created    string `json:"created"`
 }
 
@@ -141,17 +143,25 @@ type Attendance struct {
 type LoginLog struct {
 	ID         int    `json:"id"`
 	UserID     int    `json:"user_id"`
+	UserName   string `json:"user_name"`
+	UserType   string `json:"user_type"`
+	PCNumber   string `json:"pc_number,omitempty"`
 	LoginTime  string `json:"login_time"`
 	LogoutTime string `json:"logout_time"`
 }
 
 type Feedback struct {
-	ID        int    `json:"id"`
-	StudentID int    `json:"student_id"`
-	Equipment string `json:"equipment"`
-	Condition string `json:"condition"`
-	Comment   string `json:"comment"`
-	Date      string `json:"date"`
+	ID           int    `json:"id"`
+	StudentID    int    `json:"student_id"`
+	StudentName  string `json:"student_name"`
+	StudentIDStr string `json:"student_id_str"`
+	PCNumber     string `json:"pc_number"`
+	TimeIn       string `json:"time_in"`
+	TimeOut      string `json:"time_out"`
+	Equipment    string `json:"equipment"`
+	Condition    string `json:"condition"`
+	Comment      string `json:"comment"`
+	Date         string `json:"date"`
 }
 
 // Dashboard data structures
@@ -257,10 +267,12 @@ func (a *App) createTables() error {
 			first_name VARCHAR(255),
 			middle_name VARCHAR(255),
 			last_name VARCHAR(255),
+			gender VARCHAR(20),
 			role VARCHAR(50) NOT NULL,
 			employee_id VARCHAR(255) UNIQUE,
 			student_id VARCHAR(255) UNIQUE,
 			year VARCHAR(100),
+			photo_url VARCHAR(500),
 			created TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 	`)
@@ -274,8 +286,10 @@ func (a *App) createTables() error {
 		"ALTER TABLE users ADD COLUMN first_name VARCHAR(255)",
 		"ALTER TABLE users ADD COLUMN middle_name VARCHAR(255)",
 		"ALTER TABLE users ADD COLUMN last_name VARCHAR(255)",
+		"ALTER TABLE users ADD COLUMN gender VARCHAR(20)",
 		"ALTER TABLE users ADD COLUMN employee_id VARCHAR(255)",
 		"ALTER TABLE users ADD COLUMN student_id VARCHAR(255)",
+		"ALTER TABLE users ADD COLUMN photo_url VARCHAR(500)",
 	}
 
 	for _, query := range alterQueries {
@@ -355,6 +369,9 @@ func (a *App) createTables() error {
 		CREATE TABLE IF NOT EXISTS login_logs (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			user_id INT,
+			user_name VARCHAR(255),
+			user_type VARCHAR(50),
+			pc_number VARCHAR(50),
 			login_time TIMESTAMP,
 			logout_time TIMESTAMP NULL,
 			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -364,11 +381,16 @@ func (a *App) createTables() error {
 		return err
 	}
 
-	// Feedback table
+	// Feedback table (Equipment Reports)
 	_, err = a.db.Exec(`
 		CREATE TABLE IF NOT EXISTS feedback (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			student_id INT,
+			student_name VARCHAR(255),
+			student_id_str VARCHAR(255),
+			pc_number VARCHAR(50),
+			time_in TIME,
+			time_out TIME,
 			equipment VARCHAR(255) NOT NULL,
 			` + "`condition`" + ` VARCHAR(50) NOT NULL,
 			comment TEXT,
@@ -376,8 +398,39 @@ func (a *App) createTables() error {
 			FOREIGN KEY (student_id) REFERENCES users(id) ON DELETE CASCADE
 		) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
 	`)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Add new columns to login_logs if they don't exist
+	loginLogAlters := []string{
+		"ALTER TABLE login_logs ADD COLUMN user_name VARCHAR(255)",
+		"ALTER TABLE login_logs ADD COLUMN user_type VARCHAR(50)",
+		"ALTER TABLE login_logs ADD COLUMN pc_number VARCHAR(50)",
+	}
+	for _, query := range loginLogAlters {
+		_, err = a.db.Exec(query)
+		if err != nil && !contains(err.Error(), "Duplicate column name") {
+			log.Printf("Warning: Could not add column to login_logs: %v", err)
+		}
+	}
+
+	// Add new columns to feedback if they don't exist
+	feedbackAlters := []string{
+		"ALTER TABLE feedback ADD COLUMN student_name VARCHAR(255)",
+		"ALTER TABLE feedback ADD COLUMN student_id_str VARCHAR(255)",
+		"ALTER TABLE feedback ADD COLUMN pc_number VARCHAR(50)",
+		"ALTER TABLE feedback ADD COLUMN time_in TIME",
+		"ALTER TABLE feedback ADD COLUMN time_out TIME",
+	}
+	for _, query := range feedbackAlters {
+		_, err = a.db.Exec(query)
+		if err != nil && !contains(err.Error(), "Duplicate column name") {
+			log.Printf("Warning: Could not add column to feedback: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (a *App) insertSampleData() error {
@@ -467,11 +520,11 @@ func (a *App) Login(username, password string) (User, error) {
 	var hashedPassword string
 
 	row := a.db.QueryRow(
-		"SELECT id, username, email, password, name, first_name, middle_name, last_name, role, employee_id, student_id, year, created FROM users WHERE username = ?",
+		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE username = ?",
 		username,
 	)
 
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.Created)
+	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return User{}, fmt.Errorf("user not found")
@@ -495,7 +548,7 @@ func (a *App) Login(username, password string) (User, error) {
 	return user, nil
 }
 
-// LoginByEmail authenticates admin and instructor users using email
+// LoginByEmail authenticates admin users using email
 func (a *App) LoginByEmail(email, password string) (User, error) {
 	if a.useMockData {
 		return a.mockData.MockLoginByEmail(email, password)
@@ -505,11 +558,44 @@ func (a *App) LoginByEmail(email, password string) (User, error) {
 	var hashedPassword string
 
 	row := a.db.QueryRow(
-		"SELECT id, username, email, password, name, first_name, middle_name, last_name, role, employee_id, student_id, year, created FROM users WHERE email = ? AND role IN (?, ?)",
-		email, RoleAdmin, RoleInstructor,
+		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE email = ? AND role = ?",
+		email, RoleAdmin,
 	)
 
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.Created)
+	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+	if err != nil {
+		return User{}, fmt.Errorf("invalid credentials")
+	}
+
+	// Verify password
+	if !verifyPassword(password, hashedPassword) {
+		return User{}, fmt.Errorf("invalid credentials")
+	}
+
+	// Clear password from response
+	user.Password = ""
+
+	// Log the login
+	a.logLogin(user.ID)
+
+	return user, nil
+}
+
+// LoginByEmployeeID authenticates instructor users using Employee ID
+func (a *App) LoginByEmployeeID(employeeID, password string) (User, error) {
+	if a.useMockData {
+		return a.mockData.MockLoginByEmployeeID(employeeID, password)
+	}
+
+	var user User
+	var hashedPassword string
+
+	row := a.db.QueryRow(
+		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE employee_id = ? AND role = ?",
+		employeeID, RoleInstructor,
+	)
+
+	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 	if err != nil {
 		return User{}, fmt.Errorf("invalid credentials")
 	}
@@ -538,11 +624,11 @@ func (a *App) LoginByStudentID(studentID, password string) (User, error) {
 	var hashedPassword string
 
 	row := a.db.QueryRow(
-		"SELECT id, username, email, password, name, first_name, middle_name, last_name, role, employee_id, student_id, year, created FROM users WHERE student_id = ? AND role IN (?, ?)",
+		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE student_id = ? AND role IN (?, ?)",
 		studentID, RoleStudent, RoleWorkingStudent,
 	)
 
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.Created)
+	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 	if err != nil {
 		return User{}, fmt.Errorf("invalid credentials")
 	}
@@ -595,7 +681,7 @@ func (a *App) GetUsers() ([]User, error) {
 		return a.mockData.GetMockUsers(), nil
 	}
 
-	rows, err := a.db.Query("SELECT id, username, email, name, first_name, middle_name, last_name, role, employee_id, student_id, year, created FROM users ORDER BY created DESC")
+	rows, err := a.db.Query("SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users ORDER BY created DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -604,7 +690,7 @@ func (a *App) GetUsers() ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var user User
-		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.Created)
+		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 		if err != nil {
 			return nil, err
 		}
@@ -614,7 +700,7 @@ func (a *App) GetUsers() ([]User, error) {
 	return users, nil
 }
 
-func (a *App) CreateUser(username, email, password, name, firstName, middleName, lastName, role, employeeID, studentID, year string) error {
+func (a *App) CreateUser(username, email, password, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year string) error {
 	// Hash password
 	hashedPassword, err := hashPassword(password)
 	if err != nil {
@@ -622,14 +708,14 @@ func (a *App) CreateUser(username, email, password, name, firstName, middleName,
 	}
 
 	_, err = a.db.Exec(
-		"INSERT INTO users (username, email, password, name, first_name, middle_name, last_name, role, employee_id, student_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		username, email, hashedPassword, name, firstName, middleName, lastName, role, employeeID, studentID, year,
+		"INSERT INTO users (username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		username, email, hashedPassword, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year,
 	)
 	return err
 }
 
 // New user creation methods with detailed fields
-func (a *App) CreateWorkingStudent(studentID, lastName, firstName, middleName string) error {
+func (a *App) CreateWorkingStudent(studentID, lastName, firstName, middleName, gender string) error {
 	username := studentID
 	password := studentID
 	name := lastName + ", " + firstName
@@ -645,13 +731,13 @@ func (a *App) CreateWorkingStudent(studentID, lastName, firstName, middleName st
 	}
 
 	_, err = a.db.Exec(
-		"INSERT INTO users (username, password, name, first_name, middle_name, last_name, role, student_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		username, hashedPassword, name, firstName, middleName, lastName, role, studentID,
+		"INSERT INTO users (username, password, name, first_name, middle_name, last_name, gender, role, student_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		username, hashedPassword, name, firstName, middleName, lastName, gender, role, studentID,
 	)
 	return err
 }
 
-func (a *App) CreateInstructor(employeeID, lastName, firstName, middleName, email string) error {
+func (a *App) CreateInstructor(employeeID, lastName, firstName, middleName, gender, email string) error {
 	username := employeeID
 	password := employeeID
 	name := lastName + ", " + firstName
@@ -667,8 +753,8 @@ func (a *App) CreateInstructor(employeeID, lastName, firstName, middleName, emai
 	}
 
 	_, err = a.db.Exec(
-		"INSERT INTO users (username, email, password, name, first_name, middle_name, last_name, role, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		username, email, hashedPassword, name, firstName, middleName, lastName, role, employeeID,
+		"INSERT INTO users (username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		username, email, hashedPassword, name, firstName, middleName, lastName, gender, role, employeeID,
 	)
 	return err
 }
@@ -695,7 +781,7 @@ func (a *App) CreateAdmin(employeeID, lastName, firstName, middleName, email str
 	return err
 }
 
-func (a *App) CreateStudent(studentID, firstName, middleName, lastName string) error {
+func (a *App) CreateStudent(studentID, firstName, middleName, lastName, gender string) error {
 	username := studentID
 	password := studentID
 	name := lastName + ", " + firstName
@@ -711,16 +797,16 @@ func (a *App) CreateStudent(studentID, firstName, middleName, lastName string) e
 	}
 
 	_, err = a.db.Exec(
-		"INSERT INTO users (username, password, name, first_name, middle_name, last_name, role, student_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-		username, hashedPassword, name, firstName, middleName, lastName, role, studentID,
+		"INSERT INTO users (username, password, name, first_name, middle_name, last_name, gender, role, student_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		username, hashedPassword, name, firstName, middleName, lastName, gender, role, studentID,
 	)
 	return err
 }
 
-func (a *App) UpdateUser(id int, username, email, name, firstName, middleName, lastName, role, employeeID, studentID, year string) error {
+func (a *App) UpdateUser(id int, username, email, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year string) error {
 	_, err := a.db.Exec(
-		"UPDATE users SET username = ?, email = ?, name = ?, first_name = ?, middle_name = ?, last_name = ?, role = ?, employee_id = ?, student_id = ?, year = ? WHERE id = ?",
-		username, email, name, firstName, middleName, lastName, role, employeeID, studentID, year, id,
+		"UPDATE users SET username = ?, email = ?, name = ?, first_name = ?, middle_name = ?, last_name = ?, gender = ?, role = ?, employee_id = ?, student_id = ?, year = ? WHERE id = ?",
+		username, email, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, id,
 	)
 	return err
 }
@@ -1036,11 +1122,11 @@ func (a *App) GetUserByID(userID int) (User, error) {
 
 	var user User
 	row := a.db.QueryRow(
-		"SELECT id, username, email, name, first_name, middle_name, last_name, role, employee_id, student_id, year, created FROM users WHERE id = ?",
+		"SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE id = ?",
 		userID,
 	)
 
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.Created)
+	err := row.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 	if err != nil {
 		return User{}, fmt.Errorf("user not found")
 	}
@@ -1048,19 +1134,23 @@ func (a *App) GetUserByID(userID int) (User, error) {
 	return user, nil
 }
 
-func (a *App) SubmitFeedback(studentID int, equipment, condition, comment string) error {
+func (a *App) SubmitFeedback(studentID int, studentName, studentIDStr, pcNumber, timeIn, timeOut, equipment, condition, comment string) error {
 	_, err := a.db.Exec(
-		"INSERT INTO feedback (student_id, equipment, condition, comment) VALUES (?, ?, ?, ?)",
-		studentID, equipment, condition, comment,
+		"INSERT INTO feedback (student_id, student_name, student_id_str, pc_number, time_in, time_out, equipment, `condition`, comment) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		studentID, studentName, studentIDStr, pcNumber, timeIn, timeOut, equipment, condition, comment,
 	)
 	return err
 }
 
 func (a *App) GetFeedback() ([]Feedback, error) {
+	if a.useMockData {
+		// Return empty array for mock mode
+		return []Feedback{}, nil
+	}
+
 	rows, err := a.db.Query(`
-		SELECT f.id, f.student_id, f.equipment, f.condition, f.comment, f.date
+		SELECT f.id, f.student_id, f.student_name, f.student_id_str, f.pc_number, f.time_in, f.time_out, f.equipment, f.condition, f.comment, f.date
 		FROM feedback f
-		JOIN users u ON f.student_id = u.id
 		ORDER BY f.date DESC
 	`)
 	if err != nil {
@@ -1071,7 +1161,7 @@ func (a *App) GetFeedback() ([]Feedback, error) {
 	var feedback []Feedback
 	for rows.Next() {
 		var fb Feedback
-		err := rows.Scan(&fb.ID, &fb.StudentID, &fb.Equipment, &fb.Condition, &fb.Comment, &fb.Date)
+		err := rows.Scan(&fb.ID, &fb.StudentID, &fb.StudentName, &fb.StudentIDStr, &fb.PCNumber, &fb.TimeIn, &fb.TimeOut, &fb.Equipment, &fb.Condition, &fb.Comment, &fb.Date)
 		if err != nil {
 			return nil, err
 		}
@@ -1079,4 +1169,191 @@ func (a *App) GetFeedback() ([]Feedback, error) {
 	}
 
 	return feedback, nil
+}
+
+// Login log methods
+func (a *App) RecordLogin(userID int, userName, userType, pcNumber string) (int, error) {
+	result, err := a.db.Exec(
+		"INSERT INTO login_logs (user_id, user_name, user_type, pc_number, login_time) VALUES (?, ?, ?, ?, ?)",
+		userID, userName, userType, pcNumber, time.Now(),
+	)
+	if err != nil {
+		return 0, err
+	}
+	id, _ := result.LastInsertId()
+	return int(id), nil
+}
+
+func (a *App) RecordLogout(logID int) error {
+	_, err := a.db.Exec(
+		"UPDATE login_logs SET logout_time = ? WHERE id = ?",
+		time.Now(), logID,
+	)
+	return err
+}
+
+func (a *App) GetAllLogs() ([]LoginLog, error) {
+	if a.useMockData {
+		// Return empty array for mock mode
+		return []LoginLog{}, nil
+	}
+
+	rows, err := a.db.Query(`
+		SELECT id, user_id, user_name, user_type, pc_number, login_time, logout_time
+		FROM login_logs
+		ORDER BY login_time DESC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []LoginLog
+	for rows.Next() {
+		var log LoginLog
+		var logoutTime sql.NullString
+		err := rows.Scan(&log.ID, &log.UserID, &log.UserName, &log.UserType, &log.PCNumber, &log.LoginTime, &logoutTime)
+		if err != nil {
+			return nil, err
+		}
+		if logoutTime.Valid {
+			log.LogoutTime = logoutTime.String
+		}
+		logs = append(logs, log)
+	}
+
+	return logs, nil
+}
+
+func (a *App) GetLogsByUserType(userType string) ([]LoginLog, error) {
+	rows, err := a.db.Query(`
+		SELECT id, user_id, user_name, user_type, pc_number, login_time, logout_time
+		FROM login_logs
+		WHERE user_type = ?
+		ORDER BY login_time DESC
+	`, userType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []LoginLog
+	for rows.Next() {
+		var log LoginLog
+		var logoutTime sql.NullString
+		err := rows.Scan(&log.ID, &log.UserID, &log.UserName, &log.UserType, &log.PCNumber, &log.LoginTime, &logoutTime)
+		if err != nil {
+			return nil, err
+		}
+		if logoutTime.Valid {
+			log.LogoutTime = logoutTime.String
+		}
+		logs = append(logs, log)
+	}
+
+	return logs, nil
+}
+
+func (a *App) SearchLogs(searchTerm, userType string) ([]LoginLog, error) {
+	query := `
+		SELECT id, user_id, user_name, user_type, pc_number, login_time, logout_time
+		FROM login_logs
+		WHERE (user_name LIKE ? OR pc_number LIKE ? OR DATE(login_time) LIKE ?)
+	`
+	args := []interface{}{"%" + searchTerm + "%", "%" + searchTerm + "%", "%" + searchTerm + "%"}
+
+	if userType != "" {
+		query += " AND user_type = ?"
+		args = append(args, userType)
+	}
+
+	query += " ORDER BY login_time DESC"
+
+	rows, err := a.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []LoginLog
+	for rows.Next() {
+		var log LoginLog
+		var logoutTime sql.NullString
+		err := rows.Scan(&log.ID, &log.UserID, &log.UserName, &log.UserType, &log.PCNumber, &log.LoginTime, &logoutTime)
+		if err != nil {
+			return nil, err
+		}
+		if logoutTime.Valid {
+			log.LogoutTime = logoutTime.String
+		}
+		logs = append(logs, log)
+	}
+
+	return logs, nil
+}
+
+// User filtering methods
+func (a *App) GetUsersByType(userType string) ([]User, error) {
+	rows, err := a.db.Query(`
+		SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created 
+		FROM users 
+		WHERE role = ? 
+		ORDER BY created DESC
+	`, userType)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
+	query := `
+		SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created 
+		FROM users 
+		WHERE (name LIKE ? OR username LIKE ? OR student_id LIKE ? OR employee_id LIKE ? OR gender LIKE ?)
+	`
+	args := []interface{}{"%" + searchTerm + "%", "%" + searchTerm + "%", "%" + searchTerm + "%", "%" + searchTerm + "%", "%" + searchTerm + "%"}
+
+	if userType != "" {
+		query += " AND role = ?"
+		args = append(args, userType)
+	}
+
+	query += " ORDER BY created DESC"
+
+	rows, err := a.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var users []User
+	for rows.Next() {
+		var user User
+		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+		if err != nil {
+			return nil, err
+		}
+		users = append(users, user)
+	}
+
+	return users, nil
+}
+
+// Photo upload method
+func (a *App) UpdateUserPhoto(userID int, photoURL string) error {
+	_, err := a.db.Exec("UPDATE users SET photo_url = ? WHERE id = ?", photoURL, userID)
+	return err
 }
