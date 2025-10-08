@@ -89,7 +89,7 @@ function LoginPage() {
   const getPlaceholderText = () => {
     switch (selectedRole) {
       case 'student':
-        return 'Enter your Student ID (e.g., 2025-1234)';
+        return 'Enter your Student ID';
       case 'working_student':
         return 'Enter your Working Student ID';
       case 'instructor':
