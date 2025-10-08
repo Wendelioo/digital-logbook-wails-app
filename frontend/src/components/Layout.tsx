@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UpdateUserPhoto } from '../../wailsjs/go/main/App';
+import { UpdateUserPhoto, ChangePassword } from '../../wailsjs/go/main/App';
 import { 
   LayoutDashboard, 
   User,
   Settings,
   LogOut,
-  ChevronDown
+  ChevronDown,
+  Lock,
+  UserCircle
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -26,9 +28,18 @@ interface NavigationItem {
 function Layout({ children, navigationItems, title }: LayoutProps) {
   const { user, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
-  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [showAccountModal, setShowAccountModal] = useState(false);
+  const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>(user?.photo_url || '');
+  
+  // Password change states
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+  
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -58,11 +69,64 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
       // For now, we'll just save the data URL
       await UpdateUserPhoto(user.id, photoPreview);
       alert('Photo updated successfully!');
-      setShowProfileModal(false);
+      setPhotoFile(null);
     } catch (error) {
       console.error('Failed to update photo:', error);
       alert('Failed to update photo. Make sure you are connected to the database.');
     }
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    // Validate inputs
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      setPasswordError('All fields are required');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError('New password must be at least 6 characters long');
+      return;
+    }
+
+    if (!user) return;
+
+    try {
+      await ChangePassword(user.id, oldPassword, newPassword);
+      setPasswordSuccess('Password changed successfully!');
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      
+      // Close modal after 2 seconds
+      setTimeout(() => {
+        setShowAccountModal(false);
+        setPasswordSuccess('');
+      }, 2000);
+    } catch (error) {
+      console.error('Failed to change password:', error);
+      setPasswordError('Failed to change password. Please check your old password.');
+    }
+  };
+
+  const handleCloseAccountModal = () => {
+    setShowAccountModal(false);
+    setActiveTab('profile');
+    setPhotoFile(null);
+    setPhotoPreview(user?.photo_url || '');
+    setOldPassword('');
+    setNewPassword('');
+    setConfirmPassword('');
+    setPasswordError('');
+    setPasswordSuccess('');
   };
 
   // Close dropdown when clicking outside
@@ -186,12 +250,12 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                       type="button"
                       className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
                       onClick={() => {
-                        setShowProfileModal(true);
+                        setShowAccountModal(true);
                         setProfileDropdownOpen(false);
                       }}
                     >
-                      <User className="h-4 w-4 mr-3" />
-                      Profile (Upload Photo)
+                      <Settings className="h-4 w-4 mr-3" />
+                      Account
                     </button>
                     <button
                       type="button"
@@ -218,66 +282,202 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         </main>
       </div>
 
-      {/* Profile Photo Upload Modal */}
-      {showProfileModal && (
+      {/* Account Modal */}
+      {showAccountModal && (
         <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-          <div className="relative bg-white rounded-lg shadow-xl p-8 w-96">
-            <h3 className="text-xl font-semibold text-gray-900 mb-6">Update Profile Photo</h3>
-            
-            <div className="flex flex-col items-center space-y-4">
-              {photoPreview ? (
-                <img 
-                  src={photoPreview} 
-                  alt="Preview" 
-                  className="h-32 w-32 rounded-full object-cover border-4 border-blue-200"
-                />
-              ) : (
-                <div className="h-32 w-32 rounded-full bg-blue-100 flex items-center justify-center border-4 border-blue-200">
-                  <User className="h-16 w-16 text-blue-600" />
-                </div>
-              )}
-              
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/*"
-                onChange={handlePhotoChange}
-                className="hidden"
-              />
-              
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Choose Photo
-              </button>
-              
-              <div className="text-sm text-gray-500 text-center">
-                <p>Supported formats: JPG, PNG, GIF</p>
-                <p>Maximum size: 5MB</p>
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+            {/* Modal Header */}
+            <div className="border-b border-gray-200 px-6 py-4">
+              <h3 className="text-xl font-semibold text-gray-900">Account Settings</h3>
+            </div>
+
+            {/* Tabs */}
+            <div className="border-b border-gray-200">
+              <div className="flex space-x-8 px-6">
+                <button
+                  onClick={() => setActiveTab('profile')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === 'profile'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <UserCircle className="h-5 w-5" />
+                    <span>Profile</span>
+                  </div>
+                </button>
+                <button
+                  onClick={() => setActiveTab('password')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
+                    activeTab === 'password'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <div className="flex items-center space-x-2">
+                    <Lock className="h-5 w-5" />
+                    <span>Change Password</span>
+                  </div>
+                </button>
               </div>
             </div>
 
-            <div className="mt-6 flex justify-end space-x-3">
+            {/* Tab Content */}
+            <div className="p-6">
+              {activeTab === 'profile' && (
+                <div className="space-y-6">
+                  {/* Avatar Section */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-3">Avatar</label>
+                    <div className="flex items-center space-x-6">
+                      {photoPreview ? (
+                        <img 
+                          src={photoPreview} 
+                          alt="Profile" 
+                          className="h-24 w-24 rounded-full object-cover border-4 border-blue-200"
+                        />
+                      ) : (
+                        <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center border-4 border-blue-200">
+                          <User className="h-12 w-12 text-blue-600" />
+                        </div>
+                      )}
+                      <div className="flex-1">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/*"
+                          onChange={handlePhotoChange}
+                          className="hidden"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => fileInputRef.current?.click()}
+                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                        >
+                          Change Photo
+                        </button>
+                        {photoFile && (
+                          <button
+                            type="button"
+                            onClick={handlePhotoSave}
+                            className="ml-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+                          >
+                            Save Photo
+                          </button>
+                        )}
+                        <p className="text-xs text-gray-500 mt-2">
+                          JPG, PNG or GIF (max. 5MB)
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Name Section */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                    <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                      <p className="text-gray-900">{user?.name || 'N/A'}</p>
+                    </div>
+                  </div>
+
+                  {/* Created At Section */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Created</label>
+                    <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                      <p className="text-gray-900">
+                        {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : 'N/A'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {activeTab === 'password' && (
+                <form onSubmit={handlePasswordChange} className="space-y-6">
+                  {passwordError && (
+                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                      {passwordError}
+                    </div>
+                  )}
+                  
+                  {passwordSuccess && (
+                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+                      {passwordSuccess}
+                    </div>
+                  )}
+
+                  {/* Old Password */}
+                  <div>
+                    <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                      Old Password
+                    </label>
+                    <input
+                      type="password"
+                      id="oldPassword"
+                      value={oldPassword}
+                      onChange={(e) => setOldPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter your current password"
+                    />
+                  </div>
+
+                  {/* New Password */}
+                  <div>
+                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                      New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="newPassword"
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Enter your new password"
+                    />
+                  </div>
+
+                  {/* Confirm New Password */}
+                  <div>
+                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                      Confirm New Password
+                    </label>
+                    <input
+                      type="password"
+                      id="confirmPassword"
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      placeholder="Confirm your new password"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-4">
+                    <button
+                      type="submit"
+                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+                    >
+                      Change Password
+                    </button>
+                  </div>
+                </form>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="border-t border-gray-200 px-6 py-4 flex justify-end">
               <button
                 type="button"
-                onClick={() => {
-                  setShowProfileModal(false);
-                  setPhotoFile(null);
-                  setPhotoPreview(user?.photo_url || '');
-                }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                onClick={handleCloseAccountModal}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors font-medium"
               >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handlePhotoSave}
-                disabled={!photoFile}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Save Photo
+                Close
               </button>
             </div>
           </div>

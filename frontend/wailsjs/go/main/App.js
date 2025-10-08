@@ -38,6 +38,14 @@ export function ExportAttendanceCSV(arg1) {
   return window['go']['main']['App']['ExportAttendanceCSV'](arg1);
 }
 
+export function ExportFeedbackCSV() {
+  return window['go']['main']['App']['ExportFeedbackCSV']();
+}
+
+export function ExportLogsCSV() {
+  return window['go']['main']['App']['ExportLogsCSV']();
+}
+
 export function ExportUsersCSV() {
   return window['go']['main']['App']['ExportUsersCSV']();
 }

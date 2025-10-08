@@ -20,9 +20,10 @@ import {
   CreateUser, 
   UpdateUser, 
   DeleteUser,
-  ExportUsersCSV,
   GetAllLogs,
-  GetFeedback
+  GetFeedback,
+  ExportLogsCSV,
+  ExportFeedbackCSV
 } from '../../wailsjs/go/main/App';
 
 interface DashboardStats {
@@ -367,15 +368,6 @@ function UserManagement() {
     }
   };
 
-  const handleExport = async () => {
-    try {
-      const filename = await ExportUsersCSV();
-      alert(`Users exported to ${filename}`);
-    } catch (error) {
-      console.error('Failed to export users:', error);
-    }
-  };
-
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -466,22 +458,13 @@ function UserManagement() {
           <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
           <p className="text-gray-600">Manage system users and their roles</p>
         </div>
-        <div className="flex space-x-3">
-          <button
-            onClick={handleExport}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </button>
-          <button
-            onClick={() => setShowForm(true)}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-          >
-            <UserPlus className="h-4 w-4 mr-2" />
-            Add User
-          </button>
-        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+        >
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add User
+        </button>
       </div>
 
       {/* Filters Section */}
@@ -960,6 +943,16 @@ function ViewLogs() {
     setDateFilter('');
   };
 
+  const handleExportLogs = async () => {
+    try {
+      const filename = await ExportLogsCSV();
+      alert(`Logs exported to ${filename}`);
+    } catch (error) {
+      console.error('Failed to export logs:', error);
+      alert('Failed to export logs');
+    }
+  };
+
   // Apply filters to logs
   const filteredLogs = logs.filter((log) => {
     // General search - searches across all fields
@@ -998,6 +991,13 @@ function ViewLogs() {
             <h2 className="text-2xl font-bold text-gray-900">View Logs</h2>
             <p className="text-gray-600">Monitor user login and logout activities</p>
           </div>
+          <button
+            onClick={handleExportLogs}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </button>
         </div>
 
         {/* Search Bar and Filter Button */}
@@ -1228,6 +1228,16 @@ function Reports() {
     setDateFilter('');
   };
 
+  const handleExportReports = async () => {
+    try {
+      const filename = await ExportFeedbackCSV();
+      alert(`Reports exported to ${filename}`);
+    } catch (error) {
+      console.error('Failed to export reports:', error);
+      alert('Failed to export reports');
+    }
+  };
+
   // Apply filters to reports
   const filteredReports = reports.filter((report) => {
     // General search - searches across all fields
@@ -1265,6 +1275,13 @@ function Reports() {
             <h2 className="text-2xl font-bold text-gray-900">Equipment Reports</h2>
             <p className="text-gray-600">View student-submitted equipment condition reports</p>
           </div>
+          <button
+            onClick={handleExportReports}
+            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export CSV
+          </button>
         </div>
 
         {/* Search Bar and Filter Button */}

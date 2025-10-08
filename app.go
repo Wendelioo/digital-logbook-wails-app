@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -1087,9 +1088,17 @@ func (a *App) ExportUsersCSV() (string, error) {
 	}
 	defer rows.Close()
 
-	// Create CSV file
+	// Get user's home directory and create Downloads path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	downloadsDir := filepath.Join(homeDir, "Downloads")
+	
+	// Create CSV file in Downloads folder
 	filename := fmt.Sprintf("users_export_%s.csv", time.Now().Format("20060102_150405"))
-	file, err := os.Create(filename)
+	fullPath := filepath.Join(downloadsDir, filename)
+	file, err := os.Create(fullPath)
 	if err != nil {
 		return "", err
 	}
@@ -1111,7 +1120,108 @@ func (a *App) ExportUsersCSV() (string, error) {
 		writer.Write([]string{username, email, name, firstName, middleName, lastName, role, employeeID, studentID, year, created})
 	}
 
-	return filename, nil
+	return fullPath, nil
+}
+
+func (a *App) ExportLogsCSV() (string, error) {
+	rows, err := a.db.Query("SELECT user_name, user_type, pc_number, login_time, logout_time FROM login_logs ORDER BY login_time DESC")
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	// Get user's home directory and create Downloads path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	downloadsDir := filepath.Join(homeDir, "Downloads")
+	
+	// Create CSV file in Downloads folder
+	filename := fmt.Sprintf("logs_export_%s.csv", time.Now().Format("20060102_150405"))
+	fullPath := filepath.Join(downloadsDir, filename)
+	file, err := os.Create(fullPath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	// Write header
+	writer.Write([]string{"Full Name", "User Type", "PC Number", "Time In", "Time Out", "Date"})
+
+	// Write data
+	for rows.Next() {
+		var userName, userType, pcNumber string
+		var loginTime, logoutTime sql.NullString
+		err := rows.Scan(&userName, &userType, &pcNumber, &loginTime, &logoutTime)
+		if err != nil {
+			return "", err
+		}
+
+		timeIn := ""
+		timeOut := ""
+		date := ""
+
+		if loginTime.Valid {
+			t, _ := time.Parse("2006-01-02 15:04:05", loginTime.String)
+			timeIn = t.Format("3:04:05 PM")
+			date = t.Format("2006-01-02")
+		}
+
+		if logoutTime.Valid {
+			t, _ := time.Parse("2006-01-02 15:04:05", logoutTime.String)
+			timeOut = t.Format("3:04:05 PM")
+		}
+
+		writer.Write([]string{userName, userType, pcNumber, timeIn, timeOut, date})
+	}
+
+	return fullPath, nil
+}
+
+func (a *App) ExportFeedbackCSV() (string, error) {
+	rows, err := a.db.Query("SELECT student_name, student_id_str, pc_number, time_in, time_out, equipment, condition, comment, date FROM feedback ORDER BY date DESC")
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	// Get user's home directory and create Downloads path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	downloadsDir := filepath.Join(homeDir, "Downloads")
+	
+	// Create CSV file in Downloads folder
+	filename := fmt.Sprintf("reports_export_%s.csv", time.Now().Format("20060102_150405"))
+	fullPath := filepath.Join(downloadsDir, filename)
+	file, err := os.Create(fullPath)
+	if err != nil {
+		return "", err
+	}
+	defer file.Close()
+
+	writer := csv.NewWriter(file)
+	defer writer.Flush()
+
+	// Write header
+	writer.Write([]string{"Student Name", "Student ID", "PC Number", "Time In", "Time Out", "Equipment", "Condition", "Report", "Date"})
+
+	// Write data
+	for rows.Next() {
+		var studentName, studentIDStr, pcNumber, timeIn, timeOut, equipment, condition, comment, date string
+		err := rows.Scan(&studentName, &studentIDStr, &pcNumber, &timeIn, &timeOut, &equipment, &condition, &comment, &date)
+		if err != nil {
+			return "", err
+		}
+		writer.Write([]string{studentName, studentIDStr, pcNumber, timeIn, timeOut, equipment, condition, comment, date})
+	}
+
+	return fullPath, nil
 }
 
 // Additional utility methods
