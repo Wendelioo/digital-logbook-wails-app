@@ -36,6 +36,8 @@ export function GetAllLogs():Promise<Array<main.LoginLog>>;
 
 export function GetFeedback():Promise<Array<main.Feedback>>;
 
+export function GetHostname():Promise<string>;
+
 export function GetInstructorDashboard(arg1:string):Promise<main.InstructorDashboard>;
 
 export function GetLogsByUserType(arg1:string):Promise<Array<main.LoginLog>>;

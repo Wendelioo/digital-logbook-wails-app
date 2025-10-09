@@ -5,9 +5,9 @@ import {
   LayoutDashboard, 
   UserPlus, 
   Users, 
-  UserCheck,
   Save,
-  Plus
+  Plus,
+  UserCheck
 } from 'lucide-react';
 import { 
   GetWorkingStudentDashboard,
@@ -114,7 +114,7 @@ function DashboardOverview() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Link
           to="register-student"
           className="flex items-center p-6 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
@@ -134,17 +134,6 @@ function DashboardOverview() {
           <div>
             <h3 className="text-lg font-medium text-gray-900">Create Class List</h3>
             <p className="text-sm text-gray-500">Manage subject class lists</p>
-          </div>
-        </Link>
-
-        <Link
-          to="assist-seatin"
-          className="flex items-center p-6 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-        >
-          <UserCheck className="h-8 w-8 text-primary-600 mr-4" />
-          <div>
-            <h3 className="text-lg font-medium text-gray-900">Assist Seat-in</h3>
-            <p className="text-sm text-gray-500">Help with seat-in students</p>
           </div>
         </Link>
       </div>
@@ -545,35 +534,6 @@ function CreateClasslist() {
   );
 }
 
-function AssistSeatin() {
-  return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Assist Seat-in Students</h2>
-        <p className="text-gray-600">Help students who are logging in outside of their assigned class lists</p>
-      </div>
-
-      <div className="bg-white shadow rounded-lg p-6">
-        <div className="text-center py-12">
-          <UserCheck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Seat-in Assistance</h3>
-          <p className="text-gray-600 mb-6">
-            This feature allows you to help students who need to log in for subjects they're not officially enrolled in.
-          </p>
-          <div className="space-y-3">
-            <button className="w-full md:w-auto px-6 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700">
-              Register Seat-in Student
-            </button>
-            <button className="w-full md:w-auto px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 ml-3">
-              View Seat-in Logs
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 function WorkingStudentDashboard() {
   const location = useLocation();
   
@@ -581,7 +541,6 @@ function WorkingStudentDashboard() {
     { name: 'Dashboard', href: '/working-student', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/working-student' },
     { name: 'Register Student', href: '/working-student/register-student', icon: <UserPlus className="h-5 w-5" />, current: location.pathname === '/working-student/register-student' },
     { name: 'Create Class List', href: '/working-student/create-classlist', icon: <Users className="h-5 w-5" />, current: location.pathname === '/working-student/create-classlist' },
-    { name: 'Assist Seat-in', href: '/working-student/assist-seatin', icon: <UserCheck className="h-5 w-5" />, current: location.pathname === '/working-student/assist-seatin' },
   ];
 
   return (
@@ -590,7 +549,6 @@ function WorkingStudentDashboard() {
         <Route index element={<DashboardOverview />} />
         <Route path="register-student" element={<RegisterStudent />} />
         <Route path="create-classlist" element={<CreateClasslist />} />
-        <Route path="assist-seatin" element={<AssistSeatin />} />
       </Routes>
     </Layout>
   );

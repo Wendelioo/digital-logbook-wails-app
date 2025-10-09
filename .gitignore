@@ -1,1 +1,42 @@
+# Dependencies
 node_modules/
+
+# Build outputs
+frontend/dist/
+build/bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary
+*.test
+
+# Output of the go coverage tool
+*.out
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Logs
+*.log
+
+# Wails
+frontend/wailsjs/
+frontend/package.json.md5
+
+# Misc
+*.tar.gz
+*.zip

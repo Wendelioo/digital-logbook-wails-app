@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"os"
-	"strconv"
 )
 
 // DatabaseConfig holds database connection configuration
@@ -15,31 +14,20 @@ type DatabaseConfig struct {
 	Database string
 }
 
-// AppConfig holds application configuration
-type AppConfig struct {
-	UseMockData bool
-	Database    DatabaseConfig
-}
-
-// GetAppConfig returns application configuration from environment variables or defaults
-func GetAppConfig() AppConfig {
-	useMockData := getEnvBool("USE_MOCK_DATA", true) // Default to mock data
-	
-	return AppConfig{
-		UseMockData: useMockData,
-		Database: DatabaseConfig{
-			Host:     getEnv("DB_HOST", "localhost"),
-			Port:     getEnv("DB_PORT", "3306"),
-			Username: getEnv("DB_USERNAME", "root"),
-			Password: getEnv("DB_PASSWORD", "wendel"),
-			Database: getEnv("DB_DATABASE", "logbookdb"),
-		},
+// GetAppConfig returns database configuration from environment variables or defaults
+func GetAppConfig() DatabaseConfig {
+	return DatabaseConfig{
+		Host:     getEnv("DB_HOST", "localhost"),
+		Port:     getEnv("DB_PORT", "3306"),
+		Username: getEnv("DB_USERNAME", "root"),
+		Password: getEnv("DB_PASSWORD", "wendel"),
+		Database: getEnv("DB_DATABASE", "logbookdb"),
 	}
 }
 
 // GetDatabaseConfig returns database configuration from environment variables or defaults
 func GetDatabaseConfig() DatabaseConfig {
-	return GetAppConfig().Database
+	return GetAppConfig()
 }
 
 // GetConnectionString returns the MySQL connection string
@@ -57,16 +45,6 @@ func (config DatabaseConfig) GetConnectionString() string {
 func getEnv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
-	}
-	return defaultValue
-}
-
-// getEnvBool gets boolean environment variable with fallback to default value
-func getEnvBool(key string, defaultValue bool) bool {
-	if value := os.Getenv(key); value != "" {
-		if parsed, err := strconv.ParseBool(value); err == nil {
-			return parsed
-		}
 	}
 	return defaultValue
 }

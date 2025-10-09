@@ -37,8 +37,8 @@ function LoginPage() {
       // Use appropriate login method based on selected role
       switch (selectedRole) {
         case 'admin':
-          // For admin, use username login
-          userData = await login(username, password);
+          // For admin, use employee ID login
+          userData = await loginByEmployeeID(username, password);
           break;
         case 'instructor':
           // For instructor, use employee ID login
@@ -78,9 +78,8 @@ function LoginPage() {
       case 'working_student':
         return 'Student ID';
       case 'instructor':
-        return 'Employee ID';
       case 'admin':
-        return 'Username';
+        return 'Employee ID';
       default:
         return 'Username';
     }
@@ -93,9 +92,8 @@ function LoginPage() {
       case 'working_student':
         return 'Enter your Student ID';
       case 'instructor':
-        return 'Enter your Employee ID';
       case 'admin':
-        return 'Enter your Username';
+        return 'Enter your Employee ID';
       default:
         return 'Enter your credentials';
     }

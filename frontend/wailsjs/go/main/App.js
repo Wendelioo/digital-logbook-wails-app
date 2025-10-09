@@ -70,6 +70,10 @@ export function GetFeedback() {
   return window['go']['main']['App']['GetFeedback']();
 }
 
+export function GetHostname() {
+  return window['go']['main']['App']['GetHostname']();
+}
+
 export function GetInstructorDashboard(arg1) {
   return window['go']['main']['App']['GetInstructorDashboard'](arg1);
 }

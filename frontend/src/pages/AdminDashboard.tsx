@@ -933,7 +933,7 @@ function ViewLogs() {
       setError('');
     } catch (error) {
       console.error('Failed to load logs:', error);
-      setError('Failed to load logs. Please check your database connection or use mock data mode.');
+      setError('Failed to load logs. Please check your database connection.');
       setLogs([]);
     } finally {
       setLoading(false);
@@ -1237,7 +1237,7 @@ function Reports() {
       setError('');
     } catch (error) {
       console.error('Failed to load reports:', error);
-      setError('Failed to load reports. Please check your database connection or use mock data mode.');
+      setError('Failed to load reports. Please check your database connection.');
       setReports([]);
     } finally {
       setLoading(false);

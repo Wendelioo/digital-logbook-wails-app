@@ -21,10 +21,8 @@ import (
 
 // App struct
 type App struct {
-	ctx         context.Context
-	db          *sql.DB
-	mockData    *MockDataService
-	useMockData bool
+	ctx context.Context
+	db  *sql.DB
 }
 
 // User roles
@@ -91,6 +89,16 @@ func verifyPassword(password, hashedPassword string) bool {
 
 	// Compare hashes
 	return subtle.ConstantTimeCompare(hash, computedHash) == 1
+}
+
+// GetHostname returns the computer's hostname
+func (a *App) GetHostname() (string, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Printf("Failed to get hostname: %v", err)
+		return "Unknown", err
+	}
+	return hostname, nil
 }
 
 // Helper function to check if a string contains a substring
@@ -191,11 +199,7 @@ type WorkingStudentDashboard struct {
 
 // NewApp creates a new App application struct
 func NewApp() *App {
-	config := GetAppConfig()
-	return &App{
-		mockData:    NewMockDataService(),
-		useMockData: config.UseMockData,
-	}
+	return &App{}
 }
 
 // startup is called when the app starts. The context is saved
@@ -203,17 +207,9 @@ func NewApp() *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 
-	if a.useMockData {
-		log.Println("Using mock data mode - database connection disabled")
-		a.mockData.PrintMockCredentials()
-	} else {
-		// Initialize database
-		if err := a.initDB(); err != nil {
-			log.Printf("Failed to initialize database: %v", err)
-			log.Println("Falling back to mock data mode")
-			a.useMockData = true
-			a.mockData.PrintMockCredentials()
-		}
+	// Initialize database
+	if err := a.initDB(); err != nil {
+		log.Fatalf("Failed to initialize database: %v\nPlease ensure MySQL is running and configured correctly.", err)
 	}
 }
 
@@ -514,10 +510,6 @@ func (a *App) insertSampleData() error {
 
 // Authentication methods
 func (a *App) Login(username, password string) (User, error) {
-	if a.useMockData {
-		return a.mockData.MockLogin(username, password)
-	}
-
 	var user User
 	var hashedPassword string
 
@@ -542,8 +534,14 @@ func (a *App) Login(username, password string) (User, error) {
 	// Clear password from response
 	user.Password = ""
 
-	// Log the login
-	if err := a.logLogin(user.ID); err != nil {
+	// Get hostname for PC identification
+	hostname, err := a.GetHostname()
+	if err != nil {
+		hostname = "Unknown"
+	}
+
+	// Log the login with hostname
+	if _, err := a.RecordLogin(user.ID, user.Name, user.Role, hostname); err != nil {
 		log.Printf("Warning: Failed to log login for user %d: %v", user.ID, err)
 	}
 
@@ -552,10 +550,6 @@ func (a *App) Login(username, password string) (User, error) {
 
 // LoginByEmail authenticates admin users using email
 func (a *App) LoginByEmail(email, password string) (User, error) {
-	if a.useMockData {
-		return a.mockData.MockLoginByEmail(email, password)
-	}
-
 	var user User
 	var hashedPassword string
 
@@ -577,24 +571,28 @@ func (a *App) LoginByEmail(email, password string) (User, error) {
 	// Clear password from response
 	user.Password = ""
 
-	// Log the login
-	a.logLogin(user.ID)
+	// Get hostname for PC identification
+	hostname, err := a.GetHostname()
+	if err != nil {
+		hostname = "Unknown"
+	}
+
+	// Log the login with hostname
+	if _, err := a.RecordLogin(user.ID, user.Name, user.Role, hostname); err != nil {
+		log.Printf("Warning: Failed to log login for user %d: %v", user.ID, err)
+	}
 
 	return user, nil
 }
 
-// LoginByEmployeeID authenticates instructor users using Employee ID
+// LoginByEmployeeID authenticates admin and instructor users using Employee ID
 func (a *App) LoginByEmployeeID(employeeID, password string) (User, error) {
-	if a.useMockData {
-		return a.mockData.MockLoginByEmployeeID(employeeID, password)
-	}
-
 	var user User
 	var hashedPassword string
 
 	row := a.db.QueryRow(
-		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE employee_id = ? AND role = ?",
-		employeeID, RoleInstructor,
+		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE employee_id = ? AND role IN (?, ?)",
+		employeeID, RoleAdmin, RoleInstructor,
 	)
 
 	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
@@ -610,18 +608,22 @@ func (a *App) LoginByEmployeeID(employeeID, password string) (User, error) {
 	// Clear password from response
 	user.Password = ""
 
-	// Log the login
-	a.logLogin(user.ID)
+	// Get hostname for PC identification
+	hostname, err := a.GetHostname()
+	if err != nil {
+		hostname = "Unknown"
+	}
+
+	// Log the login with hostname
+	if _, err := a.RecordLogin(user.ID, user.Name, user.Role, hostname); err != nil {
+		log.Printf("Warning: Failed to log login for user %d: %v", user.ID, err)
+	}
 
 	return user, nil
 }
 
 // LoginByStudentID authenticates students and working students using student ID
 func (a *App) LoginByStudentID(studentID, password string) (User, error) {
-	if a.useMockData {
-		return a.mockData.MockLoginByStudentID(studentID, password)
-	}
-
 	var user User
 	var hashedPassword string
 
@@ -643,8 +645,16 @@ func (a *App) LoginByStudentID(studentID, password string) (User, error) {
 	// Clear password from response
 	user.Password = ""
 
-	// Log the login
-	a.logLogin(user.ID)
+	// Get hostname for PC identification
+	hostname, err := a.GetHostname()
+	if err != nil {
+		hostname = "Unknown"
+	}
+
+	// Log the login with hostname
+	if _, err := a.RecordLogin(user.ID, user.Name, user.Role, hostname); err != nil {
+		log.Printf("Warning: Failed to log login for user %d: %v", user.ID, err)
+	}
 
 	return user, nil
 }
@@ -679,10 +689,6 @@ func (a *App) logLogin(userID int) error {
 
 // User management methods
 func (a *App) GetUsers() ([]User, error) {
-	if a.useMockData {
-		return a.mockData.GetMockUsers(), nil
-	}
-
 	rows, err := a.db.Query("SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users ORDER BY created DESC")
 	if err != nil {
 		return nil, err
@@ -820,10 +826,6 @@ func (a *App) DeleteUser(id int) error {
 
 // Dashboard methods
 func (a *App) GetAdminDashboard() (AdminDashboard, error) {
-	if a.useMockData {
-		return a.mockData.GetMockAdminDashboard(), nil
-	}
-
 	var dashboard AdminDashboard
 
 	// Count students
@@ -855,10 +857,6 @@ func (a *App) GetAdminDashboard() (AdminDashboard, error) {
 }
 
 func (a *App) GetInstructorDashboard(instructorName string) (InstructorDashboard, error) {
-	if a.useMockData {
-		return a.mockData.GetMockInstructorDashboard(instructorName), nil
-	}
-
 	var dashboard InstructorDashboard
 
 	// Get subjects handled by instructor
@@ -906,10 +904,6 @@ func (a *App) GetInstructorDashboard(instructorName string) (InstructorDashboard
 }
 
 func (a *App) GetStudentDashboard(studentID int) (StudentDashboard, error) {
-	if a.useMockData {
-		return a.mockData.GetMockStudentDashboard(studentID), nil
-	}
-
 	var dashboard StudentDashboard
 
 	// Get student attendance records with subject info
@@ -957,10 +951,6 @@ func (a *App) GetStudentDashboard(studentID int) (StudentDashboard, error) {
 }
 
 func (a *App) GetWorkingStudentDashboard() (WorkingStudentDashboard, error) {
-	if a.useMockData {
-		return a.mockData.GetMockWorkingStudentDashboard(), nil
-	}
-
 	var dashboard WorkingStudentDashboard
 
 	// Count registered students
@@ -1009,10 +999,6 @@ func (a *App) RecordAttendance(studentID, subjectID int, status string) error {
 
 // Subject and classlist methods
 func (a *App) GetSubjects() ([]Subject, error) {
-	if a.useMockData {
-		return a.mockData.GetMockSubjects(), nil
-	}
-
 	rows, err := a.db.Query("SELECT id, code, name, instructor, room FROM subjects ORDER BY code")
 	if err != nil {
 		return nil, err
@@ -1095,7 +1081,7 @@ func (a *App) ExportUsersCSV() (string, error) {
 		return "", err
 	}
 	downloadsDir := filepath.Join(homeDir, "Downloads")
-	
+
 	// Create CSV file in Downloads folder
 	filename := fmt.Sprintf("users_export_%s.csv", time.Now().Format("20060102_150405"))
 	fullPath := filepath.Join(downloadsDir, filename)
@@ -1137,7 +1123,7 @@ func (a *App) ExportLogsCSV() (string, error) {
 		return "", err
 	}
 	downloadsDir := filepath.Join(homeDir, "Downloads")
-	
+
 	// Create CSV file in Downloads folder
 	filename := fmt.Sprintf("logs_export_%s.csv", time.Now().Format("20060102_150405"))
 	fullPath := filepath.Join(downloadsDir, filename)
@@ -1196,7 +1182,7 @@ func (a *App) ExportFeedbackCSV() (string, error) {
 		return "", err
 	}
 	downloadsDir := filepath.Join(homeDir, "Downloads")
-	
+
 	// Create CSV file in Downloads folder
 	filename := fmt.Sprintf("reports_export_%s.csv", time.Now().Format("20060102_150405"))
 	fullPath := filepath.Join(downloadsDir, filename)
@@ -1227,10 +1213,6 @@ func (a *App) ExportFeedbackCSV() (string, error) {
 
 // Additional utility methods
 func (a *App) GetUserByID(userID int) (User, error) {
-	if a.useMockData {
-		return a.mockData.GetMockUserByID(userID)
-	}
-
 	var user User
 	row := a.db.QueryRow(
 		"SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE id = ?",
@@ -1254,11 +1236,6 @@ func (a *App) SubmitFeedback(studentID int, studentName, studentIDStr, pcNumber,
 }
 
 func (a *App) GetFeedback() ([]Feedback, error) {
-	if a.useMockData {
-		// Return empty array for mock mode
-		return []Feedback{}, nil
-	}
-
 	rows, err := a.db.Query(`
 		SELECT f.id, f.student_id, f.student_name, f.student_id_str, f.pc_number, f.time_in, f.time_out, f.equipment, f.condition, f.comment, f.date
 		FROM feedback f
@@ -1304,11 +1281,6 @@ func (a *App) RecordLogout(logID int) error {
 }
 
 func (a *App) GetAllLogs() ([]LoginLog, error) {
-	if a.useMockData {
-		// Return empty array for mock mode
-		return []LoginLog{}, nil
-	}
-
 	rows, err := a.db.Query(`
 		SELECT id, user_id, user_name, user_type, pc_number, login_time, logout_time
 		FROM login_logs
@@ -1504,13 +1476,13 @@ func (a *App) ExportLogsPDF() (string, error) {
 
 	// Table header
 	pdf.SetFont("Arial", "B", 10)
-	pdf.SetFillColor(59, 130, 246) // Blue background
+	pdf.SetFillColor(59, 130, 246)  // Blue background
 	pdf.SetTextColor(255, 255, 255) // White text
-	
+
 	// Column widths (landscape A4 is 297mm wide, minus margins)
 	colWidths := []float64{60, 35, 30, 40, 40, 35}
 	headers := []string{"Full Name", "User Type", "PC Number", "Time In", "Time Out", "Date"}
-	
+
 	for i, header := range headers {
 		pdf.CellFormat(colWidths[i], 8, header, "1", 0, "C", true, 0, "")
 	}
@@ -1618,13 +1590,13 @@ func (a *App) ExportFeedbackPDF() (string, error) {
 
 	// Table header
 	pdf.SetFont("Arial", "B", 9)
-	pdf.SetFillColor(59, 130, 246) // Blue background
+	pdf.SetFillColor(59, 130, 246)  // Blue background
 	pdf.SetTextColor(255, 255, 255) // White text
-	
+
 	// Column widths (landscape A4 is 297mm wide, minus margins)
 	colWidths := []float64{40, 30, 25, 25, 25, 30, 25, 60}
 	headers := []string{"Student Name", "Student ID", "PC Number", "Time In", "Time Out", "Equipment", "Condition", "Report"}
-	
+
 	for i, header := range headers {
 		pdf.CellFormat(colWidths[i], 8, header, "1", 0, "C", true, 0, "")
 	}
@@ -1663,7 +1635,7 @@ func (a *App) ExportFeedbackPDF() (string, error) {
 		for i, cell := range data {
 			pdf.CellFormat(colWidths[i], 7, cell, "1", 0, "C", true, 0, "")
 		}
-		
+
 		// Condition cell with color
 		if condition == "Good" {
 			pdf.SetTextColor(21, 128, 61) // Green
@@ -1673,11 +1645,11 @@ func (a *App) ExportFeedbackPDF() (string, error) {
 			pdf.SetTextColor(185, 28, 28) // Red
 		}
 		pdf.CellFormat(colWidths[6], 7, condition, "1", 0, "C", true, 0, "")
-		
+
 		// Reset text color for comment
 		pdf.SetTextColor(0, 0, 0)
 		pdf.CellFormat(colWidths[7], 7, comment, "1", 0, "L", true, 0, "")
-		
+
 		pdf.Ln(-1)
 		rowNum++
 	}
