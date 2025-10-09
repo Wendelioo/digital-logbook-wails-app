@@ -16,7 +16,9 @@ import {
 } from 'lucide-react';
 import { 
   GetAdminDashboard, 
-  GetUsers, 
+  GetUsers,
+  GetUsersByType,
+  SearchUsers,
   CreateUser, 
   UpdateUser, 
   DeleteUser,
@@ -38,7 +40,6 @@ interface DashboardStats {
 interface User {
   id: number;
   username: string;
-  email?: string;
   name: string;
   first_name?: string;
   middle_name?: string;
@@ -207,7 +208,6 @@ function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
     username: '',
-    email: '',
     password: '',
     name: '',
     firstName: '',
@@ -292,11 +292,27 @@ function UserManagement() {
 
   useEffect(() => {
     loadUsers();
-  }, []);
+  }, [userTypeFilter, searchTerm]); // Reload when filters change
 
   const loadUsers = async () => {
     try {
-      const data = await GetUsers();
+      let data;
+      
+      // Use server-side filtering for better performance
+      if (searchTerm && userTypeFilter) {
+        // Search with user type filter
+        data = await SearchUsers(searchTerm, userTypeFilter);
+      } else if (searchTerm) {
+        // Search all users
+        data = await SearchUsers(searchTerm, '');
+      } else if (userTypeFilter) {
+        // Filter by user type only
+        data = await GetUsersByType(userTypeFilter);
+      } else {
+        // Get all users
+        data = await GetUsers();
+      }
+      
       setUsers(data);
     } catch (error) {
       console.error('Failed to load users:', error);
@@ -313,13 +329,11 @@ function UserManagement() {
       
       let employee_id = '';
       let student_id = '';
-      let email_to_pass = formData.email;
       let password_to_pass = formData.password;
       let username_to_pass = formData.username;
 
       if (formData.role === 'working_student') {
         student_id = formData.username;
-        email_to_pass = '';
         password_to_pass = formData.username; // Default password is student ID
       } else if (formData.role === 'instructor') {
         employee_id = formData.username;
@@ -327,14 +341,14 @@ function UserManagement() {
       } // for admin, username is username and password must be provided
 
       if (editingUser) {
-        await UpdateUser(editingUser.id, username_to_pass, email_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, employee_id, student_id, formData.year);
+        await UpdateUser(editingUser.id, username_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, employee_id, student_id, formData.year);
       } else {
-        await CreateUser(username_to_pass, email_to_pass, password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, employee_id, student_id, formData.year);
+        await CreateUser(username_to_pass, password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, employee_id, student_id, formData.year);
       }
       
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ username: '', email: '', password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'instructor', year: '' });
+      setFormData({ username: '', password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'instructor', year: '' });
       loadUsers();
     } catch (error) {
       console.error('Failed to save user:', error);
@@ -346,7 +360,6 @@ function UserManagement() {
     setEditingUser(user);
     setFormData({
       username: user.username,
-      email: user.email || '',
       password: '',
       name: user.name,
       firstName: user.first_name || '',
@@ -379,27 +392,10 @@ function UserManagement() {
   }
 
   // Derived table data (filters, sort, pagination)
+  // Note: userTypeFilter and searchTerm are now handled server-side
+  // Only column-specific filters are applied here
   const filteredUsers = users.filter((u) => {
-    // User type filter
-    if (userTypeFilter && u.role !== userTypeFilter) {
-      return false;
-    }
-
-    // Global search term (searches across multiple fields)
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      const matchesName = u.name.toLowerCase().includes(term);
-      const matchesStudentID = (u.student_id || '').toLowerCase().includes(term);
-      const matchesEmployeeID = (u.employee_id || '').toLowerCase().includes(term);
-      const matchesGender = (u.gender || '').toLowerCase().includes(term);
-      const matchesCreated = u.created.toLowerCase().includes(term);
-      
-      if (!matchesName && !matchesStudentID && !matchesEmployeeID && !matchesGender && !matchesCreated) {
-        return false;
-      }
-    }
-
-    // Column-specific filters
+    // Column-specific filters (for Excel-like filtering)
     const inName = u.name.toLowerCase().includes(filters.name.toLowerCase());
     const inUsername = u.username.toLowerCase().includes(filters.username.toLowerCase());
     const inRole = u.role.toLowerCase().includes(filters.role.toLowerCase());
@@ -522,7 +518,6 @@ function UserManagement() {
                         ...formData, 
                         role: newRole,
                         // Clear fields that might not be relevant for the new role
-                        email: newRole === 'working_student' ? '' : formData.email,
                         year: ''
                       });
                     }}
@@ -671,7 +666,7 @@ function UserManagement() {
                     onClick={() => {
                       setShowForm(false);
                       setEditingUser(null);
-                      setFormData({ username: '', email: '', password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'instructor', year: '' });
+                      setFormData({ username: '', password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'instructor', year: '' });
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >

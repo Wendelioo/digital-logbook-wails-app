@@ -1,10 +1,9 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Login, LoginByEmail, LoginByEmployeeID, LoginByStudentID } from '../../wailsjs/go/main/App';
+import { Login, LoginByEmployeeID, LoginByStudentID } from '../../wailsjs/go/main/App';
 
 interface User {
   id: number;
   username: string;
-  email?: string;
   name: string;
   first_name?: string;
   middle_name?: string;
@@ -21,7 +20,6 @@ interface User {
 interface AuthContextType {
   user: User | null;
   login: (username: string, password: string) => Promise<User | null>;
-  loginByEmail: (email: string, password: string) => Promise<User | null>;
   loginByEmployeeID: (employeeID: string, password: string) => Promise<User | null>;
   loginByStudentID: (studentID: string, password: string) => Promise<User | null>;
   logout: () => void;
@@ -51,18 +49,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return userData;
     } catch (error) {
       console.error('Login failed:', error);
-      return null;
-    }
-  };
-
-  const loginByEmail = async (email: string, password: string): Promise<User | null> => {
-    try {
-      const userData = await LoginByEmail(email, password);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      return userData;
-    } catch (error) {
-      console.error('Login by email failed:', error);
       return null;
     }
   };
@@ -100,7 +86,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value = {
     user,
     login,
-    loginByEmail,
     loginByEmployeeID,
     loginByStudentID,
     logout,

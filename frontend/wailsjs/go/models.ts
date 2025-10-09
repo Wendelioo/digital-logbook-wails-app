@@ -186,7 +186,6 @@ export namespace main {
 	export class User {
 	    id: number;
 	    username: string;
-	    email?: string;
 	    password: string;
 	    name: string;
 	    first_name?: string;
@@ -208,7 +207,6 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.username = source["username"];
-	        this.email = source["email"];
 	        this.password = source["password"];
 	        this.name = source["name"];
 	        this.first_name = source["first_name"];

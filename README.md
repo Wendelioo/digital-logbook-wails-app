@@ -92,7 +92,7 @@ wails dev
 
 After database setup, use these credentials:
 
-| Role             | Credential Type | ID/Email              | Password   |
+| Role             | Credential Type | ID                    | Password   |
 |------------------|----------------|-----------------------|------------|
 | Admin            | Employee ID    | `admin`               | `admin123` |
 | Instructor       | Employee ID    | `instructor1`         | `inst123`  |

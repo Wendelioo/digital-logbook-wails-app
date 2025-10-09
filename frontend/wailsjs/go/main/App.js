@@ -6,12 +6,12 @@ export function ChangePassword(arg1, arg2, arg3) {
   return window['go']['main']['App']['ChangePassword'](arg1, arg2, arg3);
 }
 
-export function CreateAdmin(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['CreateAdmin'](arg1, arg2, arg3, arg4, arg5);
+export function CreateAdmin(arg1, arg2, arg3, arg4) {
+  return window['go']['main']['App']['CreateAdmin'](arg1, arg2, arg3, arg4);
 }
 
-export function CreateInstructor(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['CreateInstructor'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function CreateInstructor(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['CreateInstructor'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function CreateStudent(arg1, arg2, arg3, arg4, arg5) {
@@ -22,8 +22,8 @@ export function CreateSubject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateSubject'](arg1, arg2, arg3, arg4);
 }
 
-export function CreateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) {
-  return window['go']['main']['App']['CreateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
+export function CreateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
+  return window['go']['main']['App']['CreateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 
 export function CreateWorkingStudent(arg1, arg2, arg3, arg4, arg5) {
@@ -110,10 +110,6 @@ export function Login(arg1, arg2) {
   return window['go']['main']['App']['Login'](arg1, arg2);
 }
 
-export function LoginByEmail(arg1, arg2) {
-  return window['go']['main']['App']['LoginByEmail'](arg1, arg2);
-}
-
 export function LoginByEmployeeID(arg1, arg2) {
   return window['go']['main']['App']['LoginByEmployeeID'](arg1, arg2);
 }
@@ -146,8 +142,8 @@ export function SubmitFeedback(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, a
   return window['go']['main']['App']['SubmitFeedback'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
 }
 
-export function UpdateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12) {
-  return window['go']['main']['App']['UpdateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11, arg12);
+export function UpdateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
+  return window['go']['main']['App']['UpdateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 
 export function UpdateUserPhoto(arg1, arg2) {

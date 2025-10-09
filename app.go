@@ -110,7 +110,6 @@ func contains(s, substr string) bool {
 type User struct {
 	ID         int    `json:"id"`
 	Username   string `json:"username"`
-	Email      string `json:"email,omitempty"`
 	Password   string `json:"password"`
 	Name       string `json:"name"`
 	FirstName  string `json:"first_name,omitempty"`
@@ -259,7 +258,6 @@ func (a *App) createTables() error {
 		CREATE TABLE IF NOT EXISTS users (
 			id INT AUTO_INCREMENT PRIMARY KEY,
 			username VARCHAR(255) UNIQUE NOT NULL,
-			email VARCHAR(255) UNIQUE,
 			password VARCHAR(255) NOT NULL,
 			name VARCHAR(255) NOT NULL,
 			first_name VARCHAR(255),
@@ -437,7 +435,6 @@ func (a *App) insertSampleData() error {
 	// Insert sample users with hashed passwords (using INSERT IGNORE for MySQL)
 	users := []struct {
 		Username   string
-		Email      string
 		Password   string
 		Name       string
 		FirstName  string
@@ -448,8 +445,8 @@ func (a *App) insertSampleData() error {
 		StudentID  string
 		Year       string
 	}{
-		{Username: "admin", Email: "admin@university.edu", Password: "admin123", Name: "System Administrator", FirstName: "System", LastName: "Administrator", Role: RoleAdmin, EmployeeID: "admin"},
-		{Username: "instructor1", Email: "mreyes@university.edu", Password: "inst123", Name: "Mr. Reyes", FirstName: "Mr.", LastName: "Reyes", Role: RoleInstructor, EmployeeID: "instructor1"},
+		{Username: "admin", Password: "admin123", Name: "System Administrator", FirstName: "System", LastName: "Administrator", Role: RoleAdmin, EmployeeID: "admin"},
+		{Username: "instructor1", Password: "inst123", Name: "Mr. Reyes", FirstName: "Mr.", LastName: "Reyes", Role: RoleInstructor, EmployeeID: "instructor1"},
 		{Username: "2025-1234", Password: "2025-1234", Name: "Santos, Juan", FirstName: "Juan", LastName: "Santos", Role: RoleStudent, StudentID: "2025-1234", Year: "2nd Yr BSIT"},
 		{Username: "2025-5678", Password: "2025-5678", Name: "Cruz, Maria", FirstName: "Maria", LastName: "Cruz", Role: RoleStudent, StudentID: "2025-5678", Year: "2nd Yr BSIT"},
 		{Username: "working1", Password: "working1", Name: "Working Student", FirstName: "Working", LastName: "Student", Role: RoleWorkingStudent, StudentID: "working1"},
@@ -464,8 +461,8 @@ func (a *App) insertSampleData() error {
 
 		log.Printf("Inserting user: %s (%s)", user.Username, user.Role)
 		result, err := a.db.Exec(
-			"INSERT IGNORE INTO users (username, email, password, name, first_name, middle_name, last_name, role, employee_id, student_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-			user.Username, user.Email, hashedPassword, user.Name, user.FirstName, user.MiddleName, user.LastName, user.Role, user.EmployeeID, user.StudentID, user.Year,
+			"INSERT IGNORE INTO users (username, password, name, first_name, middle_name, last_name, role, employee_id, student_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			user.Username, hashedPassword, user.Name, user.FirstName, user.MiddleName, user.LastName, user.Role, user.EmployeeID, user.StudentID, user.Year,
 		)
 		if err != nil {
 			return fmt.Errorf("failed to insert user %s: %v", user.Username, err)
@@ -514,11 +511,11 @@ func (a *App) Login(username, password string) (User, error) {
 	var hashedPassword string
 
 	row := a.db.QueryRow(
-		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE username = ?",
+		"SELECT id, username, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE username = ?",
 		username,
 	)
 
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+	err := row.Scan(&user.ID, &user.Username, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return User{}, fmt.Errorf("user not found")
@@ -548,54 +545,17 @@ func (a *App) Login(username, password string) (User, error) {
 	return user, nil
 }
 
-// LoginByEmail authenticates admin users using email
-func (a *App) LoginByEmail(email, password string) (User, error) {
-	var user User
-	var hashedPassword string
-
-	row := a.db.QueryRow(
-		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE email = ? AND role = ?",
-		email, RoleAdmin,
-	)
-
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
-	if err != nil {
-		return User{}, fmt.Errorf("invalid credentials")
-	}
-
-	// Verify password
-	if !verifyPassword(password, hashedPassword) {
-		return User{}, fmt.Errorf("invalid credentials")
-	}
-
-	// Clear password from response
-	user.Password = ""
-
-	// Get hostname for PC identification
-	hostname, err := a.GetHostname()
-	if err != nil {
-		hostname = "Unknown"
-	}
-
-	// Log the login with hostname
-	if _, err := a.RecordLogin(user.ID, user.Name, user.Role, hostname); err != nil {
-		log.Printf("Warning: Failed to log login for user %d: %v", user.ID, err)
-	}
-
-	return user, nil
-}
-
 // LoginByEmployeeID authenticates admin and instructor users using Employee ID
 func (a *App) LoginByEmployeeID(employeeID, password string) (User, error) {
 	var user User
 	var hashedPassword string
 
 	row := a.db.QueryRow(
-		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE employee_id = ? AND role IN (?, ?)",
+		"SELECT id, username, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE employee_id = ? AND role IN (?, ?)",
 		employeeID, RoleAdmin, RoleInstructor,
 	)
 
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+	err := row.Scan(&user.ID, &user.Username, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 	if err != nil {
 		return User{}, fmt.Errorf("invalid credentials")
 	}
@@ -628,11 +588,11 @@ func (a *App) LoginByStudentID(studentID, password string) (User, error) {
 	var hashedPassword string
 
 	row := a.db.QueryRow(
-		"SELECT id, username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE student_id = ? AND role IN (?, ?)",
+		"SELECT id, username, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE student_id = ? AND role IN (?, ?)",
 		studentID, RoleStudent, RoleWorkingStudent,
 	)
 
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+	err := row.Scan(&user.ID, &user.Username, &hashedPassword, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 	if err != nil {
 		return User{}, fmt.Errorf("invalid credentials")
 	}
@@ -689,7 +649,7 @@ func (a *App) logLogin(userID int) error {
 
 // User management methods
 func (a *App) GetUsers() ([]User, error) {
-	rows, err := a.db.Query("SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users ORDER BY created DESC")
+	rows, err := a.db.Query("SELECT id, username, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users ORDER BY created DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -698,7 +658,7 @@ func (a *App) GetUsers() ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var user User
-		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+		err := rows.Scan(&user.ID, &user.Username, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 		if err != nil {
 			return nil, err
 		}
@@ -708,7 +668,7 @@ func (a *App) GetUsers() ([]User, error) {
 	return users, nil
 }
 
-func (a *App) CreateUser(username, email, password, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year string) error {
+func (a *App) CreateUser(username, password, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year string) error {
 	// Hash password
 	hashedPassword, err := hashPassword(password)
 	if err != nil {
@@ -716,8 +676,8 @@ func (a *App) CreateUser(username, email, password, name, firstName, middleName,
 	}
 
 	_, err = a.db.Exec(
-		"INSERT INTO users (username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		username, email, hashedPassword, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year,
+		"INSERT INTO users (username, password, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		username, hashedPassword, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year,
 	)
 	return err
 }
@@ -745,7 +705,7 @@ func (a *App) CreateWorkingStudent(studentID, lastName, firstName, middleName, g
 	return err
 }
 
-func (a *App) CreateInstructor(employeeID, lastName, firstName, middleName, gender, email string) error {
+func (a *App) CreateInstructor(employeeID, lastName, firstName, middleName, gender string) error {
 	username := employeeID
 	password := employeeID
 	name := lastName + ", " + firstName
@@ -761,13 +721,13 @@ func (a *App) CreateInstructor(employeeID, lastName, firstName, middleName, gend
 	}
 
 	_, err = a.db.Exec(
-		"INSERT INTO users (username, email, password, name, first_name, middle_name, last_name, gender, role, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		username, email, hashedPassword, name, firstName, middleName, lastName, gender, role, employeeID,
+		"INSERT INTO users (username, password, name, first_name, middle_name, last_name, gender, role, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		username, hashedPassword, name, firstName, middleName, lastName, gender, role, employeeID,
 	)
 	return err
 }
 
-func (a *App) CreateAdmin(employeeID, lastName, firstName, middleName, email string) error {
+func (a *App) CreateAdmin(employeeID, lastName, firstName, middleName string) error {
 	username := employeeID
 	password := employeeID
 	name := lastName + ", " + firstName
@@ -783,8 +743,8 @@ func (a *App) CreateAdmin(employeeID, lastName, firstName, middleName, email str
 	}
 
 	_, err = a.db.Exec(
-		"INSERT INTO users (username, email, password, name, first_name, middle_name, last_name, role, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-		username, email, hashedPassword, name, firstName, middleName, lastName, role, employeeID,
+		"INSERT INTO users (username, password, name, first_name, middle_name, last_name, role, employee_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+		username, hashedPassword, name, firstName, middleName, lastName, role, employeeID,
 	)
 	return err
 }
@@ -811,10 +771,10 @@ func (a *App) CreateStudent(studentID, firstName, middleName, lastName, gender s
 	return err
 }
 
-func (a *App) UpdateUser(id int, username, email, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year string) error {
+func (a *App) UpdateUser(id int, username, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year string) error {
 	_, err := a.db.Exec(
-		"UPDATE users SET username = ?, email = ?, name = ?, first_name = ?, middle_name = ?, last_name = ?, gender = ?, role = ?, employee_id = ?, student_id = ?, year = ? WHERE id = ?",
-		username, email, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, id,
+		"UPDATE users SET username = ?, name = ?, first_name = ?, middle_name = ?, last_name = ?, gender = ?, role = ?, employee_id = ?, student_id = ?, year = ? WHERE id = ?",
+		username, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, id,
 	)
 	return err
 }
@@ -1069,7 +1029,7 @@ func (a *App) ExportAttendanceCSV(subjectID int) (string, error) {
 }
 
 func (a *App) ExportUsersCSV() (string, error) {
-	rows, err := a.db.Query("SELECT username, email, name, first_name, middle_name, last_name, role, employee_id, student_id, year, created FROM users ORDER BY created DESC")
+	rows, err := a.db.Query("SELECT username, name, first_name, middle_name, last_name, role, employee_id, student_id, year, created FROM users ORDER BY created DESC")
 	if err != nil {
 		return "", err
 	}
@@ -1095,16 +1055,16 @@ func (a *App) ExportUsersCSV() (string, error) {
 	defer writer.Flush()
 
 	// Write header
-	writer.Write([]string{"Username", "Email", "Name", "First Name", "Middle Name", "Last Name", "Role", "Employee ID", "Student ID", "Year", "Created"})
+	writer.Write([]string{"Username", "Name", "First Name", "Middle Name", "Last Name", "Role", "Employee ID", "Student ID", "Year", "Created"})
 
 	// Write data
 	for rows.Next() {
-		var username, email, name, firstName, middleName, lastName, role, employeeID, studentID, year, created string
-		err := rows.Scan(&username, &email, &name, &firstName, &middleName, &lastName, &role, &employeeID, &studentID, &year, &created)
+		var username, name, firstName, middleName, lastName, role, employeeID, studentID, year, created string
+		err := rows.Scan(&username, &name, &firstName, &middleName, &lastName, &role, &employeeID, &studentID, &year, &created)
 		if err != nil {
 			return "", err
 		}
-		writer.Write([]string{username, email, name, firstName, middleName, lastName, role, employeeID, studentID, year, created})
+		writer.Write([]string{username, name, firstName, middleName, lastName, role, employeeID, studentID, year, created})
 	}
 
 	return fullPath, nil
@@ -1215,11 +1175,11 @@ func (a *App) ExportFeedbackCSV() (string, error) {
 func (a *App) GetUserByID(userID int) (User, error) {
 	var user User
 	row := a.db.QueryRow(
-		"SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE id = ?",
+		"SELECT id, username, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created FROM users WHERE id = ?",
 		userID,
 	)
 
-	err := row.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+	err := row.Scan(&user.ID, &user.Username, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 	if err != nil {
 		return User{}, fmt.Errorf("user not found")
 	}
@@ -1378,7 +1338,7 @@ func (a *App) SearchLogs(searchTerm, userType string) ([]LoginLog, error) {
 // User filtering methods
 func (a *App) GetUsersByType(userType string) ([]User, error) {
 	rows, err := a.db.Query(`
-		SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created 
+		SELECT id, username, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created 
 		FROM users 
 		WHERE role = ? 
 		ORDER BY created DESC
@@ -1391,7 +1351,7 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var user User
-		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+		err := rows.Scan(&user.ID, &user.Username, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 		if err != nil {
 			return nil, err
 		}
@@ -1403,7 +1363,7 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 
 func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 	query := `
-		SELECT id, username, email, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created 
+		SELECT id, username, name, first_name, middle_name, last_name, gender, role, employee_id, student_id, year, photo_url, created 
 		FROM users 
 		WHERE (name LIKE ? OR username LIKE ? OR student_id LIKE ? OR employee_id LIKE ? OR gender LIKE ?)
 	`
@@ -1425,7 +1385,7 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 	var users []User
 	for rows.Next() {
 		var user User
-		err := rows.Scan(&user.ID, &user.Username, &user.Email, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
+		err := rows.Scan(&user.ID, &user.Username, &user.Name, &user.FirstName, &user.MiddleName, &user.LastName, &user.Gender, &user.Role, &user.EmployeeID, &user.StudentID, &user.Year, &user.PhotoURL, &user.Created)
 		if err != nil {
 			return nil, err
 		}

@@ -174,7 +174,6 @@ function RegisterStudent() {
       
       await CreateUser(
         formData.username, 
-        '', // email - not required
         formData.password, 
         fullName, 
         formData.firstName, 
