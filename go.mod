@@ -4,6 +4,7 @@ go 1.23
 
 require (
 	github.com/go-sql-driver/mysql v1.7.1
+	github.com/jung-kurt/gofpdf/v2 v2.17.3
 	github.com/wailsapp/wails/v2 v2.10.2
 	golang.org/x/crypto v0.33.0
 )

@@ -22,7 +22,11 @@ export function ExportAttendanceCSV(arg1:number):Promise<string>;
 
 export function ExportFeedbackCSV():Promise<string>;
 
+export function ExportFeedbackPDF():Promise<string>;
+
 export function ExportLogsCSV():Promise<string>;
+
+export function ExportLogsPDF():Promise<string>;
 
 export function ExportUsersCSV():Promise<string>;
 

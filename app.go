@@ -15,6 +15,7 @@ import (
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
+	"github.com/jung-kurt/gofpdf/v2"
 	"golang.org/x/crypto/argon2"
 )
 
@@ -1466,4 +1467,232 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 func (a *App) UpdateUserPhoto(userID int, photoURL string) error {
 	_, err := a.db.Exec("UPDATE users SET photo_url = ? WHERE id = ?", photoURL, userID)
 	return err
+}
+
+// PDF Export methods
+func (a *App) ExportLogsPDF() (string, error) {
+	rows, err := a.db.Query("SELECT user_name, user_type, pc_number, login_time, logout_time FROM login_logs ORDER BY login_time DESC")
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	// Get user's home directory and create Downloads path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	downloadsDir := filepath.Join(homeDir, "Downloads")
+
+	// Create PDF file in Downloads folder
+	filename := fmt.Sprintf("logs_export_%s.pdf", time.Now().Format("20060102_150405"))
+	fullPath := filepath.Join(downloadsDir, filename)
+
+	// Create new PDF
+	pdf := gofpdf.New("L", "mm", "A4", "") // Landscape orientation
+	pdf.AddPage()
+
+	// Set title
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(0, 10, "Login Logs Report")
+	pdf.Ln(12)
+
+	// Add generation timestamp
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(0, 6, fmt.Sprintf("Generated: %s", time.Now().Format("January 2, 2006 at 3:04 PM")))
+	pdf.Ln(10)
+
+	// Table header
+	pdf.SetFont("Arial", "B", 10)
+	pdf.SetFillColor(59, 130, 246) // Blue background
+	pdf.SetTextColor(255, 255, 255) // White text
+	
+	// Column widths (landscape A4 is 297mm wide, minus margins)
+	colWidths := []float64{60, 35, 30, 40, 40, 35}
+	headers := []string{"Full Name", "User Type", "PC Number", "Time In", "Time Out", "Date"}
+	
+	for i, header := range headers {
+		pdf.CellFormat(colWidths[i], 8, header, "1", 0, "C", true, 0, "")
+	}
+	pdf.Ln(-1)
+
+	// Reset text color and font for data rows
+	pdf.SetTextColor(0, 0, 0)
+	pdf.SetFont("Arial", "", 9)
+
+	// Table data with alternating row colors
+	rowNum := 0
+	for rows.Next() {
+		var userName, userType, pcNumber string
+		var loginTime, logoutTime sql.NullString
+		err := rows.Scan(&userName, &userType, &pcNumber, &loginTime, &logoutTime)
+		if err != nil {
+			return "", err
+		}
+
+		// Alternating row colors
+		if rowNum%2 == 0 {
+			pdf.SetFillColor(249, 250, 251) // Light gray
+		} else {
+			pdf.SetFillColor(255, 255, 255) // White
+		}
+
+		timeIn := ""
+		timeOut := ""
+		date := ""
+
+		if loginTime.Valid {
+			t, parseErr := time.Parse("2006-01-02 15:04:05", loginTime.String)
+			if parseErr == nil {
+				timeIn = t.Format("3:04:05 PM")
+				date = t.Format("Jan 02, 2006")
+			}
+		}
+
+		if logoutTime.Valid {
+			t, parseErr := time.Parse("2006-01-02 15:04:05", logoutTime.String)
+			if parseErr == nil {
+				timeOut = t.Format("3:04:05 PM")
+			}
+		}
+
+		// Truncate long names if necessary
+		if len(userName) > 30 {
+			userName = userName[:27] + "..."
+		}
+
+		data := []string{userName, userType, pcNumber, timeIn, timeOut, date}
+		for i, cell := range data {
+			pdf.CellFormat(colWidths[i], 7, cell, "1", 0, "C", true, 0, "")
+		}
+		pdf.Ln(-1)
+		rowNum++
+	}
+
+	// Footer
+	pdf.Ln(10)
+	pdf.SetFont("Arial", "I", 8)
+	pdf.SetTextColor(128, 128, 128)
+	pdf.Cell(0, 6, fmt.Sprintf("Total Records: %d", rowNum))
+
+	// Save PDF
+	err = pdf.OutputFileAndClose(fullPath)
+	if err != nil {
+		return "", err
+	}
+
+	return fullPath, nil
+}
+
+func (a *App) ExportFeedbackPDF() (string, error) {
+	rows, err := a.db.Query("SELECT student_name, student_id_str, pc_number, time_in, time_out, equipment, condition, comment, date FROM feedback ORDER BY date DESC")
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	// Get user's home directory and create Downloads path
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", err
+	}
+	downloadsDir := filepath.Join(homeDir, "Downloads")
+
+	// Create PDF file in Downloads folder
+	filename := fmt.Sprintf("reports_export_%s.pdf", time.Now().Format("20060102_150405"))
+	fullPath := filepath.Join(downloadsDir, filename)
+
+	// Create new PDF
+	pdf := gofpdf.New("L", "mm", "A4", "") // Landscape orientation
+	pdf.AddPage()
+
+	// Set title
+	pdf.SetFont("Arial", "B", 16)
+	pdf.Cell(0, 10, "Equipment Reports")
+	pdf.Ln(12)
+
+	// Add generation timestamp
+	pdf.SetFont("Arial", "", 10)
+	pdf.Cell(0, 6, fmt.Sprintf("Generated: %s", time.Now().Format("January 2, 2006 at 3:04 PM")))
+	pdf.Ln(10)
+
+	// Table header
+	pdf.SetFont("Arial", "B", 9)
+	pdf.SetFillColor(59, 130, 246) // Blue background
+	pdf.SetTextColor(255, 255, 255) // White text
+	
+	// Column widths (landscape A4 is 297mm wide, minus margins)
+	colWidths := []float64{40, 30, 25, 25, 25, 30, 25, 60}
+	headers := []string{"Student Name", "Student ID", "PC Number", "Time In", "Time Out", "Equipment", "Condition", "Report"}
+	
+	for i, header := range headers {
+		pdf.CellFormat(colWidths[i], 8, header, "1", 0, "C", true, 0, "")
+	}
+	pdf.Ln(-1)
+
+	// Reset text color and font for data rows
+	pdf.SetTextColor(0, 0, 0)
+	pdf.SetFont("Arial", "", 8)
+
+	// Table data with alternating row colors
+	rowNum := 0
+	for rows.Next() {
+		var studentName, studentIDStr, pcNumber, timeIn, timeOut, equipment, condition, comment, date string
+		err := rows.Scan(&studentName, &studentIDStr, &pcNumber, &timeIn, &timeOut, &equipment, &condition, &comment, &date)
+		if err != nil {
+			return "", err
+		}
+
+		// Alternating row colors
+		if rowNum%2 == 0 {
+			pdf.SetFillColor(249, 250, 251) // Light gray
+		} else {
+			pdf.SetFillColor(255, 255, 255) // White
+		}
+
+		// Truncate long text if necessary
+		if len(studentName) > 25 {
+			studentName = studentName[:22] + "..."
+		}
+		if len(comment) > 50 {
+			comment = comment[:47] + "..."
+		}
+
+		data := []string{studentName, studentIDStr, pcNumber, timeIn, timeOut, equipment}
+		pdf.SetFont("Arial", "", 8)
+		for i, cell := range data {
+			pdf.CellFormat(colWidths[i], 7, cell, "1", 0, "C", true, 0, "")
+		}
+		
+		// Condition cell with color
+		if condition == "Good" {
+			pdf.SetTextColor(21, 128, 61) // Green
+		} else if condition == "Fair" {
+			pdf.SetTextColor(161, 98, 7) // Yellow
+		} else {
+			pdf.SetTextColor(185, 28, 28) // Red
+		}
+		pdf.CellFormat(colWidths[6], 7, condition, "1", 0, "C", true, 0, "")
+		
+		// Reset text color for comment
+		pdf.SetTextColor(0, 0, 0)
+		pdf.CellFormat(colWidths[7], 7, comment, "1", 0, "L", true, 0, "")
+		
+		pdf.Ln(-1)
+		rowNum++
+	}
+
+	// Footer
+	pdf.Ln(10)
+	pdf.SetFont("Arial", "I", 8)
+	pdf.SetTextColor(128, 128, 128)
+	pdf.Cell(0, 6, fmt.Sprintf("Total Reports: %d", rowNum))
+
+	// Save PDF
+	err = pdf.OutputFileAndClose(fullPath)
+	if err != nil {
+		return "", err
+	}
+
+	return fullPath, nil
 }

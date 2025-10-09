@@ -23,7 +23,9 @@ import {
   GetAllLogs,
   GetFeedback,
   ExportLogsCSV,
-  ExportFeedbackCSV
+  ExportLogsPDF,
+  ExportFeedbackCSV,
+  ExportFeedbackPDF
 } from '../../wailsjs/go/main/App';
 
 interface DashboardStats {
@@ -953,6 +955,16 @@ function ViewLogs() {
     }
   };
 
+  const handleExportLogsPDF = async () => {
+    try {
+      const filename = await ExportLogsPDF();
+      alert(`Logs exported to ${filename}`);
+    } catch (error) {
+      console.error('Failed to export logs:', error);
+      alert('Failed to export logs');
+    }
+  };
+
   // Apply filters to logs
   const filteredLogs = logs.filter((log) => {
     // General search - searches across all fields
@@ -991,13 +1003,22 @@ function ViewLogs() {
             <h2 className="text-2xl font-bold text-gray-900">View Logs</h2>
             <p className="text-gray-600">Monitor user login and logout activities</p>
           </div>
-          <button
-            onClick={handleExportLogs}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportLogs}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </button>
+            <button
+              onClick={handleExportLogsPDF}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export PDF
+            </button>
+          </div>
         </div>
 
         {/* Search Bar and Filter Button */}
@@ -1238,6 +1259,16 @@ function Reports() {
     }
   };
 
+  const handleExportReportsPDF = async () => {
+    try {
+      const filename = await ExportFeedbackPDF();
+      alert(`Reports exported to ${filename}`);
+    } catch (error) {
+      console.error('Failed to export reports:', error);
+      alert('Failed to export reports');
+    }
+  };
+
   // Apply filters to reports
   const filteredReports = reports.filter((report) => {
     // General search - searches across all fields
@@ -1275,13 +1306,22 @@ function Reports() {
             <h2 className="text-2xl font-bold text-gray-900">Equipment Reports</h2>
             <p className="text-gray-600">View student-submitted equipment condition reports</p>
           </div>
-          <button
-            onClick={handleExportReports}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-          >
-            <Download className="h-4 w-4 mr-2" />
-            Export CSV
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={handleExportReports}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export CSV
+            </button>
+            <button
+              onClick={handleExportReportsPDF}
+              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Export PDF
+            </button>
+          </div>
         </div>
 
         {/* Search Bar and Filter Button */}

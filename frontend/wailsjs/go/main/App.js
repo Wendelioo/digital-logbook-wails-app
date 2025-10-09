@@ -42,8 +42,16 @@ export function ExportFeedbackCSV() {
   return window['go']['main']['App']['ExportFeedbackCSV']();
 }
 
+export function ExportFeedbackPDF() {
+  return window['go']['main']['App']['ExportFeedbackPDF']();
+}
+
 export function ExportLogsCSV() {
   return window['go']['main']['App']['ExportLogsCSV']();
+}
+
+export function ExportLogsPDF() {
+  return window['go']['main']['App']['ExportLogsPDF']();
 }
 
 export function ExportUsersCSV() {
