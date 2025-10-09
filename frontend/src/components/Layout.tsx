@@ -236,8 +236,8 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                         </div>
                       )}
                       <div className="text-left">
-                        <p className="text-sm font-medium text-gray-700">{user?.name || 'User'}</p>
-                        <p className="text-xs text-gray-500 capitalize">{user?.role?.replace('_', ' ') || 'Role'}</p>
+                        <span className="text-sm font-medium text-gray-700">{user?.name || 'User'}</span>
+                        <span className="text-xs text-gray-500 capitalize block">{user?.role?.replace('_', ' ') || 'Role'}</span>
                       </div>
                       <ChevronDown className="h-4 w-4 text-gray-400" />
                     </div>
@@ -366,9 +366,9 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                             Save Photo
                           </button>
                         )}
-                        <p className="text-xs text-gray-500 mt-2">
+                        <span className="text-xs text-gray-500 mt-2 block">
                           JPG, PNG or GIF (max. 5MB)
-                        </p>
+                        </span>
                       </div>
                     </div>
                   </div>
@@ -377,7 +377,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
                     <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                      <p className="text-gray-900">{user?.name || 'N/A'}</p>
+                      <span className="text-gray-900">{user?.name || 'N/A'}</span>
                     </div>
                   </div>
 
@@ -385,7 +385,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Account Created</label>
                     <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                      <p className="text-gray-900">
+                      <span className="text-gray-900">
                         {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
                           year: 'numeric',
                           month: 'long',
@@ -393,7 +393,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                           hour: '2-digit',
                           minute: '2-digit'
                         }) : 'N/A'}
-                      </p>
+                      </span>
                     </div>
                   </div>
                 </div>

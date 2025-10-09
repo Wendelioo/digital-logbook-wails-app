@@ -154,17 +154,25 @@ function DashboardOverview() {
 
 function RegisterStudent() {
   const [formData, setFormData] = useState({
+    studentID: '',
     username: '',
-    email: '',
-    name: '',
+    password: '',
     firstName: '',
     middleName: '',
     lastName: '',
-    gender: '',
-    year: ''
+    gender: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+
+  // Auto-set password to student ID when student ID changes
+  const handleStudentIDChange = (value: string) => {
+    setFormData({ 
+      ...formData, 
+      studentID: value,
+      password: value // Default password is student ID
+    });
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -175,12 +183,10 @@ function RegisterStudent() {
       // Build full name from lastName, firstName, middleName
       const fullName = `${formData.lastName}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName : ''}`;
       
-      // Use student ID as the default password
-      const password = formData.username;
       await CreateUser(
         formData.username, 
-        formData.email, 
-        password, 
+        '', // email - not required
+        formData.password, 
         fullName, 
         formData.firstName, 
         formData.middleName, 
@@ -188,19 +194,18 @@ function RegisterStudent() {
         formData.gender,
         'student', 
         '', // employeeID - empty for students
-        formData.username, // studentID - same as username
-        formData.year
+        formData.studentID, // studentID
+        '' // year - not required
       );
       setMessage('Student registered successfully! Default password is their Student ID.');
       setFormData({ 
+        studentID: '',
         username: '', 
-        email: '', 
-        name: '', 
+        password: '',
         firstName: '', 
         middleName: '', 
         lastName: '', 
-        gender: '',
-        year: '' 
+        gender: ''
       });
     } catch (error) {
       setMessage('Failed to register student. Please try again.');
@@ -220,68 +225,23 @@ function RegisterStudent() {
       <div className="bg-white shadow rounded-lg p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Student ID */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="studentID" className="block text-sm font-medium text-gray-700 mb-2">
                 Student ID
               </label>
               <input
                 type="text"
-                id="username"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                id="studentID"
+                value={formData.studentID}
+                onChange={(e) => handleStudentIDChange(e.target.value)}
                 placeholder="e.g., 2025-1234"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 required
               />
-              <p className="mt-1 text-xs text-gray-500">
-                This will also be used as the default password
-              </p>
             </div>
 
-            <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                Full Name
-              </label>
-              <input
-                type="text"
-                id="name"
-                value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Santos, Juan"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
-                First Name
-              </label>
-              <input
-                type="text"
-                id="firstName"
-                value={formData.firstName}
-                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                placeholder="e.g., Juan"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="middleName" className="block text-sm font-medium text-gray-700 mb-2">
-                Middle Name (Optional)
-              </label>
-              <input
-                type="text"
-                id="middleName"
-                value={formData.middleName}
-                onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                placeholder="e.g., Miguel"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-            </div>
-
+            {/* Last Name */}
             <div>
               <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
                 Last Name
@@ -297,20 +257,38 @@ function RegisterStudent() {
               />
             </div>
 
+            {/* First Name */}
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email (Optional)
+              <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                First Name
               </label>
               <input
-                type="email"
-                id="email"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                placeholder="e.g., student@university.edu"
+                type="text"
+                id="firstName"
+                value={formData.firstName}
+                onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                placeholder="e.g., Juan"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                required
+              />
+            </div>
+
+            {/* Middle Name */}
+            <div>
+              <label htmlFor="middleName" className="block text-sm font-medium text-gray-700 mb-2">
+                Middle Name (Optional)
+              </label>
+              <input
+                type="text"
+                id="middleName"
+                value={formData.middleName}
+                onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
+                placeholder="e.g., Miguel"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
               />
             </div>
 
+            {/* Gender */}
             <div>
               <label htmlFor="gender" className="block text-sm font-medium text-gray-700 mb-2">
                 Gender
@@ -328,19 +306,39 @@ function RegisterStudent() {
               </select>
             </div>
 
+            {/* Username */}
             <div>
-              <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-2">
-                Year / Level
+              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+                Username
               </label>
               <input
                 type="text"
-                id="year"
-                value={formData.year}
-                onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                placeholder="e.g., 2nd Yr BSIT"
+                id="username"
+                value={formData.username}
+                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                placeholder="e.g., jsantos"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 required
               />
+            </div>
+
+            {/* Password */}
+            <div className="md:col-span-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+                Password
+              </label>
+              <input
+                type="text"
+                id="password"
+                value={formData.password}
+                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                placeholder="Default: Student ID"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                required
+              />
+              <p className="mt-1 text-xs text-gray-500">
+                Default password is the Student ID (automatically filled)
+              </p>
             </div>
           </div>
 
