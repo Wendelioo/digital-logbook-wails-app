@@ -3,7 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LoginPage from './pages/LoginPage';
 import AdminDashboard from './pages/AdminDashboard';
-import InstructorDashboard from './pages/InstructorDashboard';
+import TeacherDashboard from './pages/TeacherDashboard';
 import StudentDashboard from './pages/StudentDashboard';
 import WorkingStudentDashboard from './pages/WorkingStudentDashboard';
 import './style.css';
@@ -47,11 +47,11 @@ function App() {
               } 
             />
             <Route 
-              path="/instructor/*" 
+              path="/teacher/*" 
               element={
                 <ProtectedRoute>
-                  <RoleRoute allowedRoles={['instructor']}>
-                    <InstructorDashboard />
+                  <RoleRoute allowedRoles={['teacher']}>
+                    <TeacherDashboard />
                   </RoleRoute>
                 </ProtectedRoute>
               } 

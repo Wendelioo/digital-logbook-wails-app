@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { User, Lock, Mail, CreditCard } from 'lucide-react';
+import { User, Lock } from 'lucide-react';
 import illustration from '../../../assets/illustrations/welcome-illustration.png';
 
 const roleRoutes: { [key: string]: string } = {
   student: '/student',
   working_student: '/working-student',
-  instructor: '/instructor',
+  teacher: '/teacher',
   admin: '/admin'
 };
 
@@ -18,7 +18,7 @@ function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { login, loginByEmail, loginByEmployeeID, loginByStudentID } = useAuth();
+  const { loginAsAdmin, loginAsTeacher, loginAsStudent, loginAsWorkingStudent } = useAuth();
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -34,20 +34,19 @@ function LoginPage() {
     try {
       let userData = null;
       
-      // Use appropriate login method based on selected role
+      // Use role-specific login method
       switch (selectedRole) {
         case 'admin':
-          // For admin, use employee ID login
-          userData = await loginByEmployeeID(username, password);
+          userData = await loginAsAdmin(username, password);
           break;
-        case 'instructor':
-          // For instructor, use employee ID login
-          userData = await loginByEmployeeID(username, password);
+        case 'teacher':
+          userData = await loginAsTeacher(username, password);
           break;
         case 'student':
+          userData = await loginAsStudent(username, password);
+          break;
         case 'working_student':
-          // For students and working students, use student ID login
-          userData = await loginByStudentID(username, password);
+          userData = await loginAsWorkingStudent(username, password);
           break;
         default:
           setError('Invalid role selected');
@@ -56,12 +55,7 @@ function LoginPage() {
       }
       
       if (userData) {
-        // Verify the user's actual role matches the selected role
-        if (userData.role === selectedRole) {
-          navigate(roleRoutes[userData.role]);
-        } else {
-          setError(`Invalid credentials for ${selectedRole} role`);
-        }
+        navigate(roleRoutes[userData.role]);
       } else {
         setError('Invalid credentials');
       }
@@ -77,7 +71,7 @@ function LoginPage() {
       case 'student':
       case 'working_student':
         return 'Student ID';
-      case 'instructor':
+      case 'teacher':
       case 'admin':
         return 'Employee ID';
       default:
@@ -91,7 +85,7 @@ function LoginPage() {
         return 'Enter your Student ID';
       case 'working_student':
         return 'Enter your Student ID';
-      case 'instructor':
+      case 'teacher':
       case 'admin':
         return 'Enter your Employee ID';
       default:
@@ -132,7 +126,7 @@ function LoginPage() {
                   >
                     <option value="student">Student</option>
                     <option value="working_student">Working Student</option>
-                    <option value="instructor">Instructor</option>
+                    <option value="teacher">Teacher</option>
                     <option value="admin">Admin</option>
                   </select>
                 </div>

@@ -25,7 +25,7 @@ interface Subject {
   id: number;
   code: string;
   name: string;
-  instructor: string;
+  teacher: string;
   room: string;
 }
 
@@ -173,7 +173,6 @@ function RegisterStudent() {
       const fullName = `${formData.lastName}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName : ''}`;
       
       await CreateUser(
-        formData.username, 
         formData.password, 
         fullName, 
         formData.firstName, 
@@ -377,7 +376,7 @@ function CreateClasslist() {
   const [formData, setFormData] = useState({
     code: '',
     name: '',
-    instructor: '',
+    teacher: '',
     room: ''
   });
   const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -403,9 +402,9 @@ function CreateClasslist() {
     setMessage('');
 
     try {
-      await CreateSubject(formData.code, formData.name, formData.instructor, formData.room);
+      await CreateSubject(formData.code, formData.name, formData.teacher, formData.room);
       setMessage('Class list created successfully!');
-      setFormData({ code: '', name: '', instructor: '', room: '' });
+      setFormData({ code: '', name: '', teacher: '', room: '' });
       // Reload subjects
       const data = await GetSubjects();
       setSubjects(data);
@@ -421,7 +420,7 @@ function CreateClasslist() {
     <div>
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Create Class List</h2>
-        <p className="text-gray-600">Create new subject class lists and assign instructors</p>
+        <p className="text-gray-600">Create new subject class lists and assign teachers</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -460,14 +459,14 @@ function CreateClasslist() {
             </div>
 
             <div>
-              <label htmlFor="instructor" className="block text-sm font-medium text-gray-700 mb-2">
-                Instructor
+              <label htmlFor="teacher" className="block text-sm font-medium text-gray-700 mb-2">
+                Teacher
               </label>
               <input
                 type="text"
-                id="instructor"
-                value={formData.instructor}
-                onChange={(e) => setFormData({ ...formData, instructor: e.target.value })}
+                id="teacher"
+                value={formData.teacher}
+                onChange={(e) => setFormData({ ...formData, teacher: e.target.value })}
                 placeholder="e.g., Mr. Reyes"
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 required
@@ -518,7 +517,7 @@ function CreateClasslist() {
                   <div>
                     <h4 className="font-medium text-gray-900">{subject.code}</h4>
                     <p className="text-sm text-gray-600">{subject.name}</p>
-                    <p className="text-sm text-gray-500">{subject.instructor} • {subject.room}</p>
+                    <p className="text-sm text-gray-500">{subject.teacher} • {subject.room}</p>
                   </div>
                   <button className="text-primary-600 hover:text-primary-900 text-sm">
                     Manage Students

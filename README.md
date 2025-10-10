@@ -4,7 +4,7 @@ A modern desktop application for monitoring and managing student computer labora
 
 ## Features
 
-- 🔐 Multi-role authentication (Admin, Instructor, Student, Working Student)
+- 🔐 Multi-role authentication (Admin, Teacher, Student, Working Student)
 - 👥 User management system
 - 📊 Dashboard analytics for all user roles
 - 📝 Attendance tracking
@@ -95,7 +95,7 @@ After database setup, use these credentials:
 | Role             | Credential Type | ID                    | Password   |
 |------------------|----------------|-----------------------|------------|
 | Admin            | Employee ID    | `admin`               | `admin123` |
-| Instructor       | Employee ID    | `instructor1`         | `inst123`  |
+| Teacher          | Employee ID    | `teacher1`            | `teach123` |
 | Student          | Student ID     | `2025-1234`           | `2025-1234`|
 | Working Student  | Student ID     | `working1`            | `working1` |
 
@@ -137,13 +137,13 @@ digital-logbook-wails-app/
 ## Key Features by Role
 
 ### Admin Dashboard
-- View all users (students, instructors, working students)
+- View all users (students, teachers, working students)
 - User management (create, edit, delete)
 - View login logs with PC numbers
 - View equipment reports
 - Export data to CSV/PDF
 
-### Instructor Dashboard
+### Teacher Dashboard
 - View assigned subjects
 - Monitor student attendance
 - Track classroom activities

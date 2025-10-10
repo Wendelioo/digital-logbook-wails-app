@@ -12,7 +12,7 @@ import {
   Clock
 } from 'lucide-react';
 import { 
-  GetInstructorDashboard,
+  GetTeacherDashboard,
   GetSubjects,
   RecordAttendance,
   ExportAttendanceCSV
@@ -23,7 +23,7 @@ interface Subject {
   id: number;
   code: string;
   name: string;
-  instructor: string;
+  teacher: string;
   room: string;
 }
 
@@ -37,14 +37,14 @@ interface Attendance {
   time_out: string;
 }
 
-interface InstructorDashboardData {
+interface TeacherDashboardData {
   subjects: Subject[];
   attendance: Attendance[];
 }
 
 function DashboardOverview() {
   const { user } = useAuth();
-  const [dashboardData, setDashboardData] = useState<InstructorDashboardData>({
+  const [dashboardData, setDashboardData] = useState<TeacherDashboardData>({
     subjects: [],
     attendance: []
   });
@@ -61,8 +61,8 @@ function DashboardOverview() {
       
       setLoading(true);
       try {
-        console.log('Loading dashboard for instructor:', user.name);
-        const data = await GetInstructorDashboard(user.name);
+        console.log('Loading dashboard for teacher:', user.name);
+        const data = await GetTeacherDashboard(user.name);
         console.log('Dashboard data received:', data);
         
         if (data) {
@@ -70,7 +70,7 @@ function DashboardOverview() {
         }
         setError('');
       } catch (error) {
-        console.error('Failed to load instructor dashboard:', error);
+        console.error('Failed to load teacher dashboard:', error);
         setError('Unable to load dashboard data from server.');
         // Keep empty data as fallback
       } finally {
@@ -87,8 +87,8 @@ function DashboardOverview() {
     <div className="p-6">
       {/* Welcome Message - Always visible */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.name || 'Instructor'}!</h1>
-        <p className="text-gray-600">Here's your instructor dashboard overview</p>
+        <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.name || 'Teacher'}!</h1>
+        <p className="text-gray-600">Here's your teacher dashboard overview</p>
       </div>
 
       {/* Error Message */}
@@ -574,20 +574,20 @@ function AttendanceManagement() {
   );
 }
 
-function InstructorDashboard() {
+function TeacherDashboard() {
   const location = useLocation();
   
-  console.log('InstructorDashboard component rendering');
+  console.log('TeacherDashboard component rendering');
   console.log('Current location:', location.pathname);
   
   const navigationItems = [
-    { name: 'Dashboard', href: '/instructor', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/instructor' },
-    { name: 'Class Lists', href: '/instructor/classlists', icon: <Users className="h-5 w-5" />, current: location.pathname === '/instructor/classlists' },
-    { name: 'Attendance', href: '/instructor/attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/instructor/attendance' },
+    { name: 'Dashboard', href: '/teacher', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/teacher' },
+    { name: 'Class Lists', href: '/teacher/classlists', icon: <Users className="h-5 w-5" />, current: location.pathname === '/teacher/classlists' },
+    { name: 'Attendance', href: '/teacher/attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/teacher/attendance' },
   ];
 
   return (
-    <Layout navigationItems={navigationItems} title="Instructor Dashboard">
+    <Layout navigationItems={navigationItems} title="Teacher Dashboard">
       <Routes>
         <Route index element={<DashboardOverview />} />
         <Route path="classlists" element={<Classlists />} />
@@ -597,4 +597,5 @@ function InstructorDashboard() {
   );
 }
 
-export default InstructorDashboard;
+export default TeacherDashboard;
+

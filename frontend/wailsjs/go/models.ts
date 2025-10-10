@@ -2,7 +2,7 @@ export namespace main {
 	
 	export class AdminDashboard {
 	    total_students: number;
-	    total_instructors: number;
+	    total_teachers: number;
 	    working_students: number;
 	    recent_logins: number;
 	
@@ -13,7 +13,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.total_students = source["total_students"];
-	        this.total_instructors = source["total_instructors"];
+	        this.total_teachers = source["total_teachers"];
 	        this.working_students = source["working_students"];
 	        this.recent_logins = source["recent_logins"];
 	    }
@@ -74,58 +74,6 @@ export namespace main {
 	        this.date = source["date"];
 	    }
 	}
-	export class Subject {
-	    id: number;
-	    code: string;
-	    name: string;
-	    instructor: string;
-	    room: string;
-	
-	    static createFrom(source: any = {}) {
-	        return new Subject(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.code = source["code"];
-	        this.name = source["name"];
-	        this.instructor = source["instructor"];
-	        this.room = source["room"];
-	    }
-	}
-	export class InstructorDashboard {
-	    subjects: Subject[];
-	    attendance: Attendance[];
-	
-	    static createFrom(source: any = {}) {
-	        return new InstructorDashboard(source);
-	    }
-	
-	    constructor(source: any = {}) {
-	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.subjects = this.convertValues(source["subjects"], Subject);
-	        this.attendance = this.convertValues(source["attendance"], Attendance);
-	    }
-	
-		convertValues(a: any, classs: any, asMap: boolean = false): any {
-		    if (!a) {
-		        return a;
-		    }
-		    if (a.slice && a.map) {
-		        return (a as any[]).map(elem => this.convertValues(elem, classs));
-		    } else if ("object" === typeof a) {
-		        if (asMap) {
-		            for (const key of Object.keys(a)) {
-		                a[key] = new classs(a[key]);
-		            }
-		            return a;
-		        }
-		        return new classs(a);
-		    }
-		    return a;
-		}
-	}
 	export class LoginLog {
 	    id: number;
 	    user_id: number;
@@ -182,10 +130,60 @@ export namespace main {
 		    return a;
 		}
 	}
+	export class Subject {
+	    id: number;
+	    code: string;
+	    name: string;
+	    teacher: string;
+	    room: string;
 	
+	    static createFrom(source: any = {}) {
+	        return new Subject(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.code = source["code"];
+	        this.name = source["name"];
+	        this.teacher = source["teacher"];
+	        this.room = source["room"];
+	    }
+	}
+	export class TeacherDashboard {
+	    subjects: Subject[];
+	    attendance: Attendance[];
+	
+	    static createFrom(source: any = {}) {
+	        return new TeacherDashboard(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.subjects = this.convertValues(source["subjects"], Subject);
+	        this.attendance = this.convertValues(source["attendance"], Attendance);
+	    }
+	
+		convertValues(a: any, classs: any, asMap: boolean = false): any {
+		    if (!a) {
+		        return a;
+		    }
+		    if (a.slice && a.map) {
+		        return (a as any[]).map(elem => this.convertValues(elem, classs));
+		    } else if ("object" === typeof a) {
+		        if (asMap) {
+		            for (const key of Object.keys(a)) {
+		                a[key] = new classs(a[key]);
+		            }
+		            return a;
+		        }
+		        return new classs(a);
+		    }
+		    return a;
+		}
+	}
 	export class User {
 	    id: number;
-	    username: string;
 	    password: string;
 	    name: string;
 	    first_name?: string;
@@ -206,7 +204,6 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
-	        this.username = source["username"];
 	        this.password = source["password"];
 	        this.name = source["name"];
 	        this.first_name = source["first_name"];

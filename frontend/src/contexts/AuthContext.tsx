@@ -3,7 +3,6 @@ import { Login, LoginByEmployeeID, LoginByStudentID } from '../../wailsjs/go/mai
 
 interface User {
   id: number;
-  username: string;
   name: string;
   first_name?: string;
   middle_name?: string;
@@ -19,9 +18,10 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<User | null>;
-  loginByEmployeeID: (employeeID: string, password: string) => Promise<User | null>;
-  loginByStudentID: (studentID: string, password: string) => Promise<User | null>;
+  loginAsAdmin: (employeeID: string, password: string) => Promise<User | null>;
+  loginAsTeacher: (employeeID: string, password: string) => Promise<User | null>;
+  loginAsStudent: (studentID: string, password: string) => Promise<User | null>;
+  loginAsWorkingStudent: (studentID: string, password: string) => Promise<User | null>;
   logout: () => void;
   loading: boolean;
 }
@@ -41,38 +41,66 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setLoading(false);
   }, []);
 
-  const login = async (username: string, password: string): Promise<User | null> => {
-    try {
-      const userData = await Login(username, password);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      return userData;
-    } catch (error) {
-      console.error('Login failed:', error);
-      return null;
-    }
-  };
-
-  const loginByEmployeeID = async (employeeID: string, password: string): Promise<User | null> => {
+  const loginAsAdmin = async (employeeID: string, password: string): Promise<User | null> => {
     try {
       const userData = await LoginByEmployeeID(employeeID, password);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      return userData;
+      if (userData && userData.role === 'admin') {
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+      console.error('Login failed: User is not an admin');
+      return null;
     } catch (error) {
-      console.error('Login by employee ID failed:', error);
+      console.error('Admin login failed:', error);
       return null;
     }
   };
 
-  const loginByStudentID = async (studentID: string, password: string): Promise<User | null> => {
+  const loginAsTeacher = async (employeeID: string, password: string): Promise<User | null> => {
+    try {
+      const userData = await LoginByEmployeeID(employeeID, password);
+      if (userData && userData.role === 'teacher') {
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+      console.error('Login failed: User is not a teacher');
+      return null;
+    } catch (error) {
+      console.error('Teacher login failed:', error);
+      return null;
+    }
+  };
+
+  const loginAsStudent = async (studentID: string, password: string): Promise<User | null> => {
     try {
       const userData = await LoginByStudentID(studentID, password);
-      setUser(userData);
-      localStorage.setItem('user', JSON.stringify(userData));
-      return userData;
+      if (userData && userData.role === 'student') {
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+      console.error('Login failed: User is not a student');
+      return null;
     } catch (error) {
-      console.error('Login by student ID failed:', error);
+      console.error('Student login failed:', error);
+      return null;
+    }
+  };
+
+  const loginAsWorkingStudent = async (studentID: string, password: string): Promise<User | null> => {
+    try {
+      const userData = await LoginByStudentID(studentID, password);
+      if (userData && userData.role === 'working_student') {
+        setUser(userData);
+        localStorage.setItem('user', JSON.stringify(userData));
+        return userData;
+      }
+      console.error('Login failed: User is not a working student');
+      return null;
+    } catch (error) {
+      console.error('Working student login failed:', error);
       return null;
     }
   };
@@ -85,9 +113,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const value = {
     user,
-    login,
-    loginByEmployeeID,
-    loginByStudentID,
+    loginAsAdmin,
+    loginAsTeacher,
+    loginAsStudent,
+    loginAsWorkingStudent,
     logout,
     loading
   };

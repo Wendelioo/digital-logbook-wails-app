@@ -32,14 +32,13 @@ import {
 
 interface DashboardStats {
   total_students: number;
-  total_instructors: number;
+  total_teachers: number;
   working_students: number;
   recent_logins: number;
 }
 
 interface User {
   id: number;
-  username: string;
   name: string;
   first_name?: string;
   middle_name?: string;
@@ -80,7 +79,7 @@ interface Feedback {
 function DashboardOverview() {
   const [stats, setStats] = useState<DashboardStats>({
     total_students: 0,
-    total_instructors: 0,
+    total_teachers: 0,
     working_students: 0,
     recent_logins: 0
   });
@@ -109,8 +108,8 @@ function DashboardOverview() {
       icon: <Users className="h-8 w-8" />
     },
     {
-      title: 'Instructors',
-      value: stats.total_instructors,
+      title: 'Teachers',
+      value: stats.total_teachers,
       color: 'bg-green-500',
       icon: <Users className="h-8 w-8" />
     },
@@ -207,24 +206,24 @@ function UserManagement() {
   const [userTypeFilter, setUserTypeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [formData, setFormData] = useState({
-    username: '',
     password: '',
     name: '',
     firstName: '',
     middleName: '',
     lastName: '',
     gender: '',
-    role: 'instructor',
+    role: 'teacher',
+    employeeId: '',
+    studentId: '',
     year: ''
   });
 
   // Excel-like table state: sorting, filtering, selection, pagination
-  type SortKey = 'name' | 'username' | 'role' | 'year' | 'created';
+  type SortKey = 'name' | 'role' | 'year' | 'created';
   const [sortKey, setSortKey] = useState<SortKey>('name');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [filters, setFilters] = useState<Record<SortKey, string>>({
     name: '',
-    username: '',
     role: '',
     year: '',
     created: ''
@@ -250,7 +249,7 @@ function UserManagement() {
   };
 
   const clearFilters = () => {
-    setFilters({ name: '', username: '', role: '', year: '', created: '' });
+    setFilters({ name: '', role: '', year: '', created: '' });
     setPage(1);
   };
 
@@ -265,9 +264,9 @@ function UserManagement() {
 
   const copySelected = async (rows: User[]) => {
     try {
-      const header = ['Name', 'Username', 'Role', 'Year', 'Created'];
+      const header = ['Name', 'ID', 'Role', 'Year', 'Created'];
       const lines = rows.map((u) =>
-        [u.name, u.username, u.role.replace('_', ' '), u.year || '', u.created].join('\t')
+        [u.name, u.employee_id || u.student_id || '-', u.role.replace('_', ' '), u.year || '', u.created].join('\t')
       );
       const text = [header.join('\t'), ...lines].join('\n');
       await navigator.clipboard.writeText(text);
@@ -327,28 +326,17 @@ function UserManagement() {
       // Build name from lastName, firstName, middleName
       const fullName = `${formData.lastName}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName : ''}`;
       
-      let employee_id = '';
-      let student_id = '';
-      let password_to_pass = formData.password;
-      let username_to_pass = formData.username;
-
-      if (formData.role === 'working_student') {
-        student_id = formData.username;
-        password_to_pass = formData.username; // Default password is student ID
-      } else if (formData.role === 'instructor') {
-        employee_id = formData.username;
-        password_to_pass = formData.username; // Default password is employee ID
-      } // for admin, username is username and password must be provided
+      let password_to_pass = formData.password || formData.employeeId || formData.studentId;
 
       if (editingUser) {
-        await UpdateUser(editingUser.id, username_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, employee_id, student_id, formData.year);
+        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year);
       } else {
-        await CreateUser(username_to_pass, password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, employee_id, student_id, formData.year);
+        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year);
       }
       
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ username: '', password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'instructor', year: '' });
+      setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '' });
       loadUsers();
     } catch (error) {
       console.error('Failed to save user:', error);
@@ -359,7 +347,6 @@ function UserManagement() {
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setFormData({
-      username: user.username,
       password: '',
       name: user.name,
       firstName: user.first_name || '',
@@ -367,6 +354,8 @@ function UserManagement() {
       lastName: user.last_name || '',
       gender: user.gender || '',
       role: user.role,
+      employeeId: user.employee_id || '',
+      studentId: user.student_id || '',
       year: user.year || ''
     });
     setShowForm(true);
@@ -397,11 +386,10 @@ function UserManagement() {
   const filteredUsers = users.filter((u) => {
     // Column-specific filters (for Excel-like filtering)
     const inName = u.name.toLowerCase().includes(filters.name.toLowerCase());
-    const inUsername = u.username.toLowerCase().includes(filters.username.toLowerCase());
     const inRole = u.role.toLowerCase().includes(filters.role.toLowerCase());
     const inYear = (u.year || '').toLowerCase().includes(filters.year.toLowerCase());
     const inCreated = (u.created || '').toLowerCase().includes(filters.created.toLowerCase());
-    return inName && inUsername && inRole && inYear && inCreated;
+    return inName && inRole && inYear && inCreated;
   });
 
   const sortedUsers = [...filteredUsers].sort((a, b) => {
@@ -411,10 +399,6 @@ function UserManagement() {
       case 'name':
         va = a.name.toLowerCase();
         vb = b.name.toLowerCase();
-        break;
-      case 'username':
-        va = a.username.toLowerCase();
-        vb = b.username.toLowerCase();
         break;
       case 'role':
         va = a.role.toLowerCase();
@@ -478,7 +462,7 @@ function UserManagement() {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">All</option>
-              <option value="instructor">Instructor</option>
+              <option value="teacher">Teacher</option>
               <option value="student">Student</option>
               <option value="working_student">Working Student</option>
             </select>
@@ -524,7 +508,7 @@ function UserManagement() {
                     className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                     disabled={!!editingUser} // Disable role change when editing
                   >
-                    <option value="instructor">Instructor</option>
+                    <option value="teacher">Teacher</option>
                     <option value="working_student">Working Student</option>
                   </select>
                   <p className="mt-1 text-xs text-gray-500">
@@ -540,8 +524,8 @@ function UserManagement() {
                       <label className="block text-sm font-medium text-gray-700">Student ID</label>
                       <input
                         type="text"
-                        value={formData.username}
-                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+                        value={formData.studentId}
+                        onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
                         placeholder="e.g., 2025-1234"
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
@@ -596,16 +580,16 @@ function UserManagement() {
                       </select>
                     </div>
                   </>
-                ) : formData.role === 'instructor' ? (
-                  // Instructor Form: Employee ID, First/Middle/Last Name, Gender (No Email)
+                ) : formData.role === 'teacher' ? (
+                  // Teacher Form: Employee ID, First/Middle/Last Name, Gender (No Email)
                   <>
                     <div>
                       <label className="block text-sm font-medium text-gray-700">Employee ID</label>
                       <input
                         type="text"
-                        value={formData.username}
-                        onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                        placeholder="e.g., instructor1"
+                        value={formData.employeeId}
+                        onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
+                        placeholder="e.g., teacher1"
                         className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
                         required
                       />
@@ -666,7 +650,7 @@ function UserManagement() {
                     onClick={() => {
                       setShowForm(false);
                       setEditingUser(null);
-                      setFormData({ username: '', password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'instructor', year: '' });
+                      setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '' });
                     }}
                     className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
                   >
@@ -712,8 +696,8 @@ function UserManagement() {
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('name')}>
                     Name <span className="ml-1">{sortIndicator('name')}</span>
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('username')}>
-                    Username <span className="ml-1">{sortIndicator('username')}</span>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ID
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('role')}>
                     Role <span className="ml-1">{sortIndicator('role')}</span>
@@ -738,13 +722,7 @@ function UserManagement() {
                     />
                   </th>
                   <th className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={filters.username}
-                      onChange={(e) => onFilterChange('username', e.target.value)}
-                      placeholder="Filter username"
-                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                    />
+                    {/* ID column - no filter */}
                   </th>
                   <th className="px-3 py-2">
                     <input
@@ -788,10 +766,10 @@ function UserManagement() {
                         type="checkbox"
                         checked={selectedIds.has(user.id)}
                         onChange={() => toggleSelectRow(user.id)}
-                      />
-                    </td>
-                    <td className="px-3 py-2 text-sm text-gray-900">{user.name}</td>
-                    <td className="px-3 py-2 text-sm text-gray-900">{user.username}</td>
+                    />
+                  </td>
+                  <td className="px-3 py-2 text-sm text-gray-900">{user.name}</td>
+                  <td className="px-3 py-2 text-sm text-gray-900">{user.employee_id || user.student_id || '-'}</td>
                     <td className="px-3 py-2 text-sm text-gray-900">{user.role.replace('_', ' ')}</td>
                     <td className="px-3 py-2 text-sm text-gray-900">{user.year || ''}</td>
                     <td className="px-3 py-2 text-sm text-gray-900">{user.created}</td>

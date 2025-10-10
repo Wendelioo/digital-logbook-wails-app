@@ -6,13 +6,13 @@ export function ChangePassword(arg1:number,arg2:string,arg3:string):Promise<void
 
 export function CreateAdmin(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
-export function CreateInstructor(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
-
 export function CreateStudent(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
 export function CreateSubject(arg1:string,arg2:string,arg3:string,arg4:string):Promise<void>;
 
-export function CreateUser(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;
+export function CreateTeacher(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
+
+export function CreateUser(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string):Promise<void>;
 
 export function CreateWorkingStudent(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string):Promise<void>;
 
@@ -38,13 +38,13 @@ export function GetFeedback():Promise<Array<main.Feedback>>;
 
 export function GetHostname():Promise<string>;
 
-export function GetInstructorDashboard(arg1:string):Promise<main.InstructorDashboard>;
-
 export function GetLogsByUserType(arg1:string):Promise<Array<main.LoginLog>>;
 
 export function GetStudentDashboard(arg1:number):Promise<main.StudentDashboard>;
 
 export function GetSubjects():Promise<Array<main.Subject>>;
+
+export function GetTeacherDashboard(arg1:string):Promise<main.TeacherDashboard>;
 
 export function GetUserByID(arg1:number):Promise<main.User>;
 
@@ -72,6 +72,6 @@ export function SearchUsers(arg1:string,arg2:string):Promise<Array<main.User>>;
 
 export function SubmitFeedback(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string):Promise<void>;
 
-export function UpdateUser(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;
+export function UpdateUser(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string):Promise<void>;
 
 export function UpdateUserPhoto(arg1:number,arg2:string):Promise<void>;
