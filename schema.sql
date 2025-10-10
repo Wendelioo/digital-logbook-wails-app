@@ -1,299 +1,250 @@
 -- ============================================
--- Digital Logbook Database Schema
+-- Digital Logbook Monitoring System
+-- Database Schema
 -- ============================================
 -- Database: logbookdb
 -- Charset: utf8mb4
 -- Engine: InnoDB
 -- ============================================
 
--- Create database
 CREATE DATABASE IF NOT EXISTS logbookdb CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 USE logbookdb;
 
 -- ============================================
--- 1. USERS TABLE (Master Login Table)
+-- 1. USERS TABLE
 -- ============================================
+-- Stores common login credentials for all users
 DROP TABLE IF EXISTS users;
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    username VARCHAR(255) NOT NULL UNIQUE COMMENT 'Employee ID for admin/teacher, Student ID for student/working_student',
-    password VARCHAR(255) NOT NULL COMMENT 'Hashed password (Argon2id)',
-    user_type ENUM('admin', 'teacher', 'student', 'working_student') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    username VARCHAR(255) NOT NULL UNIQUE COMMENT 'Employee ID or Student ID (school-assigned)',
+    password VARCHAR(255) NOT NULL COMMENT 'Hashed password',
+    user_type ENUM('student', 'working_student', 'teacher', 'admin') NOT NULL COMMENT 'Identifies what kind of user',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'When the account was created',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'When credentials were last updated',
     INDEX idx_username (username),
     INDEX idx_user_type (user_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Master login table for all users';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 2. ADMIN TABLE
+-- 2. STUDENTS TABLE
 -- ============================================
-DROP TABLE IF EXISTS admin;
-CREATE TABLE admin (
-    admin_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
-    last_name VARCHAR(255) NOT NULL,
-    first_name VARCHAR(255) NOT NULL,
-    middle_name VARCHAR(255),
-    profile VARCHAR(500) COMMENT 'Profile image path',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Admin profile information';
-
--- ============================================
--- 3. TEACHER TABLE
--- ============================================
-DROP TABLE IF EXISTS teacher;
-CREATE TABLE teacher (
-    teacher_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
-    last_name VARCHAR(255) NOT NULL,
-    first_name VARCHAR(255) NOT NULL,
-    middle_name VARCHAR(255),
-    profile VARCHAR(500) COMMENT 'Profile image path',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Teacher profile information';
-
--- ============================================
--- 4. STUDENT TABLE
--- ============================================
-DROP TABLE IF EXISTS student;
-CREATE TABLE student (
-    student_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
-    student_no VARCHAR(255) NOT NULL UNIQUE COMMENT 'Unique student ID number',
+-- Stores student information
+DROP TABLE IF EXISTS students;
+CREATE TABLE students (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL UNIQUE COMMENT 'Official school student ID',
     first_name VARCHAR(255) NOT NULL,
     middle_name VARCHAR(255),
     last_name VARCHAR(255) NOT NULL,
-    year_level VARCHAR(50),
-    section VARCHAR(50),
-    profile VARCHAR(500) COMMENT 'Profile image path',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
-    INDEX idx_student_no (student_no)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Student profile information';
+    year_level VARCHAR(255) COMMENT 'e.g., 1st Year, 2nd Year',
+    section VARCHAR(255) COMMENT 'Section name',
+    profile_photo VARCHAR(255) COMMENT 'Profile photo filename or path',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation date',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'When student info is updated',
+    INDEX idx_student_id (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 5. WORKING_STUDENT TABLE
+-- 3. WORKING_STUDENTS TABLE
 -- ============================================
-DROP TABLE IF EXISTS working_student;
-CREATE TABLE working_student (
-    working_student_id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL UNIQUE,
-    student_no VARCHAR(255) NOT NULL UNIQUE COMMENT 'Same ID as student',
+-- Similar to students, but tagged as working students
+DROP TABLE IF EXISTS working_students;
+CREATE TABLE working_students (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    student_id INT NOT NULL UNIQUE COMMENT 'Official school ID',
     first_name VARCHAR(255) NOT NULL,
     middle_name VARCHAR(255),
     last_name VARCHAR(255) NOT NULL,
-    year_level VARCHAR(50),
-    section VARCHAR(50),
-    profile VARCHAR(500) COMMENT 'Profile image path',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    INDEX idx_user_id (user_id),
-    INDEX idx_student_no (student_no)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Working student profile information';
+    year_level VARCHAR(255) COMMENT 'Year level',
+    section VARCHAR(255) COMMENT 'Section',
+    profile_photo VARCHAR(255) COMMENT 'Profile photo path',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Record creation date',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'When info is updated',
+    INDEX idx_student_id (student_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 4. TEACHERS TABLE
+-- ============================================
+-- Stores teacher information
+DROP TABLE IF EXISTS teachers;
+CREATE TABLE teachers (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    teacher_id INT NOT NULL UNIQUE COMMENT 'Official employee ID',
+    first_name VARCHAR(255) NOT NULL,
+    middle_name VARCHAR(255),
+    last_name VARCHAR(255) NOT NULL,
+    profile_photo VARCHAR(255) COMMENT 'Profile photo',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Created date',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated date',
+    INDEX idx_teacher_id (teacher_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================
+-- 5. ADMINS TABLE
+-- ============================================
+-- Stores admin information
+DROP TABLE IF EXISTS admins;
+CREATE TABLE admins (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    admin_id INT NOT NULL UNIQUE COMMENT 'Employee ID',
+    first_name VARCHAR(255) NOT NULL,
+    middle_name VARCHAR(255),
+    last_name VARCHAR(255) NOT NULL,
+    profile_photo VARCHAR(255) COMMENT 'Profile photo',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'Created date',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'Updated date',
+    INDEX idx_admin_id (admin_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
 -- 6. CLASSLIST TABLE
 -- ============================================
+-- Created by working student and managed by teacher
 DROP TABLE IF EXISTS classlist;
 CREATE TABLE classlist (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    subject_code VARCHAR(50) NOT NULL,
-    subject_title VARCHAR(255) NOT NULL,
-    teacher_id INT NOT NULL,
-    schedule VARCHAR(255),
-    room VARCHAR(100),
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (teacher_id) REFERENCES teacher(teacher_id) ON DELETE CASCADE,
-    INDEX idx_teacher_id (teacher_id),
-    INDEX idx_subject_code (subject_code)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Class lists created by working students, managed by teachers';
+    subject_code VARCHAR(255) NOT NULL COMMENT 'Subject code (e.g., IT101)',
+    subject_title VARCHAR(255) NOT NULL COMMENT 'Subject title',
+    assigned_teacher VARCHAR(255) COMMENT 'The teacher handling the subject',
+    schedule VARCHAR(255) COMMENT 'Class schedule',
+    room VARCHAR(255) COMMENT 'Room name or number',
+    created_by INT COMMENT 'Working student who created the classlist',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT 'When created',
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT 'When updated',
+    FOREIGN KEY (created_by) REFERENCES working_students(id) ON DELETE SET NULL,
+    INDEX idx_subject_code (subject_code),
+    INDEX idx_created_by (created_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 7. CLASSLIST_STUDENTS TABLE
+-- 7. CLASS_STUDENTS TABLE
 -- ============================================
-DROP TABLE IF EXISTS classlist_students;
-CREATE TABLE classlist_students (
+-- Stores students enrolled in a classlist
+DROP TABLE IF EXISTS class_students;
+CREATE TABLE class_students (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    classlist_id INT NOT NULL,
-    student_id INT NOT NULL,
-    FOREIGN KEY (classlist_id) REFERENCES classlist(id) ON DELETE CASCADE,
-    FOREIGN KEY (student_id) REFERENCES student(student_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_enrollment (classlist_id, student_id),
-    INDEX idx_classlist_id (classlist_id),
+    class_id INT NOT NULL COMMENT 'Class this student belongs to',
+    student_id INT NOT NULL COMMENT 'Student ID',
+    first_name VARCHAR(255) NOT NULL,
+    middle_name VARCHAR(255),
+    last_name VARCHAR(255) NOT NULL,
+    FOREIGN KEY (class_id) REFERENCES classlist(id) ON DELETE CASCADE,
+    INDEX idx_class_id (class_id),
     INDEX idx_student_id (student_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Links students to class lists';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
 -- 8. ATTENDANCE TABLE
 -- ============================================
+-- Managed and validated by teacher
 DROP TABLE IF EXISTS attendance;
 CREATE TABLE attendance (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    classlist_id INT NOT NULL,
-    date DATE NOT NULL,
-    FOREIGN KEY (classlist_id) REFERENCES classlist(id) ON DELETE CASCADE,
-    UNIQUE KEY unique_attendance_date (classlist_id, date),
-    INDEX idx_classlist_id (classlist_id),
-    INDEX idx_date (date)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Attendance sessions managed by teachers';
-
--- ============================================
--- 9. ATTENDANCE_RECORDS TABLE
--- ============================================
-DROP TABLE IF EXISTS attendance_records;
-CREATE TABLE attendance_records (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    attendance_id INT NOT NULL,
-    student_id INT NOT NULL,
-    time_in TIME,
-    time_out TIME,
-    status ENUM('Present', 'Late', 'Absent', 'Excused') NOT NULL DEFAULT 'Absent',
-    FOREIGN KEY (attendance_id) REFERENCES attendance(id) ON DELETE CASCADE,
-    FOREIGN KEY (student_id) REFERENCES student(student_id) ON DELETE CASCADE,
-    UNIQUE KEY unique_student_attendance (attendance_id, student_id),
-    INDEX idx_attendance_id (attendance_id),
+    class_id INT NOT NULL COMMENT 'The class this attendance belongs to',
+    date DATE NOT NULL COMMENT 'Date of attendance',
+    student_id INT NOT NULL COMMENT 'Student ID',
+    time_in TIME COMMENT 'Time in',
+    time_out TIME COMMENT 'Time out',
+    status ENUM('Present', 'Absent', 'Late', 'Excused') NOT NULL DEFAULT 'Absent' COMMENT 'Attendance status',
+    FOREIGN KEY (class_id) REFERENCES classlist(id) ON DELETE CASCADE,
+    INDEX idx_class_id (class_id),
+    INDEX idx_date (date),
     INDEX idx_student_id (student_id),
     INDEX idx_status (status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Individual student attendance records';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 10. LOGIN_LOGS TABLE
+-- 9. LOGIN_LOGS TABLE
 -- ============================================
+-- Records user logins and logouts for tracking purposes
 DROP TABLE IF EXISTS login_logs;
 CREATE TABLE login_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    user_id INT NOT NULL,
-    user_type ENUM('student', 'working_student', 'teacher', 'admin') NOT NULL,
-    pc_number VARCHAR(100),
-    login_time TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    logout_time TIMESTAMP NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    user_id INT NOT NULL COMMENT 'Employee or student ID',
+    user_type ENUM('student', 'working_student', 'teacher', 'admin') NOT NULL COMMENT 'User type',
+    pc_number VARCHAR(255) COMMENT 'Computer number',
+    login_time DATETIME NOT NULL COMMENT 'Login timestamp',
+    logout_time DATETIME COMMENT 'Logout timestamp',
     INDEX idx_user_id (user_id),
     INDEX idx_user_type (user_type),
     INDEX idx_login_time (login_time)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='User login/logout tracking managed by admin';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
--- 11. FEEDBACK SURVEY SYSTEM
+-- 10. FEEDBACK TABLE
 -- ============================================
-
--- Feedback Questions Table
-DROP TABLE IF EXISTS feedback_questions;
-CREATE TABLE feedback_questions (
+-- Submitted by students before logging out
+-- Includes condition ratings for computer equipment
+DROP TABLE IF EXISTS feedback;
+CREATE TABLE feedback (
     id INT AUTO_INCREMENT PRIMARY KEY,
-    question_text TEXT NOT NULL,
-    question_type ENUM('multiple_choice', 'text') NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX idx_question_type (question_type)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Survey questions for students and working students';
-
--- Feedback Choices Table
-DROP TABLE IF EXISTS feedback_choices;
-CREATE TABLE feedback_choices (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    question_id INT NOT NULL,
-    choice_text VARCHAR(500) NOT NULL,
-    FOREIGN KEY (question_id) REFERENCES feedback_questions(id) ON DELETE CASCADE,
-    INDEX idx_question_id (question_id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Multiple choice options for feedback questions';
-
--- Feedback Responses Table
-DROP TABLE IF EXISTS feedback_responses;
-CREATE TABLE feedback_responses (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    student_id INT NOT NULL,
-    pc_number VARCHAR(100),
-    question_id INT NOT NULL,
-    choice_id INT NULL COMMENT 'NULL for text responses',
-    comment TEXT COMMENT 'Free-text response or additional comment',
-    date_submitted TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (student_id) REFERENCES student(student_id) ON DELETE CASCADE,
-    FOREIGN KEY (question_id) REFERENCES feedback_questions(id) ON DELETE CASCADE,
-    FOREIGN KEY (choice_id) REFERENCES feedback_choices(id) ON DELETE SET NULL,
+    student_id INT NOT NULL COMMENT 'Student ID',
+    first_name VARCHAR(255) NOT NULL,
+    middle_name VARCHAR(255),
+    last_name VARCHAR(255) NOT NULL,
+    pc_number VARCHAR(255) COMMENT 'Computer used',
+    equipment_condition ENUM('Good', 'Minor Issue', 'Needs Repair', 'Not Working') NOT NULL COMMENT 'General feedback about the PC',
+    monitor_condition ENUM('Good', 'Flickering', 'No Display', 'Other') NOT NULL COMMENT 'Monitor condition',
+    keyboard_condition ENUM('Good', 'Some Keys Not Working', 'Sticky Keys', 'Other') NOT NULL COMMENT 'Keyboard condition',
+    mouse_condition ENUM('Good', 'Not Working', 'Lagging', 'Other') NOT NULL COMMENT 'Mouse condition',
+    comments TEXT COMMENT 'Optional additional comments',
+    date_submitted DATETIME NOT NULL COMMENT 'When feedback was submitted',
     INDEX idx_student_id (student_id),
-    INDEX idx_question_id (question_id),
+    INDEX idx_pc_number (pc_number),
     INDEX idx_date_submitted (date_submitted)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Student feedback survey responses';
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================
 -- DEFAULT ADMIN ACCOUNT
 -- ============================================
--- Create default admin user
+-- Create default admin user for initial system access
 -- Username: ADMIN001
 -- Password: ADMIN001 (plain text for development - CHANGE IN PRODUCTION!)
 
-INSERT INTO users (username, password, user_type) VALUES ('ADMIN001', 'ADMIN001', 'admin');
-SET @admin_user_id = LAST_INSERT_ID();
-INSERT INTO admin (user_id, last_name, first_name, middle_name) VALUES (@admin_user_id, 'Administrator', 'System', NULL);
+INSERT INTO users (username, password, user_type) 
+VALUES ('1', 'ADMIN001', 'admin');
 
--- ============================================
--- SAMPLE DATA (Optional - for testing)
--- ============================================
-
--- Sample Teacher
-INSERT INTO users (username, password, user_type) VALUES ('TEACH001', 'TEACH001', 'teacher');
-SET @teacher_user_id = LAST_INSERT_ID();
-INSERT INTO teacher (user_id, last_name, first_name, middle_name) VALUES (@teacher_user_id, 'Santos', 'Juan', 'Cruz');
-
--- Sample Working Student
-INSERT INTO users (username, password, user_type) VALUES ('2025-1001', '2025-1001', 'working_student');
-SET @ws_user_id = LAST_INSERT_ID();
-INSERT INTO working_student (user_id, student_no, first_name, middle_name, last_name, year_level, section) 
-VALUES (@ws_user_id, '2025-1001', 'Maria', 'Reyes', 'Garcia', '3rd Year', 'BSIT-3A');
-
--- Sample Student
-INSERT INTO users (username, password, user_type) VALUES ('2025-2001', '2025-2001', 'student');
-SET @student_user_id = LAST_INSERT_ID();
-INSERT INTO student (user_id, student_no, first_name, middle_name, last_name, year_level, section) 
-VALUES (@student_user_id, '2025-2001', 'Pedro', 'Miguel', 'Dela Cruz', '2nd Year', 'BSIT-2A');
-
--- Sample Feedback Questions
-INSERT INTO feedback_questions (question_text, question_type) VALUES 
-('How would you rate the overall condition of the computer lab?', 'multiple_choice'),
-('Were all equipment functioning properly during your session?', 'multiple_choice'),
-('Please describe any issues you encountered:', 'text');
-
--- Sample Feedback Choices
-SET @q1_id = (SELECT id FROM feedback_questions WHERE question_text LIKE '%overall condition%' LIMIT 1);
-SET @q2_id = (SELECT id FROM feedback_questions WHERE question_text LIKE '%equipment functioning%' LIMIT 1);
-
-INSERT INTO feedback_choices (question_id, choice_text) VALUES 
-(@q1_id, 'Excellent'),
-(@q1_id, 'Good'),
-(@q1_id, 'Fair'),
-(@q1_id, 'Poor'),
-(@q2_id, 'Yes, everything worked fine'),
-(@q2_id, 'Some equipment had minor issues'),
-(@q2_id, 'Multiple equipment had problems');
+INSERT INTO admins (admin_id, first_name, middle_name, last_name) 
+VALUES (1, 'System', NULL, 'Administrator');
 
 -- ============================================
 -- END OF SCHEMA
 -- ============================================
 
--- NOTES:
--- 1. All passwords are stored in plain text for development
---    In production, implement proper password hashing (Argon2id, bcrypt, etc.)
+-- IMPORTANT NOTES:
+-- ================
+-- 1. All passwords are stored in plain text for development purposes only
+--    In production, implement proper password hashing (bcrypt, argon2, etc.)
 -- 
--- 2. Default credentials:
---    Admin: ADMIN001 / ADMIN001
---    Teacher: TEACH001 / TEACH001
---    Working Student: 2025-1001 / 2025-1001
---    Student: 2025-2001 / 2025-2001
+-- 2. Default credentials for initial login:
+--    Admin Username: ADMIN001
+--    Admin Password: ADMIN001
 --
--- 3. CHANGE ALL DEFAULT PASSWORDS after deployment!
+-- 3. ⚠️  SECURITY WARNING: Change the default password immediately after deployment!
 --
--- 4. Foreign key constraints ensure referential integrity:
---    - Deleting a user cascades to their profile table
---    - Deleting a teacher cascades to their classlists
---    - Deleting a classlist cascades to student enrollments and attendance
+-- 4. Table structure:
+--    - 'users' table: Stores login credentials for all user types
+--    - 'students', 'working_students', 'teachers', 'admins': Store profile data
+--    - 'username' in users table should match the ID fields in respective tables
 --
--- 5. ENUMs ensure data consistency for user_type and status fields
+-- 5. Foreign key constraints ensure referential integrity:
+--    - classlist.created_by → working_students.id (ON DELETE SET NULL)
+--    - class_students.class_id → classlist.id (ON DELETE CASCADE)
+--    - attendance.class_id → classlist.id (ON DELETE CASCADE)
+--
+-- 6. All tables include created_at and updated_at timestamps for audit trails
+--
+-- 7. The feedback table captures detailed equipment condition information:
+--    - equipment_condition: Overall PC condition
+--    - monitor_condition: Display issues
+--    - keyboard_condition: Keyboard problems
+--    - mouse_condition: Mouse functionality
+--    - comments: Optional free-text feedback
+--
+-- 8. Indexes are created on frequently queried columns for performance optimization
+--
+-- 9. Character set: utf8mb4 for full Unicode support (including emojis)
+--
+-- 10. Engine: InnoDB for ACID compliance and foreign key support
