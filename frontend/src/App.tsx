@@ -76,6 +76,7 @@ function App() {
                 </ProtectedRoute>
               } 
             />
+            
             <Route path="/" element={<Navigate to="/login" />} />
             <Route path="/dashboard" element={<Navigate to="/login" />} />
           </Routes>

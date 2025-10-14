@@ -20,12 +20,12 @@ export namespace main {
 	}
 	export class Attendance {
 	    id: number;
-	    student_id: number;
-	    subject_id: number;
+	    class_id: number;
 	    date: string;
+	    student_id: number;
+	    time_in?: string;
+	    time_out?: string;
 	    status: string;
-	    time_in: string;
-	    time_out: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Attendance(source);
@@ -34,26 +34,51 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
-	        this.student_id = source["student_id"];
-	        this.subject_id = source["subject_id"];
+	        this.class_id = source["class_id"];
 	        this.date = source["date"];
-	        this.status = source["status"];
+	        this.student_id = source["student_id"];
 	        this.time_in = source["time_in"];
 	        this.time_out = source["time_out"];
+	        this.status = source["status"];
+	    }
+	}
+	export class ClassStudent {
+	    id: number;
+	    student_id: string;
+	    first_name: string;
+	    middle_name?: string;
+	    last_name: string;
+	    subject_id: number;
+	
+	    static createFrom(source: any = {}) {
+	        return new ClassStudent(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.student_id = source["student_id"];
+	        this.first_name = source["first_name"];
+	        this.middle_name = source["middle_name"];
+	        this.last_name = source["last_name"];
+	        this.subject_id = source["subject_id"];
 	    }
 	}
 	export class Feedback {
 	    id: number;
 	    student_id: number;
-	    student_name: string;
 	    student_id_str: string;
+	    first_name: string;
+	    middle_name?: string;
+	    last_name: string;
+	    student_name: string;
 	    pc_number: string;
-	    time_in: string;
-	    time_out: string;
-	    equipment: string;
-	    condition: string;
-	    comment: string;
-	    date: string;
+	    equipment_condition: string;
+	    monitor_condition: string;
+	    keyboard_condition: string;
+	    mouse_condition: string;
+	    comments?: string;
+	    date_submitted: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Feedback(source);
@@ -63,15 +88,18 @@ export namespace main {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
 	        this.student_id = source["student_id"];
-	        this.student_name = source["student_name"];
 	        this.student_id_str = source["student_id_str"];
+	        this.first_name = source["first_name"];
+	        this.middle_name = source["middle_name"];
+	        this.last_name = source["last_name"];
+	        this.student_name = source["student_name"];
 	        this.pc_number = source["pc_number"];
-	        this.time_in = source["time_in"];
-	        this.time_out = source["time_out"];
-	        this.equipment = source["equipment"];
-	        this.condition = source["condition"];
-	        this.comment = source["comment"];
-	        this.date = source["date"];
+	        this.equipment_condition = source["equipment_condition"];
+	        this.monitor_condition = source["monitor_condition"];
+	        this.keyboard_condition = source["keyboard_condition"];
+	        this.mouse_condition = source["mouse_condition"];
+	        this.comments = source["comments"];
+	        this.date_submitted = source["date_submitted"];
 	    }
 	}
 	export class LoginLog {
@@ -81,7 +109,7 @@ export namespace main {
 	    user_type: string;
 	    pc_number?: string;
 	    login_time: string;
-	    logout_time: string;
+	    logout_time?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new LoginLog(source);
@@ -136,6 +164,7 @@ export namespace main {
 	    name: string;
 	    teacher: string;
 	    room: string;
+	    schedule: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Subject(source);
@@ -148,6 +177,7 @@ export namespace main {
 	        this.name = source["name"];
 	        this.teacher = source["teacher"];
 	        this.room = source["room"];
+	        this.schedule = source["schedule"];
 	    }
 	}
 	export class TeacherDashboard {

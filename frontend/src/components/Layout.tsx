@@ -67,7 +67,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     try {
       // In a real app, you would upload the file to a server
       // For now, we'll just save the data URL
-      await UpdateUserPhoto(user.id, photoPreview);
+      await UpdateUserPhoto(user.id, user.role, photoPreview);
       alert('Photo updated successfully!');
       setPhotoFile(null);
     } catch (error) {
@@ -100,7 +100,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     if (!user) return;
 
     try {
-      await ChangePassword(user.id, oldPassword, newPassword);
+      await ChangePassword(user.name, oldPassword, newPassword);
       setPasswordSuccess('Password changed successfully!');
       setOldPassword('');
       setNewPassword('');

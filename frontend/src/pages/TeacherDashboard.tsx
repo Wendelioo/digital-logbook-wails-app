@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useLocation } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, useParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { 
   LayoutDashboard, 
@@ -9,44 +9,39 @@ import {
   BookOpen,
   CheckCircle,
   XCircle,
-  Clock
+  Clock,
+  ArrowLeft,
+  UserPlus,
+  Save,
+  Trash2
 } from 'lucide-react';
 import { 
   GetTeacherDashboard,
   GetSubjects,
+  GetClassStudents,
   RecordAttendance,
   ExportAttendanceCSV
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
+import { main } from '../../wailsjs/go/models';
 
-interface Subject {
-  id: number;
-  code: string;
-  name: string;
-  teacher: string;
-  room: string;
-}
-
-interface Attendance {
-  id: number;
-  student_id: number;
-  subject_id: number;
-  date: string;
-  status: string;
-  time_in: string;
-  time_out: string;
-}
-
-interface TeacherDashboardData {
-  subjects: Subject[];
-  attendance: Attendance[];
-}
+// Use the generated models from the backend
+type Subject = main.Subject;
+type Attendance = main.Attendance;
+type TeacherDashboardData = main.TeacherDashboard;
+type ClassStudent = main.ClassStudent;
 
 function DashboardOverview() {
   const { user } = useAuth();
-  const [dashboardData, setDashboardData] = useState<TeacherDashboardData>({
-    subjects: [],
-    attendance: []
+  const [dashboardData, setDashboardData] = useState<TeacherDashboardData>(() => {
+    const initialData = new main.TeacherDashboard({
+      subjects: [],
+      attendance: []
+    });
+    // Ensure arrays are never null
+    if (!initialData.subjects) initialData.subjects = [];
+    if (!initialData.attendance) initialData.attendance = [];
+    return initialData;
   });
   const [loading, setLoading] = useState(false); // Start with false to show content immediately
   const [error, setError] = useState<string>('');
@@ -66,6 +61,9 @@ function DashboardOverview() {
         console.log('Dashboard data received:', data);
         
         if (data) {
+          // Ensure arrays are never null
+          if (!data.subjects) data.subjects = [];
+          if (!data.attendance) data.attendance = [];
           setDashboardData(data);
         }
         setError('');
@@ -140,7 +138,7 @@ function DashboardOverview() {
                     Today's Attendance
                   </dt>
                   <dd className="text-3xl font-bold text-gray-900">
-                    {dashboardData.attendance.length || (error ? '5' : '0')}
+                    {dashboardData.attendance?.length || (error ? '5' : '0')}
                   </dd>
                 </dl>
               </div>
@@ -160,7 +158,7 @@ function DashboardOverview() {
                     Present Today
                   </dt>
                   <dd className="text-3xl font-bold text-gray-900">
-                    {dashboardData.attendance.filter(a => a.status === 'Present').length || (error ? '4' : '0')}
+                    {dashboardData.attendance?.filter(a => a.status === 'Present').length || (error ? '4' : '0')}
                   </dd>
                 </dl>
               </div>
@@ -172,7 +170,7 @@ function DashboardOverview() {
       {/* My Subjects Section */}
       <div className="mb-8">
         <h3 className="text-lg font-medium text-gray-900 mb-4">My Subjects</h3>
-        {dashboardData.subjects.length === 0 && !error ? (
+        {(dashboardData.subjects?.length || 0) === 0 && !error ? (
           <div className="bg-white shadow rounded-lg p-6">
             <div className="text-center">
               <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
@@ -184,7 +182,7 @@ function DashboardOverview() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {dashboardData.subjects.length > 0 ? (
+            {(dashboardData.subjects?.length || 0) > 0 ? (
               dashboardData.subjects.map((subject) => (
                 <div key={subject.id} className="bg-white overflow-hidden shadow rounded-lg">
                   <div className="p-6">
@@ -244,7 +242,7 @@ function DashboardOverview() {
           <h3 className="text-lg font-medium text-gray-900">Today's Attendance</h3>
         </div>
         <div className="px-6 py-4">
-          {dashboardData.attendance.length === 0 && !error ? (
+          {(dashboardData.attendance?.length || 0) === 0 && !error ? (
             <div className="text-center py-8">
               <ClipboardList className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900">No attendance records</h3>
@@ -254,7 +252,7 @@ function DashboardOverview() {
             </div>
           ) : (
             <div className="space-y-3">
-              {dashboardData.attendance.length > 0 ? (
+              {(dashboardData.attendance?.length || 0) > 0 ? (
                 dashboardData.attendance.map((record) => (
                   <div key={record.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center">
@@ -264,7 +262,7 @@ function DashboardOverview() {
                       }`}></div>
                       <div>
                         <p className="text-sm font-medium text-gray-900">Student ID: {record.student_id}</p>
-                        <p className="text-sm text-gray-500">{record.time_in} - {record.time_out}</p>
+                        <p className="text-sm text-gray-500">{record.time_in || '-'} - {record.time_out || '-'}</p>
                       </div>
                     </div>
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -313,6 +311,7 @@ function DashboardOverview() {
 }
 
 function Classlists() {
+  const navigate = useNavigate();
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -335,6 +334,10 @@ function Classlists() {
     loadSubjects();
   }, []);
 
+  const handleViewClassList = (subjectId: number) => {
+    navigate(`/teacher/classlists/${subjectId}`);
+  };
+
   return (
     <div className="p-6">
       <div className="mb-6">
@@ -352,48 +355,286 @@ function Classlists() {
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
         </div>
+      ) : subjects.length > 0 ? (
+        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Subject Code
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Schedule
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Room
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {subjects.map((subject) => (
+                <tr key={subject.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {subject.code}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {subject.schedule || 'TBA'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {subject.room}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button 
+                      onClick={() => handleViewClassList(subject.id)}
+                      className="text-primary-600 hover:text-primary-900 font-medium hover:underline transition-colors"
+                    >
+                      View Class List
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       ) : (
-        <div className="bg-white shadow overflow-hidden sm:rounded-md">
-          <ul className="divide-y divide-gray-200">
-            {subjects.length > 0 ? (
-              subjects.map((subject) => (
-                <li key={subject.id}>
-                  <div className="px-4 py-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center">
-                        <BookOpen className="h-6 w-6 text-primary-600 mr-3" />
-                        <div>
-                          <h3 className="text-lg font-medium text-gray-900">{subject.code}</h3>
-                          <p className="text-sm text-gray-600">{subject.name}</p>
-                          <p className="text-sm text-gray-500">{subject.room}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <button className="text-primary-600 hover:text-primary-900 text-sm">
-                          View Students
-                        </button>
-                        <button className="text-primary-600 hover:text-primary-900 text-sm">
-                          Export List
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))
-            ) : (
-              <li>
-                <div className="px-4 py-8 text-center">
-                  <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
-                  <h3 className="mt-2 text-sm font-medium text-gray-900">No subjects found</h3>
-                  <p className="mt-1 text-sm text-gray-500">
-                    No subjects are assigned to you yet.
-                  </p>
-                </div>
-              </li>
-            )}
-          </ul>
+        <div className="bg-white shadow sm:rounded-lg p-6">
+          <div className="text-center py-8">
+            <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No subjects found</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              No subjects are assigned to you yet.
+            </p>
+          </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function ViewClassList() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const [subject, setSubject] = useState<Subject | null>(null);
+  const [students, setStudents] = useState<ClassStudent[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    const loadClassDetails = async () => {
+      if (!id) return;
+      
+      setLoading(true);
+      try {
+        // Get all subjects and find the selected one
+        const subjects = await GetSubjects();
+        const selectedSubject = subjects.find(s => s.id === parseInt(id));
+        
+        if (selectedSubject) {
+          setSubject(selectedSubject);
+        }
+
+        // Get students for this class
+        const studentsData = await GetClassStudents(parseInt(id));
+        setStudents(studentsData || []);
+        setError('');
+      } catch (error) {
+        console.error('Failed to load class details:', error);
+        setError('Unable to load class details from server.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadClassDetails();
+  }, [id]);
+
+  const handleRemoveStudent = (studentId: number) => {
+    if (confirm('Are you sure you want to remove this student from the class?')) {
+      // Remove student logic would go here
+      setStudents(students.filter(s => s.id !== studentId));
+      alert('Student removed successfully!');
+    }
+  };
+
+  const handleAddStudent = () => {
+    alert('Add student functionality would be implemented here');
+  };
+
+  const handleSaveChanges = () => {
+    alert('Save changes functionality would be implemented here');
+  };
+
+  if (loading) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!subject) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Class not found</p>
+          <button
+            onClick={() => navigate('/teacher/classlists')}
+            className="mt-4 text-primary-600 hover:text-primary-900"
+          >
+            Back to Class Lists
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="p-6">
+      {/* Header with Back Button */}
+      <div className="mb-6 flex items-center">
+        <button
+          onClick={() => navigate('/teacher/classlists')}
+          className="mr-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+        >
+          <ArrowLeft className="h-5 w-5 text-gray-600" />
+        </button>
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">View Class List</h2>
+          <p className="text-gray-600">Manage students enrolled in this class</p>
+        </div>
+      </div>
+
+      {error && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      {/* Class Information Header */}
+      <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Class Information</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="flex">
+            <span className="font-medium text-gray-700 w-32">Subject Code:</span>
+            <span className="text-gray-900">{subject.code}</span>
+          </div>
+          <div className="flex">
+            <span className="font-medium text-gray-700 w-32">Schedule:</span>
+            <span className="text-gray-900">{subject.schedule || 'TBA'}</span>
+          </div>
+          <div className="flex">
+            <span className="font-medium text-gray-700 w-32">Subject Name:</span>
+            <span className="text-gray-900">{subject.name}</span>
+          </div>
+          <div className="flex">
+            <span className="font-medium text-gray-700 w-32">Room:</span>
+            <span className="text-gray-900">{subject.room}</span>
+          </div>
+          <div className="flex md:col-span-2">
+            <span className="font-medium text-gray-700 w-32">Teacher:</span>
+            <span className="text-gray-900">{subject.teacher}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Action Buttons */}
+      <div className="mb-4 flex justify-between items-center">
+        <div className="text-sm text-gray-600">
+          Total Students: <span className="font-semibold">{students.length}</span>
+        </div>
+        <div className="flex gap-3">
+          <button
+            onClick={handleAddStudent}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 transition-colors"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add Student
+          </button>
+          <button
+            onClick={handleSaveChanges}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
+          >
+            <Save className="h-4 w-4 mr-2" />
+            Save Changes
+          </button>
+        </div>
+      </div>
+
+      {/* Student List Table */}
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+        {students.length > 0 ? (
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Student ID
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Last Name
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  First Name
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Middle Name
+                </th>
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {students.map((student) => (
+                <tr key={student.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {student.student_id}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {student.last_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {student.first_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {student.middle_name || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => handleRemoveStudent(student.id)}
+                      className="inline-flex items-center text-red-600 hover:text-red-900 font-medium hover:underline transition-colors"
+                    >
+                      <Trash2 className="h-4 w-4 mr-1" />
+                      Remove
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        ) : (
+          <div className="px-6 py-12 text-center">
+            <Users className="mx-auto h-12 w-12 text-gray-400" />
+            <h3 className="mt-2 text-sm font-medium text-gray-900">No students enrolled</h3>
+            <p className="mt-1 text-sm text-gray-500">
+              Get started by adding a student to this class.
+            </p>
+            <div className="mt-6">
+              <button
+                onClick={handleAddStudent}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+              >
+                <UserPlus className="h-4 w-4 mr-2" />
+                Add Student
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
@@ -555,7 +796,7 @@ function AttendanceManagement() {
                     }`}></div>
                     <div>
                       <p className="text-sm font-medium text-gray-900">Student ID: {record.student_id}</p>
-                      <p className="text-sm text-gray-500">{record.date} • {record.time_in} - {record.time_out}</p>
+                      <p className="text-sm text-gray-500">{record.date} • {record.time_in || '-'} - {record.time_out || '-'}</p>
                     </div>
                   </div>
                   <span className={`px-2 py-1 text-xs font-medium rounded-full ${
@@ -591,6 +832,7 @@ function TeacherDashboard() {
       <Routes>
         <Route index element={<DashboardOverview />} />
         <Route path="classlists" element={<Classlists />} />
+        <Route path="classlists/:id" element={<ViewClassList />} />
         <Route path="attendance" element={<AttendanceManagement />} />
       </Routes>
     </Layout>

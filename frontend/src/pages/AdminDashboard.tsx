@@ -29,6 +29,7 @@ import {
   ExportFeedbackCSV,
   ExportFeedbackPDF
 } from '../../wailsjs/go/main/App';
+import { main } from '../../wailsjs/go/models';
 
 interface DashboardStats {
   total_students: number;
@@ -62,19 +63,8 @@ interface LoginLog {
   logout_time?: string;
 }
 
-interface Feedback {
-  id: number;
-  student_id: number;
-  student_name: string;
-  student_id_str: string;
-  pc_number: string;
-  time_in: string;
-  time_out: string;
-  equipment: string;
-  condition: string;
-  comment: string;
-  date: string;
-}
+// Use the generated Feedback model from main
+type Feedback = main.Feedback;
 
 function DashboardOverview() {
   const [stats, setStats] = useState<DashboardStats>({
@@ -1246,19 +1236,19 @@ function Reports() {
   const filteredReports = reports.filter((report) => {
     // General search - searches across all fields
     const searchLower = searchQuery.toLowerCase();
-    const matchesSearch = searchQuery === '' || 
+    const matchesSearch = searchQuery === '' ||
       report.student_name.toLowerCase().includes(searchLower) ||
       report.student_id_str.toLowerCase().includes(searchLower) ||
       report.pc_number.toLowerCase().includes(searchLower) ||
-      report.time_in.toLowerCase().includes(searchLower) ||
-      report.time_out.toLowerCase().includes(searchLower) ||
-      report.equipment.toLowerCase().includes(searchLower) ||
-      report.condition.toLowerCase().includes(searchLower) ||
-      report.comment.toLowerCase().includes(searchLower) ||
-      (report.date && report.date.toLowerCase().includes(searchLower));
+      report.equipment_condition.toLowerCase().includes(searchLower) ||
+      report.monitor_condition.toLowerCase().includes(searchLower) ||
+      report.keyboard_condition.toLowerCase().includes(searchLower) ||
+      report.mouse_condition.toLowerCase().includes(searchLower) ||
+      (report.comments && report.comments.toLowerCase().includes(searchLower)) ||
+      (report.date_submitted && report.date_submitted.toLowerCase().includes(searchLower));
     
     // Date filter
-    const matchesDate = dateFilter === '' || (report.date && report.date.startsWith(dateFilter));
+    const matchesDate = dateFilter === '' || (report.date_submitted && report.date_submitted.startsWith(dateFilter));
 
     return matchesSearch && matchesDate;
   });
@@ -1398,19 +1388,22 @@ function Reports() {
                   PC Number
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Time In
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Time Out
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Equipment
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Condition
+                  Monitor
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Report
+                  Keyboard
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Mouse
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Comments
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Date
                 </th>
               </tr>
             </thead>
@@ -1426,34 +1419,37 @@ function Reports() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {report.pc_number}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.time_in}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.time_out}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.equipment}
-                  </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      report.condition === 'Good' 
+                      report.equipment_condition === 'Good' 
                         ? 'bg-green-100 text-green-800' 
-                        : report.condition === 'Fair' 
+                        : report.equipment_condition === 'Minor Issue' 
                         ? 'bg-yellow-100 text-yellow-800'
                         : 'bg-red-100 text-red-800'
                     }`}>
-                      {report.condition}
+                      {report.equipment_condition}
                     </span>
                   </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.monitor_condition}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.keyboard_condition}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.mouse_condition}
+                  </td>
                   <td className="px-6 py-4 text-sm text-gray-900">
-                    {report.comment}
+                    {report.comments || '-'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {report.date_submitted ? new Date(report.date_submitted).toLocaleDateString() : '-'}
                   </td>
                 </tr>
               ))}
               {filteredReports.length === 0 && (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
                     No reports found
                   </td>
                 </tr>

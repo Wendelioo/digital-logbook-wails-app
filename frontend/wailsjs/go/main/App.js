@@ -6,28 +6,12 @@ export function ChangePassword(arg1, arg2, arg3) {
   return window['go']['main']['App']['ChangePassword'](arg1, arg2, arg3);
 }
 
-export function CreateAdmin(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['CreateAdmin'](arg1, arg2, arg3, arg4);
-}
-
-export function CreateStudent(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['CreateStudent'](arg1, arg2, arg3, arg4, arg5);
-}
-
 export function CreateSubject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateSubject'](arg1, arg2, arg3, arg4);
 }
 
-export function CreateTeacher(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['CreateTeacher'](arg1, arg2, arg3, arg4, arg5);
-}
-
 export function CreateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
   return window['go']['main']['App']['CreateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
-}
-
-export function CreateWorkingStudent(arg1, arg2, arg3, arg4, arg5) {
-  return window['go']['main']['App']['CreateWorkingStudent'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function DeleteUser(arg1) {
@@ -54,10 +38,6 @@ export function ExportLogsPDF() {
   return window['go']['main']['App']['ExportLogsPDF']();
 }
 
-export function ExportUsersCSV() {
-  return window['go']['main']['App']['ExportUsersCSV']();
-}
-
 export function GetAdminDashboard() {
   return window['go']['main']['App']['GetAdminDashboard']();
 }
@@ -66,16 +46,12 @@ export function GetAllLogs() {
   return window['go']['main']['App']['GetAllLogs']();
 }
 
+export function GetClassStudents(arg1) {
+  return window['go']['main']['App']['GetClassStudents'](arg1);
+}
+
 export function GetFeedback() {
   return window['go']['main']['App']['GetFeedback']();
-}
-
-export function GetHostname() {
-  return window['go']['main']['App']['GetHostname']();
-}
-
-export function GetLogsByUserType(arg1) {
-  return window['go']['main']['App']['GetLogsByUserType'](arg1);
 }
 
 export function GetStudentDashboard(arg1) {
@@ -88,10 +64,6 @@ export function GetSubjects() {
 
 export function GetTeacherDashboard(arg1) {
   return window['go']['main']['App']['GetTeacherDashboard'](arg1);
-}
-
-export function GetUserByID(arg1) {
-  return window['go']['main']['App']['GetUserByID'](arg1);
 }
 
 export function GetUsers() {
@@ -110,42 +82,18 @@ export function Login(arg1, arg2) {
   return window['go']['main']['App']['Login'](arg1, arg2);
 }
 
-export function LoginByEmployeeID(arg1, arg2) {
-  return window['go']['main']['App']['LoginByEmployeeID'](arg1, arg2);
-}
-
-export function LoginByStudentID(arg1, arg2) {
-  return window['go']['main']['App']['LoginByStudentID'](arg1, arg2);
-}
-
 export function RecordAttendance(arg1, arg2, arg3) {
   return window['go']['main']['App']['RecordAttendance'](arg1, arg2, arg3);
-}
-
-export function RecordLogin(arg1, arg2, arg3, arg4) {
-  return window['go']['main']['App']['RecordLogin'](arg1, arg2, arg3, arg4);
-}
-
-export function RecordLogout(arg1) {
-  return window['go']['main']['App']['RecordLogout'](arg1);
-}
-
-export function SearchLogs(arg1, arg2) {
-  return window['go']['main']['App']['SearchLogs'](arg1, arg2);
 }
 
 export function SearchUsers(arg1, arg2) {
   return window['go']['main']['App']['SearchUsers'](arg1, arg2);
 }
 
-export function SubmitFeedback(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
-  return window['go']['main']['App']['SubmitFeedback'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
-}
-
 export function UpdateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
   return window['go']['main']['App']['UpdateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
 }
 
-export function UpdateUserPhoto(arg1, arg2) {
-  return window['go']['main']['App']['UpdateUserPhoto'](arg1, arg2);
+export function UpdateUserPhoto(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateUserPhoto'](arg1, arg2, arg3);
 }

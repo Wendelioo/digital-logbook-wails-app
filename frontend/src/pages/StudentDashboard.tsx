@@ -15,28 +15,18 @@ import {
   RecordAttendance
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
+import { main } from '../../wailsjs/go/models';
 
-interface Attendance {
-  id: number;
-  student_id: number;
-  subject_id: number;
-  date: string;
-  status: string;
-  time_in: string;
-  time_out: string;
-}
-
-interface StudentDashboardData {
-  attendance: Attendance[];
-  today_log?: Attendance;
-}
+// Use the generated models from the backend
+type Attendance = main.Attendance;
+type StudentDashboardData = main.StudentDashboard;
 
 function DashboardOverview() {
   const { user } = useAuth();
-  const [dashboardData, setDashboardData] = useState<StudentDashboardData>({
+  const [dashboardData, setDashboardData] = useState<StudentDashboardData>(new main.StudentDashboard({
     attendance: [],
     today_log: undefined
-  });
+  }));
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -87,7 +77,7 @@ function DashboardOverview() {
                     Status: {dashboardData.today_log.status}
                   </p>
                   <p className="text-sm text-gray-600">
-                    Time In: {dashboardData.today_log.time_in} | Time Out: {dashboardData.today_log.time_out}
+                    Time In: {dashboardData.today_log.time_in || '-'} | Time Out: {dashboardData.today_log.time_out || '-'}
                   </p>
                 </div>
               </div>
@@ -257,13 +247,13 @@ function MyAttendance() {
                       }`}></div>
                       <div>
                         <p className="text-sm font-medium text-gray-900">
-                          Subject ID: {record.subject_id}
+                          Class ID: {record.class_id}
                         </p>
                         <p className="text-sm text-gray-600">
                           Date: {record.date}
                         </p>
                         <p className="text-sm text-gray-500">
-                          Time: {record.time_in} - {record.time_out}
+                          Time: {record.time_in || '-'} - {record.time_out || '-'}
                         </p>
                       </div>
                     </div>

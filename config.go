@@ -1,12 +1,16 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
+	"log"
 	"os"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
-// DatabaseConfig holds database connection configuration
-type DatabaseConfig struct {
+// DBConfig holds database configuration
+type DBConfig struct {
 	Host     string
 	Port     string
 	Username string
@@ -14,37 +18,53 @@ type DatabaseConfig struct {
 	Database string
 }
 
-// GetAppConfig returns database configuration from environment variables or defaults
-func GetAppConfig() DatabaseConfig {
-	return DatabaseConfig{
+// GetDBConfig returns database configuration from environment or defaults
+func GetDBConfig() DBConfig {
+	return DBConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
 		Port:     getEnv("DB_PORT", "3306"),
-		Username: getEnv("DB_USERNAME", "comp-lab1"),
-		Password: getEnv("DB_PASSWORD", "computer123"),
+		Username: getEnv("DB_USERNAME", "root"),
+		Password: getEnv("DB_PASSWORD", "wendel"),
 		Database: getEnv("DB_DATABASE", "logbookdb"),
 	}
 }
 
-// GetDatabaseConfig returns database configuration from environment variables or defaults
-func GetDatabaseConfig() DatabaseConfig {
-	return GetAppConfig()
+// getEnv gets an environment variable or returns a default value
+func getEnv(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
 }
 
-// GetConnectionString returns the MySQL connection string
-func (config DatabaseConfig) GetConnectionString() string {
-	return fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true",
+// InitDatabase initializes and returns a database connection
+func InitDatabase() (*sql.DB, error) {
+	config := GetDBConfig()
+	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
 		config.Username,
 		config.Password,
 		config.Host,
 		config.Port,
 		config.Database,
 	)
+
+	db, err := sql.Open("mysql", dsn)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database: %w", err)
+	}
+
+	// Test the connection
+	err = db.Ping()
+	if err != nil {
+		return nil, fmt.Errorf("failed to connect to database: %w", err)
+	}
+
+	log.Println("✓ Database connection established successfully")
+	return db, nil
 }
 
-// getEnv gets environment variable with fallback to default value
-func getEnv(key, defaultValue string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
-	}
-	return defaultValue
-}
+
+
+
+
