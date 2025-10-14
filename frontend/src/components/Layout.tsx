@@ -46,14 +46,20 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
     // Show feedback modal only for students
     if (user?.role === 'student') {
       setShowFeedbackModal(true);
     } else {
       // For non-students, logout directly
-      logout();
-      navigate('/login');
+      try {
+        await logout();
+        navigate('/login');
+      } catch (error) {
+        console.error('Logout error:', error);
+        // Even if logout fails, navigate to login
+        navigate('/login');
+      }
     }
   };
 
@@ -85,7 +91,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     }
     
     setShowFeedbackModal(false);
-    logout();
+    await logout();
     navigate('/login');
   };
 

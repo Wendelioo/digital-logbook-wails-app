@@ -18,13 +18,13 @@ type DBConfig struct {
 	Database string
 }
 
-// GetDBConfig returns database configuration from environment or defaults
+// GetDBConfig returns database configuration from environment variables or defaults
 func GetDBConfig() DBConfig {
 	return DBConfig{
 		Host:     getEnv("DB_HOST", "localhost"),
 		Port:     getEnv("DB_PORT", "3306"),
-		Username: getEnv("DB_USERNAME", "root"),
-		Password: getEnv("DB_PASSWORD", "wendel"),
+		Username: getEnv("DB_USERNAME", "computerlab"),
+		Password: getEnv("DB_PASSWORD", "computer"),
 		Database: getEnv("DB_DATABASE", "logbookdb"),
 	}
 }
@@ -41,7 +41,8 @@ func getEnv(key, defaultValue string) string {
 // InitDatabase initializes and returns a database connection
 func InitDatabase() (*sql.DB, error) {
 	config := GetDBConfig()
-	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
+	dsn := fmt.Sprintf(
+		"%s:%s@tcp(%s:%s)/%s?parseTime=true&charset=utf8mb4",
 		config.Username,
 		config.Password,
 		config.Host,
@@ -55,16 +56,10 @@ func InitDatabase() (*sql.DB, error) {
 	}
 
 	// Test the connection
-	err = db.Ping()
-	if err != nil {
+	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
 	log.Println("✓ Database connection established successfully")
 	return db, nil
 }
-
-
-
-
-

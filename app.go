@@ -62,19 +62,22 @@ type User struct {
 	Created    string  `json:"created"`
 }
 
-// Login authenticates a user
-func (a *App) Login(username, password string) (*User, error) {
-	// MOCK DATA - Check for test users first (for temporary testing without database)
-	mockUsers := getMockUsers()
-	if mockUser, exists := mockUsers[username]; exists {
-		if mockUser.Password == password {
-			log.Printf("✓ Mock user login successful: %s (role: %s)", username, mockUser.Role)
-			return mockUser, nil
-		}
-		return nil, fmt.Errorf("invalid credentials")
+// Logout logs a user out and records logout time
+func (a *App) Logout(userID int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
 	}
 
-	// If not a mock user, proceed with database authentication
+	// Update the most recent login log for this user to set logout time
+	query := `UPDATE login_logs SET logout_time = NOW() 
+			  WHERE user_id = ? AND logout_time IS NULL 
+			  ORDER BY login_time DESC LIMIT 1`
+	_, err := a.db.Exec(query, userID)
+	return err
+}
+
+// Login authenticates a user
+func (a *App) Login(username, password string) (*User, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not connected")
 	}
@@ -99,110 +102,86 @@ func (a *App) Login(username, password string) (*User, error) {
 	user.Created = createdAt.Format("2006-01-02 15:04:05")
 
 	// Get additional user details based on role
+	var detailQuery string
 	switch user.Role {
 	case "admin":
-		query = `SELECT admin_id, first_name, middle_name, last_name FROM admins WHERE admin_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, admin_id FROM admins WHERE user_id = ?`
 	case "teacher":
-		query = `SELECT teacher_id, first_name, middle_name, last_name FROM teachers WHERE teacher_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, teacher_id FROM teachers WHERE user_id = ?`
 	case "student":
-		query = `SELECT student_id, first_name, middle_name, last_name FROM students WHERE student_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section FROM students WHERE user_id = ?`
 	case "working_student":
-		query = `SELECT student_id, first_name, middle_name, last_name FROM working_students WHERE student_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section FROM working_students WHERE user_id = ?`
 	}
 
-	var id int
-	var firstName, middleName, lastName sql.NullString
-	err = a.db.QueryRow(query, user.ID).Scan(&id, &firstName, &middleName, &lastName)
-	if err == nil {
-		if firstName.Valid {
-			user.FirstName = &firstName.String
+	var firstName, middleName, lastName, gender sql.NullString
+	var employeeID, studentID, year, section sql.NullString
+
+	switch user.Role {
+	case "admin", "teacher":
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &employeeID)
+		if err == nil {
+			if firstName.Valid {
+				user.FirstName = &firstName.String
+			}
+			if middleName.Valid {
+				user.MiddleName = &middleName.String
+			}
+			if lastName.Valid {
+				user.LastName = &lastName.String
+			}
+			if gender.Valid {
+				user.Gender = &gender.String
+			}
+			if employeeID.Valid {
+				user.EmployeeID = &employeeID.String
+			}
 		}
-		if middleName.Valid {
-			user.MiddleName = &middleName.String
-		}
-		if lastName.Valid {
-			user.LastName = &lastName.String
+	case "student", "working_student":
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &studentID, &year, &section)
+		if err == nil {
+			if firstName.Valid {
+				user.FirstName = &firstName.String
+			}
+			if middleName.Valid {
+				user.MiddleName = &middleName.String
+			}
+			if lastName.Valid {
+				user.LastName = &lastName.String
+			}
+			if gender.Valid {
+				user.Gender = &gender.String
+			}
+			if studentID.Valid {
+				user.StudentID = &studentID.String
+			}
+			if year.Valid {
+				user.Year = &year.String
+			}
+			if section.Valid {
+				user.Section = &section.String
+			}
 		}
 	}
 
+	log.Printf("✓ User login successful: %s (role: %s)", username, user.Role)
 	return &user, nil
 }
 
-// getMockUsers returns mock users for temporary testing
-func getMockUsers() map[string]*User {
-	// Helper function to create string pointers
-	strPtr := func(s string) *string { return &s }
-
-	mockUsers := make(map[string]*User)
-
-	// Mock Admin User
-	mockUsers["admin"] = &User{
-		ID:         1,
-		Password:   "admin123",
-		Name:       "admin",
-		FirstName:  strPtr("System"),
-		MiddleName: strPtr("S."),
-		LastName:   strPtr("Administrator"),
-		Gender:     strPtr("Male"),
-		Role:       "admin",
-		EmployeeID: strPtr("ADMIN001"),
-		Created:    time.Now().Format("2006-01-02 15:04:05"),
-	}
-
-	// Mock Teacher User
-	mockUsers["teacher"] = &User{
-		ID:         2,
-		Password:   "teacher123",
-		Name:       "teacher",
-		FirstName:  strPtr("Maria"),
-		MiddleName: strPtr("C."),
-		LastName:   strPtr("Santos"),
-		Gender:     strPtr("Female"),
-		Role:       "teacher",
-		EmployeeID: strPtr("TEACH001"),
-		Created:    time.Now().Format("2006-01-02 15:04:05"),
-	}
-
-	// Mock Student User
-	mockUsers["student"] = &User{
-		ID:         3,
-		Password:   "student123",
-		Name:       "student",
-		FirstName:  strPtr("Juan"),
-		MiddleName: strPtr("D."),
-		LastName:   strPtr("Cruz"),
-		Gender:     strPtr("Male"),
-		Role:       "student",
-		StudentID:  strPtr("2024-001"),
-		Year:       strPtr("3rd Year"),
-		Created:    time.Now().Format("2006-01-02 15:04:05"),
-	}
-
-	// Mock Working Student User
-	mockUsers["working"] = &User{
-		ID:         4,
-		Password:   "working123",
-		Name:       "working",
-		FirstName:  strPtr("Ana"),
-		MiddleName: strPtr("B."),
-		LastName:   strPtr("Reyes"),
-		Gender:     strPtr("Female"),
-		Role:       "working_student",
-		StudentID:  strPtr("2024-002"),
-		Year:       strPtr("4th Year"),
-		Created:    time.Now().Format("2006-01-02 15:04:05"),
-	}
-
-	return mockUsers
-}
-
-// GetUsers returns all users
+// GetUsers returns all users with complete details
 func (a *App) GetUsers() ([]User, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, username, password, user_type, created_at FROM users ORDER BY created_at DESC`
+	query := `
+		SELECT 
+			id, username, user_type, created_at,
+			first_name, middle_name, last_name, gender,
+			employee_id, student_id_str, year_level, section
+		FROM v_users_complete
+		ORDER BY created_at DESC
+	`
 	rows, err := a.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -213,24 +192,64 @@ func (a *App) GetUsers() ([]User, error) {
 	for rows.Next() {
 		var user User
 		var createdAt time.Time
-		err := rows.Scan(&user.ID, &user.Name, &user.Password, &user.Role, &createdAt)
+		var firstName, middleName, lastName, gender sql.NullString
+		var employeeID, studentID, year, section sql.NullString
+
+		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
+			&firstName, &middleName, &lastName, &gender,
+			&employeeID, &studentID, &year, &section)
 		if err != nil {
 			continue
 		}
+
 		user.Created = createdAt.Format("2006-01-02 15:04:05")
+
+		if firstName.Valid {
+			user.FirstName = &firstName.String
+		}
+		if middleName.Valid {
+			user.MiddleName = &middleName.String
+		}
+		if lastName.Valid {
+			user.LastName = &lastName.String
+		}
+		if gender.Valid {
+			user.Gender = &gender.String
+		}
+		if employeeID.Valid {
+			user.EmployeeID = &employeeID.String
+		}
+		if studentID.Valid {
+			user.StudentID = &studentID.String
+		}
+		if year.Valid {
+			user.Year = &year.String
+		}
+		if section.Valid {
+			user.Section = &section.String
+		}
+
 		users = append(users, user)
 	}
 
 	return users, nil
 }
 
-// GetUsersByType returns users filtered by type
+// GetUsersByType returns users filtered by type with complete details
 func (a *App) GetUsersByType(userType string) ([]User, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, username, password, user_type, created_at FROM users WHERE user_type = ? ORDER BY created_at DESC`
+	query := `
+		SELECT 
+			id, username, user_type, created_at,
+			first_name, middle_name, last_name, gender,
+			employee_id, student_id_str, year_level, section
+		FROM v_users_complete
+		WHERE user_type = ?
+		ORDER BY created_at DESC
+	`
 	rows, err := a.db.Query(query, userType)
 	if err != nil {
 		return nil, err
@@ -241,25 +260,77 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 	for rows.Next() {
 		var user User
 		var createdAt time.Time
-		err := rows.Scan(&user.ID, &user.Name, &user.Password, &user.Role, &createdAt)
+		var firstName, middleName, lastName, gender sql.NullString
+		var employeeID, studentID, year, section sql.NullString
+
+		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
+			&firstName, &middleName, &lastName, &gender,
+			&employeeID, &studentID, &year, &section)
 		if err != nil {
 			continue
 		}
+
 		user.Created = createdAt.Format("2006-01-02 15:04:05")
+
+		if firstName.Valid {
+			user.FirstName = &firstName.String
+		}
+		if middleName.Valid {
+			user.MiddleName = &middleName.String
+		}
+		if lastName.Valid {
+			user.LastName = &lastName.String
+		}
+		if gender.Valid {
+			user.Gender = &gender.String
+		}
+		if employeeID.Valid {
+			user.EmployeeID = &employeeID.String
+		}
+		if studentID.Valid {
+			user.StudentID = &studentID.String
+		}
+		if year.Valid {
+			user.Year = &year.String
+		}
+		if section.Valid {
+			user.Section = &section.String
+		}
+
 		users = append(users, user)
 	}
 
 	return users, nil
 }
 
-// SearchUsers searches users by name, ID, gender, or date
+// SearchUsers searches users by name, ID, gender, or date with complete details
 func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, username, password, user_type, created_at FROM users WHERE username LIKE ?`
-	args := []interface{}{"%" + searchTerm + "%"}
+	query := `
+		SELECT 
+			id, username, user_type, created_at,
+			first_name, middle_name, last_name, gender,
+			employee_id, student_id_str, year_level, section
+		FROM v_users_complete
+		WHERE (
+			username LIKE ? OR
+			first_name LIKE ? OR
+			last_name LIKE ? OR
+			middle_name LIKE ? OR
+			gender LIKE ? OR
+			employee_id LIKE ? OR
+			student_id_str LIKE ? OR
+			year_level LIKE ? OR
+			section LIKE ? OR
+			DATE_FORMAT(created_at, '%Y-%m-%d') LIKE ?
+		)
+	`
+	searchPattern := "%" + searchTerm + "%"
+	args := []interface{}{searchPattern, searchPattern, searchPattern, searchPattern, searchPattern,
+		searchPattern, searchPattern, searchPattern, searchPattern, searchPattern}
 
 	if userType != "" {
 		query += ` AND user_type = ?`
@@ -278,11 +349,43 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 	for rows.Next() {
 		var user User
 		var createdAt time.Time
-		err := rows.Scan(&user.ID, &user.Name, &user.Password, &user.Role, &createdAt)
+		var firstName, middleName, lastName, gender sql.NullString
+		var employeeID, studentID, year, section sql.NullString
+
+		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
+			&firstName, &middleName, &lastName, &gender,
+			&employeeID, &studentID, &year, &section)
 		if err != nil {
 			continue
 		}
+
 		user.Created = createdAt.Format("2006-01-02 15:04:05")
+
+		if firstName.Valid {
+			user.FirstName = &firstName.String
+		}
+		if middleName.Valid {
+			user.MiddleName = &middleName.String
+		}
+		if lastName.Valid {
+			user.LastName = &lastName.String
+		}
+		if gender.Valid {
+			user.Gender = &gender.String
+		}
+		if employeeID.Valid {
+			user.EmployeeID = &employeeID.String
+		}
+		if studentID.Valid {
+			user.StudentID = &studentID.String
+		}
+		if year.Valid {
+			user.Year = &year.String
+		}
+		if section.Valid {
+			user.Section = &section.String
+		}
+
 		users = append(users, user)
 	}
 
@@ -313,17 +416,17 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 	// Insert into respective table based on role
 	switch role {
 	case "admin":
-		query = `INSERT INTO admins (admin_id, first_name, middle_name, last_name) VALUES (?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName)
+		query = `INSERT INTO admins (user_id, admin_id, first_name, middle_name, last_name, gender) VALUES (?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(gender))
 	case "teacher":
-		query = `INSERT INTO teachers (teacher_id, first_name, middle_name, last_name) VALUES (?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName)
+		query = `INSERT INTO teachers (user_id, teacher_id, first_name, middle_name, last_name, gender) VALUES (?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(gender))
 	case "student":
-		query = `INSERT INTO students (student_id, first_name, middle_name, last_name, year_level, section) VALUES (?, ?, ?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName, nullString(year), nullString(section))
+		query = `INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, year_level, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(year), nullString(section))
 	case "working_student":
-		query = `INSERT INTO working_students (student_id, first_name, middle_name, last_name, year_level, section) VALUES (?, ?, ?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName, nullString(year), nullString(section))
+		query = `INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, gender, year_level, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(year), nullString(section))
 	}
 
 	return err
@@ -340,17 +443,17 @@ func (a *App) UpdateUser(id int, name, firstName, middleName, lastName, gender, 
 	var err error
 	switch role {
 	case "admin":
-		query = `UPDATE admins SET first_name = ?, middle_name = ?, last_name = ? WHERE admin_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, id)
+		query = `UPDATE admins SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, admin_id = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(employeeID), id)
 	case "teacher":
-		query = `UPDATE teachers SET first_name = ?, middle_name = ?, last_name = ? WHERE teacher_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, id)
+		query = `UPDATE teachers SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, teacher_id = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(employeeID), id)
 	case "student":
-		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ?, year_level = ?, section = ? WHERE student_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(year), nullString(section), id)
+		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, year_level = ?, section = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(year), nullString(section), id)
 	case "working_student":
-		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ?, year_level = ?, section = ? WHERE student_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(year), nullString(section), id)
+		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, year_level = ?, section = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(year), nullString(section), id)
 	}
 
 	return err
@@ -388,16 +491,32 @@ func (a *App) GetAdminDashboard() (AdminDashboard, error) {
 	}
 
 	// Count total students
-	a.db.QueryRow(`SELECT COUNT(*) FROM students`).Scan(&dashboard.TotalStudents)
+	err := a.db.QueryRow(`SELECT COUNT(*) FROM students`).Scan(&dashboard.TotalStudents)
+	if err != nil {
+		log.Printf("⚠ Failed to count students: %v", err)
+	}
 
 	// Count total teachers
-	a.db.QueryRow(`SELECT COUNT(*) FROM teachers`).Scan(&dashboard.TotalTeachers)
+	err = a.db.QueryRow(`SELECT COUNT(*) FROM teachers`).Scan(&dashboard.TotalTeachers)
+	if err != nil {
+		log.Printf("⚠ Failed to count teachers: %v", err)
+	}
 
 	// Count working students
-	a.db.QueryRow(`SELECT COUNT(*) FROM working_students`).Scan(&dashboard.WorkingStudents)
+	err = a.db.QueryRow(`SELECT COUNT(*) FROM working_students`).Scan(&dashboard.WorkingStudents)
+	if err != nil {
+		log.Printf("⚠ Failed to count working students: %v", err)
+	}
 
 	// Count recent logins (last 24 hours)
-	a.db.QueryRow(`SELECT COUNT(*) FROM login_logs WHERE login_time >= DATE_SUB(NOW(), INTERVAL 24 HOUR)`).Scan(&dashboard.RecentLogins)
+	err = a.db.QueryRow(`
+		SELECT COUNT(*) 
+		FROM login_logs 
+		WHERE login_time >= DATE_SUB(NOW(), INTERVAL 24 HOUR)
+	`).Scan(&dashboard.RecentLogins)
+	if err != nil {
+		log.Printf("⚠ Failed to count recent logins: %v", err)
+	}
 
 	return dashboard, nil
 }
@@ -417,13 +536,20 @@ type LoginLog struct {
 	LogoutTime *string `json:"logout_time"`
 }
 
-// GetAllLogs returns all login logs
+// GetAllLogs returns all login logs with user details
 func (a *App) GetAllLogs() ([]LoginLog, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, user_id, user_type, pc_number, login_time, logout_time FROM login_logs ORDER BY login_time DESC LIMIT 1000`
+	query := `
+		SELECT 
+			id, user_id, user_type, pc_number, 
+			login_time, logout_time, full_name
+		FROM v_login_logs_complete 
+		ORDER BY login_time DESC 
+		LIMIT 1000
+	`
 	rows, err := a.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -433,10 +559,11 @@ func (a *App) GetAllLogs() ([]LoginLog, error) {
 	var logs []LoginLog
 	for rows.Next() {
 		var log LoginLog
-		var pcNumber, logoutTime sql.NullString
+		var pcNumber sql.NullString
 		var loginTime time.Time
+		var logoutTime sql.NullTime
 
-		err := rows.Scan(&log.ID, &log.UserID, &log.UserType, &pcNumber, &loginTime, &logoutTime)
+		err := rows.Scan(&log.ID, &log.UserID, &log.UserType, &pcNumber, &loginTime, &logoutTime, &log.UserName)
 		if err != nil {
 			continue
 		}
@@ -446,9 +573,9 @@ func (a *App) GetAllLogs() ([]LoginLog, error) {
 			log.PCNumber = &pcNumber.String
 		}
 		if logoutTime.Valid {
-			log.LogoutTime = &logoutTime.String
+			formattedLogoutTime := logoutTime.Time.Format("2006-01-02 15:04:05")
+			log.LogoutTime = &formattedLogoutTime
 		}
-		log.UserName = fmt.Sprintf("User %d", log.UserID)
 
 		logs = append(logs, log)
 	}
@@ -598,7 +725,7 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 	// In production, you might want to get this from the user record
 	lastName = userName // Simplified - you may want to parse this properly
 	firstName = ""
-	
+
 	// Get user details from database
 	var userRole string
 	err := a.db.QueryRow("SELECT user_type FROM users WHERE id = ?", userID).Scan(&userRole)
@@ -607,13 +734,13 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 		var query string
 		switch userRole {
 		case "student":
-			query = "SELECT first_name, middle_name, last_name FROM students WHERE student_id = ?"
+			query = "SELECT first_name, middle_name, last_name FROM students WHERE user_id = ?"
 		case "working_student":
-			query = "SELECT first_name, middle_name, last_name FROM working_students WHERE student_id = ?"
+			query = "SELECT first_name, middle_name, last_name FROM working_students WHERE user_id = ?"
 		default:
 			query = ""
 		}
-		
+
 		if query != "" {
 			var middleNameNull sql.NullString
 			err = a.db.QueryRow(query, userID).Scan(&firstName, &middleNameNull, &lastName)
@@ -665,10 +792,10 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 			  equipment_condition, monitor_condition, keyboard_condition, mouse_condition, 
 			  comments, date_submitted) 
 			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`
-	
+
 	_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName, pcNumber,
 		equipmentCondition, monitorCondition, keyboardCondition, mouseCondition, nullString(additionalComments))
-	
+
 	if err != nil {
 		log.Printf("Failed to save equipment feedback: %v", err)
 		return fmt.Errorf("failed to save feedback: %w", err)
@@ -910,20 +1037,17 @@ type Attendance struct {
 func (a *App) GetTeacherDashboard(teacherName string) (TeacherDashboard, error) {
 	var dashboard TeacherDashboard
 
-	// Get subjects (will automatically use mock data if DB not connected)
+	if a.db == nil {
+		return dashboard, fmt.Errorf("database not connected")
+	}
+
+	// Get subjects
 	subjects, err := a.GetSubjects()
 	if err != nil {
 		log.Printf("⚠ Failed to get subjects: %v", err)
-		subjects = getMockSubjects() // Fallback to mock data
+		return dashboard, err
 	}
 	dashboard.Subjects = subjects
-
-	// If database is not connected, return mock attendance data
-	if a.db == nil {
-		log.Println("⚠ Database not connected, returning mock attendance")
-		// Return dashboard with just subjects, no attendance
-		return dashboard, nil
-	}
 
 	// Get today's attendance
 	query := `SELECT id, class_id, date, student_id, time_in, time_out, status 
@@ -957,109 +1081,31 @@ func (a *App) GetTeacherDashboard(teacherName string) (TeacherDashboard, error) 
 	return dashboard, nil
 }
 
-// getMockSubjects returns mock subjects for testing
-func getMockSubjects() []Subject {
-	return []Subject{
-		{
-			ID:       1,
-			Code:     "IT101",
-			Name:     "Programming Fundamentals",
-			Teacher:  "Maria C. Santos",
-			Room:     "Lab 1",
-			Schedule: "MWF 8-9AM",
-		},
-		{
-			ID:       2,
-			Code:     "IT102",
-			Name:     "Database Management",
-			Teacher:  "Maria C. Santos",
-			Room:     "Lab 2",
-			Schedule: "TTh 1-2PM",
-		},
-		{
-			ID:       3,
-			Code:     "IT103",
-			Name:     "Web Development",
-			Teacher:  "Maria C. Santos",
-			Room:     "Lab 1",
-			Schedule: "MWF 10-11AM",
-		},
-		{
-			ID:       4,
-			Code:     "IT201",
-			Name:     "Data Structures",
-			Teacher:  "Juan P. Dela Cruz",
-			Room:     "Lab 3",
-			Schedule: "TTh 2-3PM",
-		},
-		{
-			ID:       5,
-			Code:     "IT202",
-			Name:     "Network Administration",
-			Teacher:  "Juan P. Dela Cruz",
-			Room:     "Lab 2",
-			Schedule: "MWF 1-2PM",
-		},
-	}
-}
-
-// getMockStudents returns mock students for testing
-func getMockStudents() []ClassStudent {
-	// Helper function to create string pointers
-	strPtr := func(s string) *string {
-		if s == "" {
-			return nil
-		}
-		return &s
-	}
-
-	return []ClassStudent{
-		{ID: 1, StudentID: "20201", FirstName: "Wendel", MiddleName: strPtr("T"), LastName: "Enriquez", SubjectID: 1},
-		{ID: 2, StudentID: "20202", FirstName: "Niño", MiddleName: strPtr("Y"), LastName: "Rivera", SubjectID: 1},
-		{ID: 3, StudentID: "20203", FirstName: "Sammy", MiddleName: nil, LastName: "Velchez", SubjectID: 1},
-		{ID: 4, StudentID: "20204", FirstName: "Maria", MiddleName: strPtr("L"), LastName: "Santos", SubjectID: 1},
-		{ID: 5, StudentID: "20205", FirstName: "Juan", MiddleName: strPtr("D"), LastName: "Cruz", SubjectID: 1},
-		
-		{ID: 6, StudentID: "20206", FirstName: "Ana", MiddleName: strPtr("B"), LastName: "Reyes", SubjectID: 2},
-		{ID: 7, StudentID: "20207", FirstName: "Pedro", MiddleName: strPtr("M"), LastName: "Garcia", SubjectID: 2},
-		{ID: 8, StudentID: "20208", FirstName: "Sofia", MiddleName: nil, LastName: "Mendoza", SubjectID: 2},
-		
-		{ID: 9, StudentID: "20209", FirstName: "Carlos", MiddleName: strPtr("R"), LastName: "Torres", SubjectID: 3},
-		{ID: 10, StudentID: "20210", FirstName: "Elena", MiddleName: strPtr("V"), LastName: "Flores", SubjectID: 3},
-	}
-}
-
 // GetSubjects returns all subjects
 func (a *App) GetSubjects() ([]Subject, error) {
-	// Return mock data if database is not connected
 	if a.db == nil {
-		log.Println("⚠ Database not connected, returning mock subjects")
-		return getMockSubjects(), nil
+		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, subject_code, subject_title, assigned_teacher, room FROM classlist ORDER BY subject_code`
+	query := `SELECT id, subject_code, subject_title, assigned_teacher, room, schedule FROM classlist ORDER BY subject_code`
 	rows, err := a.db.Query(query)
 	if err != nil {
-		// If database query fails, return mock data as fallback
-		log.Printf("⚠ Database query failed, returning mock subjects: %v", err)
-		return getMockSubjects(), nil
+		return nil, err
 	}
 	defer rows.Close()
 
 	var subjects []Subject
 	for rows.Next() {
 		var subj Subject
-		err := rows.Scan(&subj.ID, &subj.Code, &subj.Name, &subj.Teacher, &subj.Room)
+		var schedule sql.NullString
+		err := rows.Scan(&subj.ID, &subj.Code, &subj.Name, &subj.Teacher, &subj.Room, &schedule)
 		if err != nil {
 			continue
 		}
+		if schedule.Valid {
+			subj.Schedule = schedule.String
+		}
 		subjects = append(subjects, subj)
-	}
-
-	// If no subjects found in database, return mock data
-	if len(subjects) == 0 {
-		log.Println("⚠ No subjects found in database, returning mock subjects")
-		return getMockSubjects(), nil
 	}
 
 	return subjects, nil
@@ -1067,36 +1113,27 @@ func (a *App) GetSubjects() ([]Subject, error) {
 
 // GetClassStudents returns students enrolled in a specific class
 func (a *App) GetClassStudents(subjectID int) ([]ClassStudent, error) {
-	// Return mock data if database is not connected
 	if a.db == nil {
-		log.Printf("⚠ Database not connected, returning mock students for subject %d", subjectID)
-		allStudents := getMockStudents()
-		var filteredStudents []ClassStudent
-		for _, student := range allStudents {
-			if student.SubjectID == subjectID {
-				filteredStudents = append(filteredStudents, student)
-			}
-		}
-		return filteredStudents, nil
+		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT s.id, s.student_id, s.first_name, s.middle_name, s.last_name, cl.subject_id
-			  FROM students s
-			  INNER JOIN classlist cl ON s.class_id = cl.id
-			  WHERE cl.id = ?
-			  ORDER BY s.last_name, s.first_name`
-	
-	rows, err := a.db.Query(query, subjectID)
+	query := `
+		SELECT s.id, s.student_id, s.first_name, s.middle_name, s.last_name, s.class_id
+		FROM students s
+		WHERE s.class_id = ?
+		
+		UNION ALL
+		
+		SELECT ws.id, ws.student_id, ws.first_name, ws.middle_name, ws.last_name, ws.class_id
+		FROM working_students ws
+		WHERE ws.class_id = ?
+		
+		ORDER BY last_name, first_name
+	`
+
+	rows, err := a.db.Query(query, subjectID, subjectID)
 	if err != nil {
-		log.Printf("⚠ Database query failed, returning mock students: %v", err)
-		allStudents := getMockStudents()
-		var filteredStudents []ClassStudent
-		for _, student := range allStudents {
-			if student.SubjectID == subjectID {
-				filteredStudents = append(filteredStudents, student)
-			}
-		}
-		return filteredStudents, nil
+		return nil, err
 	}
 	defer rows.Close()
 
@@ -1104,27 +1141,18 @@ func (a *App) GetClassStudents(subjectID int) ([]ClassStudent, error) {
 	for rows.Next() {
 		var student ClassStudent
 		var middleName sql.NullString
-		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName, &student.LastName, &student.SubjectID)
+		var classID sql.NullInt32
+		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName, &student.LastName, &classID)
 		if err != nil {
 			continue
 		}
 		if middleName.Valid {
 			student.MiddleName = &middleName.String
 		}
-		students = append(students, student)
-	}
-
-	// If no students found, return mock data
-	if len(students) == 0 {
-		log.Printf("⚠ No students found in database for subject %d, returning mock students", subjectID)
-		allStudents := getMockStudents()
-		var filteredStudents []ClassStudent
-		for _, student := range allStudents {
-			if student.SubjectID == subjectID {
-				filteredStudents = append(filteredStudents, student)
-			}
+		if classID.Valid {
+			student.SubjectID = int(classID.Int32)
 		}
-		return filteredStudents, nil
+		students = append(students, student)
 	}
 
 	return students, nil
@@ -1319,13 +1347,13 @@ func (a *App) UpdateUserPhoto(userID int, userRole, photoURL string) error {
 	var query string
 	switch userRole {
 	case "admin":
-		query = `UPDATE admins SET profile_photo = ? WHERE admin_id = ?`
+		query = `UPDATE admins SET profile_photo = ? WHERE user_id = ?`
 	case "teacher":
-		query = `UPDATE teachers SET profile_photo = ? WHERE teacher_id = ?`
+		query = `UPDATE teachers SET profile_photo = ? WHERE user_id = ?`
 	case "student":
-		query = `UPDATE students SET profile_photo = ? WHERE student_id = ?`
+		query = `UPDATE students SET profile_photo = ? WHERE user_id = ?`
 	case "working_student":
-		query = `UPDATE working_students SET profile_photo = ? WHERE student_id = ?`
+		query = `UPDATE working_students SET profile_photo = ? WHERE user_id = ?`
 	default:
 		return fmt.Errorf("invalid user role")
 	}

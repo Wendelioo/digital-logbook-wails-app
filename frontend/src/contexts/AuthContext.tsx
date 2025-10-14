@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { Login } from '../../wailsjs/go/main/App';
+import { Login, Logout } from '../../wailsjs/go/main/App';
 
 interface User {
   id: number;
@@ -18,12 +18,8 @@ interface User {
 
 interface AuthContextType {
   user: User | null;
-  login: (username: string, password: string) => Promise<void>;
-  loginAsAdmin: (username: string, password: string) => Promise<User>;
-  loginAsTeacher: (username: string, password: string) => Promise<User>;
-  loginAsStudent: (username: string, password: string) => Promise<User>;
-  loginAsWorkingStudent: (username: string, password: string) => Promise<User>;
-  logout: () => void;
+  login: (username: string, password: string) => Promise<User>;
+  logout: () => Promise<void>;
   isAuthenticated: boolean;
 }
 
@@ -48,8 +44,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
-  const login = async (username: string, password: string) => {
+  const login = async (username: string, password: string): Promise<User> => {
     try {
+      // Clear any existing user data first
+      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem('user');
+
       // Call the backend Login function
       const userData = await Login(username, password);
       
@@ -63,71 +64,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       // Save to localStorage for persistence
       localStorage.setItem('user', JSON.stringify(userData));
+      
+      return userData;
     } catch (error) {
       console.error('Login failed:', error);
+      // Ensure state is cleared on login failure
+      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem('user');
       throw error;
     }
   };
 
-  // Role-specific login methods (all use the same Login function)
-  const loginAsAdmin = async (username: string, password: string): Promise<User> => {
-    const userData = await Login(username, password);
-    if (!userData) {
-      throw new Error('Invalid credentials');
+  const logout = async () => {
+    try {
+      // Call backend logout if user exists
+      if (user) {
+        await Logout(user.id);
+      }
+    } catch (error) {
+      console.error('Backend logout failed:', error);
+      // Continue with frontend logout even if backend fails
+    } finally {
+      // Always clear frontend state
+      setUser(null);
+      setIsAuthenticated(false);
+      localStorage.removeItem('user');
+      
+      // Clear any other potential state
+      sessionStorage.clear();
     }
-    setUser(userData);
-    setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(userData));
-    return userData;
-  };
-
-  const loginAsTeacher = async (username: string, password: string): Promise<User> => {
-    const userData = await Login(username, password);
-    if (!userData) {
-      throw new Error('Invalid credentials');
-    }
-    setUser(userData);
-    setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(userData));
-    return userData;
-  };
-
-  const loginAsStudent = async (username: string, password: string): Promise<User> => {
-    const userData = await Login(username, password);
-    if (!userData) {
-      throw new Error('Invalid credentials');
-    }
-    setUser(userData);
-    setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(userData));
-    return userData;
-  };
-
-  const loginAsWorkingStudent = async (username: string, password: string): Promise<User> => {
-    const userData = await Login(username, password);
-    if (!userData) {
-      throw new Error('Invalid credentials');
-    }
-    setUser(userData);
-    setIsAuthenticated(true);
-    localStorage.setItem('user', JSON.stringify(userData));
-    return userData;
-  };
-
-  const logout = () => {
-    setUser(null);
-    setIsAuthenticated(false);
-    localStorage.removeItem('user');
   };
 
   return (
     <AuthContext.Provider value={{ 
       user, 
       login, 
-      loginAsAdmin,
-      loginAsTeacher,
-      loginAsStudent,
-      loginAsWorkingStudent,
       logout, 
       isAuthenticated 
     }}>

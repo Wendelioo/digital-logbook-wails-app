@@ -251,7 +251,6 @@ function RegisterStudent() {
         <div className="text-center mb-8">
           <h2 className="text-2xl font-bold text-blue-600 mb-2">Registration</h2>
           <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
-          <p className="text-gray-600 mt-4">Create new student accounts for the system</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

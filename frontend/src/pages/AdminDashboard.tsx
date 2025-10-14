@@ -196,6 +196,7 @@ function UserManagement() {
   const [editingUser, setEditingUser] = useState<User | null>(null);
   const [userTypeFilter, setUserTypeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
   const [formData, setFormData] = useState({
     password: '',
     name: '',
@@ -254,6 +255,13 @@ function UserManagement() {
     });
   };
 
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => {
+      setNotification(null);
+    }, 5000); // Hide notification after 5 seconds
+  };
+
   const copySelected = async (rows: User[]) => {
     try {
       const header = ['Name', 'ID', 'Role', 'Year', 'Created'];
@@ -275,9 +283,12 @@ function UserManagement() {
     try {
       await Promise.all(ids.map((id) => DeleteUser(id)));
       setSelectedIds(new Set());
+      showNotification('success', `${ids.length} user(s) deleted successfully!`);
       loadUsers();
     } catch (err) {
       console.error('Bulk delete failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to delete users. Please try again.';
+      showNotification('error', errorMessage);
     }
   };
 
@@ -318,12 +329,22 @@ function UserManagement() {
       // Build name from lastName, firstName, middleName
       const fullName = `${formData.lastName}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName : ''}`;
       
-      let password_to_pass = formData.password || formData.employeeId || formData.studentId;
+      // For new users, password is required
+      // For editing, if password is empty, we keep the old password (backend handles this)
+      let password_to_pass = formData.password;
+      
+      // If creating a new user and no password provided, show error
+      if (!editingUser && !password_to_pass) {
+        showNotification('error', 'Password is required for new users');
+        return;
+      }
 
       if (editingUser) {
         await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year, formData.section);
+        showNotification('success', 'User updated successfully!');
       } else {
         await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year, formData.section);
+        showNotification('success', 'User created successfully!');
       }
       
       setShowForm(false);
@@ -332,7 +353,8 @@ function UserManagement() {
       loadUsers();
     } catch (error) {
       console.error('Failed to save user:', error);
-      alert('Failed to save user. Please check the console for errors.');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save user. Please try again.';
+      showNotification('error', errorMessage);
     }
   };
 
@@ -358,9 +380,12 @@ function UserManagement() {
     if (confirm('Are you sure you want to delete this user?')) {
       try {
         await DeleteUser(id);
+        showNotification('success', 'User deleted successfully!');
         loadUsers();
       } catch (error) {
         console.error('Failed to delete user:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete user. Please try again.';
+        showNotification('error', errorMessage);
       }
     }
   };
@@ -475,6 +500,47 @@ function UserManagement() {
         </div>
       </div>
 
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
+          notification.type === 'success' ? 'border-l-4 border-green-400' : 'border-l-4 border-red-400'
+        }`}>
+          <div className="p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <div className="ml-3 w-0 flex-1 pt-0.5">
+                <p className={`text-sm font-medium ${
+                  notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {notification.message}
+                </p>
+              </div>
+              <div className="ml-4 flex-shrink-0 flex">
+                <button
+                  className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onClick={() => setNotification(null)}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* User Form Modal */}
       {showForm && (
         <div 
@@ -540,7 +606,7 @@ function UserManagement() {
 
                 {/* Role-specific fields */}
                 {formData.role === 'working_student' ? (
-                  // Working Student Form: Student ID, First/Middle/Last Name, Gender
+                  // Working Student Form: Student ID, Password, First/Middle/Last Name, Gender
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-2">Student ID</label>
@@ -552,7 +618,20 @@ function UserManagement() {
                         required
                       />
                       <p className="mt-1 text-xs text-gray-500">
-                        This will also be used as the default password
+                        This will be used as the username
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                      <input
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required={!editingUser}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        {editingUser ? 'Leave blank to keep current password' : 'Required for new users'}
                       </p>
                     </div>
                     <div>
@@ -625,10 +704,10 @@ function UserManagement() {
                     <div></div>
                   </div>
                 ) : formData.role === 'teacher' ? (
-                  // Teacher Form: Employee ID, First/Middle/Last Name, Gender (No Email)
+                  // Teacher Form: Teacher ID, Password, First/Middle/Last Name, Gender
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Teacher ID</label>
                       <input
                         type="text"
                         value={formData.employeeId}
@@ -637,7 +716,20 @@ function UserManagement() {
                         required
                       />
                       <p className="mt-1 text-xs text-gray-500">
-                        This will also be used as the default password
+                        This will be used as the username
+                      </p>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                      <input
+                        type="password"
+                        value={formData.password}
+                        onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required={!editingUser}
+                      />
+                      <p className="mt-1 text-xs text-gray-500">
+                        {editingUser ? 'Leave blank to keep current password' : 'Required for new users'}
                       </p>
                     </div>
                     <div>

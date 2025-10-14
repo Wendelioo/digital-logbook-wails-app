@@ -44,6 +44,8 @@ export function GetWorkingStudentDashboard():Promise<main.WorkingStudentDashboar
 
 export function Login(arg1:string,arg2:string):Promise<main.User>;
 
+export function Logout(arg1:number):Promise<void>;
+
 export function RecordAttendance(arg1:number,arg2:number,arg3:string):Promise<void>;
 
 export function SaveEquipmentFeedback(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;

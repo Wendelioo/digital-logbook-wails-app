@@ -20,7 +20,7 @@ function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   
-  const { loginAsAdmin, loginAsTeacher, loginAsStudent, loginAsWorkingStudent } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -34,35 +34,24 @@ function LoginPage() {
     setError('');
 
     try {
-      let userData = null;
-      
-      // Use role-specific login method
-      switch (selectedRole) {
-        case 'admin':
-          userData = await loginAsAdmin(username, password);
-          break;
-        case 'teacher':
-          userData = await loginAsTeacher(username, password);
-          break;
-        case 'student':
-          userData = await loginAsStudent(username, password);
-          break;
-        case 'working_student':
-          userData = await loginAsWorkingStudent(username, password);
-          break;
-        default:
-          setError('Invalid role selected');
-          setLoading(false);
-          return;
-      }
+      // Use the unified login function
+      const userData = await login(username, password);
       
       if (userData) {
+        // Verify the user's role matches the selected role (optional security check)
+        if (userData.role !== selectedRole) {
+          setError(`Please select the correct login type: ${userData.role}`);
+          return;
+        }
+        
         navigate(roleRoutes[userData.role]);
       } else {
         setError('Invalid credentials');
       }
     } catch (err) {
-      setError('Login failed. Please try again.');
+      console.error('Login error:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Login failed. Please try again.';
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
