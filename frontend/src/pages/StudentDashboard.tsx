@@ -13,7 +13,8 @@ import {
 import { 
   GetStudentDashboard,
   RecordAttendance,
-  GetStudentFeedback
+  GetStudentFeedback,
+  GetStudentLoginLogs
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
 import { main } from '../../wailsjs/go/models';
@@ -22,6 +23,7 @@ import { main } from '../../wailsjs/go/models';
 type Attendance = main.Attendance;
 type StudentDashboardData = main.StudentDashboard;
 type Feedback = main.Feedback;
+type LoginLog = main.LoginLog;
 
 function DashboardOverview() {
   const { user } = useAuth();
@@ -195,24 +197,27 @@ function DashboardOverview() {
 
 function LoginHistory() {
   const { user } = useAuth();
-  const [attendance, setAttendance] = useState<Attendance[]>([]);
+  const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
 
   useEffect(() => {
-    const loadAttendance = async () => {
+    const loadLoginLogs = async () => {
       if (!user) return;
       
       try {
-        const data = await GetStudentDashboard(user.id);
-        setAttendance(data.attendance || []);
+        const data = await GetStudentLoginLogs(user.id);
+        setLoginLogs(data || []);
+        setError('');
       } catch (error) {
-        console.error('Failed to load attendance:', error);
+        console.error('Failed to load login logs:', error);
+        setError('Unable to load login history. Make sure you are connected to the database.');
       } finally {
         setLoading(false);
       }
     };
 
-    loadAttendance();
+    loadLoginLogs();
   }, [user]);
 
   if (loading) {
@@ -227,49 +232,112 @@ function LoginHistory() {
     <div>
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Login History</h2>
-        <p className="text-gray-600">View your complete login and attendance history</p>
+        <p className="text-gray-600">View your complete login and logout history with PC information</p>
       </div>
 
-      <div className="bg-white shadow overflow-hidden sm:rounded-md">
-        {attendance.length === 0 ? (
+      {error && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+        {loginLogs.length === 0 ? (
           <div className="text-center py-12">
             <ClipboardList className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No login records found</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Login History Yet</h3>
+            <p className="text-gray-500 mb-4">
+              Your login and logout activities will appear here.
+            </p>
+            <p className="text-sm text-gray-400">
+              This tracks when you log in and out of the system, including which PC you used.
+            </p>
           </div>
         ) : (
-          <ul className="divide-y divide-gray-200">
-            {attendance.map((record) => (
-              <li key={record.id}>
-                <div className="px-4 py-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <div className={`w-4 h-4 rounded-full mr-4 ${
-                        record.status === 'Present' ? 'bg-green-500' :
-                        record.status === 'Absent' ? 'bg-red-500' : 'bg-yellow-500'
-                      }`}></div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          Class ID: {record.class_id}
-                        </p>
-                        <p className="text-sm text-gray-600">
-                          Date: {record.date}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          Time In: {record.time_in || '-'} | Time Out: {record.time_out || '-'}
-                        </p>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PC Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Login Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Logout Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {loginLogs.map((log) => (
+                  <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <div className="flex-shrink-0 h-10 w-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                          <svg className="h-6 w-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </svg>
+                        </div>
+                        <div className="ml-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {log.pc_number || <span className="text-gray-400 italic">Unknown</span>}
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                      record.status === 'Present' ? 'bg-green-100 text-green-800' :
-                      record.status === 'Absent' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {record.status}
-                    </span>
-                  </div>
-                </div>
-              </li>
-            ))}
-          </ul>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {log.login_time ? new Date(log.login_time).toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit',
+                        second: '2-digit',
+                        hour12: true 
+                      }) : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {log.logout_time ? (
+                        new Date(log.logout_time).toLocaleTimeString('en-US', { 
+                          hour: '2-digit', 
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: true 
+                        })
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          Active
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {log.login_time ? new Date(log.login_time).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'short',
+                        day: 'numeric'
+                      }) : '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {log.logout_time ? (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                          Completed
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                          <span className="w-2 h-2 mr-1.5 bg-green-600 rounded-full animate-pulse"></span>
+                          Active Session
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         )}
       </div>
     </div>
@@ -468,26 +536,6 @@ function FeedbackHistory() {
           ))
         )}
       </div>
-
-      {feedbackList.length > 0 && (
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
-                About Feedback
-              </h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>This is a compilation of all equipment feedback you've submitted when logging out. The system automatically records your feedback to help maintain equipment quality.</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

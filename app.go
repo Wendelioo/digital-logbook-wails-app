@@ -615,6 +615,54 @@ func (a *App) GetAllLogs() ([]LoginLog, error) {
 	return logs, nil
 }
 
+// GetStudentLoginLogs returns login logs for a specific student
+func (a *App) GetStudentLoginLogs(userID int) ([]LoginLog, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			id, user_id, user_type, pc_number, 
+			login_time, logout_time, full_name
+		FROM v_login_logs_complete 
+		WHERE user_id = ?
+		ORDER BY login_time DESC 
+		LIMIT 100
+	`
+	rows, err := a.db.Query(query, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []LoginLog
+	for rows.Next() {
+		var log LoginLog
+		var pcNumber sql.NullString
+		var loginTime time.Time
+		var logoutTime sql.NullTime
+
+		err := rows.Scan(&log.ID, &log.UserID, &log.UserType, &pcNumber, &loginTime, &logoutTime, &log.UserName)
+		if err != nil {
+			continue
+		}
+
+		log.LoginTime = loginTime.Format("2006-01-02 15:04:05")
+		if pcNumber.Valid {
+			log.PCNumber = &pcNumber.String
+		}
+		if logoutTime.Valid {
+			formattedLogoutTime := logoutTime.Time.Format("2006-01-02 15:04:05")
+			log.LogoutTime = &formattedLogoutTime
+		}
+
+		logs = append(logs, log)
+	}
+
+	return logs, nil
+}
+
 // ==============================================================================
 // FEEDBACK
 // ==============================================================================

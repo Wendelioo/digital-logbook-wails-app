@@ -32,6 +32,8 @@ export function GetStudentDashboard(arg1:number):Promise<main.StudentDashboard>;
 
 export function GetStudentFeedback(arg1:number):Promise<Array<main.Feedback>>;
 
+export function GetStudentLoginLogs(arg1:number):Promise<Array<main.LoginLog>>;
+
 export function GetSubjects():Promise<Array<main.Subject>>;
 
 export function GetTeacherDashboard(arg1:string):Promise<main.TeacherDashboard>;

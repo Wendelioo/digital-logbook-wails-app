@@ -62,6 +62,10 @@ export function GetStudentFeedback(arg1) {
   return window['go']['main']['App']['GetStudentFeedback'](arg1);
 }
 
+export function GetStudentLoginLogs(arg1) {
+  return window['go']['main']['App']['GetStudentLoginLogs'](arg1);
+}
+
 export function GetSubjects() {
   return window['go']['main']['App']['GetSubjects']();
 }
