@@ -57,6 +57,7 @@ type User struct {
 	EmployeeID *string `json:"employee_id"`
 	StudentID  *string `json:"student_id"`
 	Year       *string `json:"year"`
+	Section    *string `json:"section"`
 	PhotoURL   *string `json:"photo_url"`
 	Created    string  `json:"created"`
 }
@@ -289,7 +290,7 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 }
 
 // CreateUser creates a new user
-func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year string) error {
+func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, section string) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
 	}
@@ -318,36 +319,40 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 		query = `INSERT INTO teachers (teacher_id, first_name, middle_name, last_name) VALUES (?, ?, ?, ?)`
 		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName)
 	case "student":
-		query = `INSERT INTO students (student_id, first_name, middle_name, last_name) VALUES (?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName)
+		query = `INSERT INTO students (student_id, first_name, middle_name, last_name, year_level, section) VALUES (?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName, nullString(year), nullString(section))
 	case "working_student":
-		query = `INSERT INTO working_students (student_id, first_name, middle_name, last_name) VALUES (?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName)
+		query = `INSERT INTO working_students (student_id, first_name, middle_name, last_name, year_level, section) VALUES (?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName, nullString(year), nullString(section))
 	}
 
 	return err
 }
 
 // UpdateUser updates an existing user
-func (a *App) UpdateUser(id int, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year string) error {
+func (a *App) UpdateUser(id int, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, section string) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
 	}
 
 	// Update in respective table based on role
 	var query string
+	var err error
 	switch role {
 	case "admin":
 		query = `UPDATE admins SET first_name = ?, middle_name = ?, last_name = ? WHERE admin_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, id)
 	case "teacher":
 		query = `UPDATE teachers SET first_name = ?, middle_name = ?, last_name = ? WHERE teacher_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, id)
 	case "student":
-		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ? WHERE student_id = ?`
+		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ?, year_level = ?, section = ? WHERE student_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(year), nullString(section), id)
 	case "working_student":
-		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ? WHERE student_id = ?`
+		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ?, year_level = ?, section = ? WHERE student_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(year), nullString(section), id)
 	}
 
-	_, err := a.db.Exec(query, firstName, nullString(middleName), lastName, id)
 	return err
 }
 
@@ -520,6 +525,157 @@ func (a *App) GetFeedback() ([]Feedback, error) {
 	}
 
 	return feedbacks, nil
+}
+
+// GetStudentFeedback returns feedback history for a specific student
+func (a *App) GetStudentFeedback(studentID int) ([]Feedback, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `SELECT id, student_id, first_name, middle_name, last_name, pc_number, 
+			  equipment_condition, monitor_condition, keyboard_condition, mouse_condition, 
+			  comments, date_submitted 
+			  FROM feedback WHERE student_id = ? ORDER BY date_submitted DESC`
+	rows, err := a.db.Query(query, studentID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var feedbacks []Feedback
+	for rows.Next() {
+		var fb Feedback
+		var middleName, comments sql.NullString
+		var dateSubmitted time.Time
+
+		err := rows.Scan(&fb.ID, &fb.StudentID, &fb.FirstName, &middleName, &fb.LastName,
+			&fb.PCNumber, &fb.EquipmentCondition, &fb.MonitorCondition,
+			&fb.KeyboardCondition, &fb.MouseCondition, &comments, &dateSubmitted)
+		if err != nil {
+			continue
+		}
+
+		if middleName.Valid {
+			fb.MiddleName = &middleName.String
+		}
+		if comments.Valid {
+			fb.Comments = &comments.String
+		}
+
+		fb.StudentIDStr = strconv.Itoa(fb.StudentID)
+		fb.StudentName = fmt.Sprintf("%s, %s", fb.LastName, fb.FirstName)
+		if middleName.Valid {
+			fb.StudentName += " " + middleName.String
+		}
+		fb.DateSubmitted = dateSubmitted.Format("2006-01-02 15:04:05")
+
+		feedbacks = append(feedbacks, fb)
+	}
+
+	return feedbacks, nil
+}
+
+// SaveEquipmentFeedback saves equipment feedback from a student
+func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, computerIssue, mouseStatus, mouseIssue, keyboardStatus, keyboardIssue, monitorStatus, monitorIssue, additionalComments string) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	// Automatically detect PC number - for now we'll use a placeholder
+	// In a real system, this would be detected from:
+	// - Computer name
+	// - MAC address
+	// - IP address
+	// - Hardware ID
+	// - Login session tracking
+	pcNumber := fmt.Sprintf("PC-%d", userID) // Placeholder - replace with actual PC detection logic
+
+	// Parse user name to get first, middle, and last name
+	// Assuming format: "LastName, FirstName MiddleName" or "LastName, FirstName"
+	var firstName, middleName, lastName string
+	// For now, use the userName as-is and split it
+	// In production, you might want to get this from the user record
+	lastName = userName // Simplified - you may want to parse this properly
+	firstName = ""
+	
+	// Get user details from database
+	var userRole string
+	err := a.db.QueryRow("SELECT user_type FROM users WHERE id = ?", userID).Scan(&userRole)
+	if err == nil {
+		// Get name details based on role
+		var query string
+		switch userRole {
+		case "student":
+			query = "SELECT first_name, middle_name, last_name FROM students WHERE student_id = ?"
+		case "working_student":
+			query = "SELECT first_name, middle_name, last_name FROM working_students WHERE student_id = ?"
+		default:
+			query = ""
+		}
+		
+		if query != "" {
+			var middleNameNull sql.NullString
+			err = a.db.QueryRow(query, userID).Scan(&firstName, &middleNameNull, &lastName)
+			if err == nil && middleNameNull.Valid {
+				middleName = middleNameNull.String
+			}
+		}
+	}
+
+	// Determine equipment conditions based on status
+	equipmentCondition := "Good"
+	if computerStatus == "no" {
+		if computerIssue != "" {
+			equipmentCondition = computerIssue
+		} else {
+			equipmentCondition = "Issue"
+		}
+	}
+
+	monitorCondition := "Good"
+	if monitorStatus == "no" {
+		if monitorIssue != "" {
+			monitorCondition = monitorIssue
+		} else {
+			monitorCondition = "Issue"
+		}
+	}
+
+	keyboardCondition := "Good"
+	if keyboardStatus == "no" {
+		if keyboardIssue != "" {
+			keyboardCondition = keyboardIssue
+		} else {
+			keyboardCondition = "Issue"
+		}
+	}
+
+	mouseCondition := "Good"
+	if mouseStatus == "no" {
+		if mouseIssue != "" {
+			mouseCondition = mouseIssue
+		} else {
+			mouseCondition = "Issue"
+		}
+	}
+
+	// Insert feedback into database
+	query := `INSERT INTO feedback (student_id, first_name, middle_name, last_name, pc_number, 
+			  equipment_condition, monitor_condition, keyboard_condition, mouse_condition, 
+			  comments, date_submitted) 
+			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`
+	
+	_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName, pcNumber,
+		equipmentCondition, monitorCondition, keyboardCondition, mouseCondition, nullString(additionalComments))
+	
+	if err != nil {
+		log.Printf("Failed to save equipment feedback: %v", err)
+		return fmt.Errorf("failed to save feedback: %w", err)
+	}
+
+	log.Printf("✓ Equipment feedback saved for user %d", userID)
+	return nil
 }
 
 // ==============================================================================

@@ -224,6 +224,7 @@ export namespace main {
 	    employee_id?: string;
 	    student_id?: string;
 	    year?: string;
+	    section?: string;
 	    photo_url?: string;
 	    created: string;
 	
@@ -244,6 +245,7 @@ export namespace main {
 	        this.employee_id = source["employee_id"];
 	        this.student_id = source["student_id"];
 	        this.year = source["year"];
+	        this.section = source["section"];
 	        this.photo_url = source["photo_url"];
 	        this.created = source["created"];
 	    }

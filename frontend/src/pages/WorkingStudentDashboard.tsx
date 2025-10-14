@@ -11,7 +11,8 @@ import {
   ArrowLeft,
   Trash2,
   Edit,
-  Eye
+  Eye,
+  BookOpen
 } from 'lucide-react';
 import { 
   GetWorkingStudentDashboard,
@@ -129,7 +130,7 @@ function DashboardOverview() {
             </div>
           </div>
           <div className="ml-3">
-            <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Register Student</h3>
+            <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Add Student</h3>
             <p className="text-xs text-gray-500">Add new student accounts</p>
           </div>
         </Link>
@@ -176,7 +177,9 @@ function RegisterStudent() {
     firstName: '',
     middleName: '',
     lastName: '',
-    gender: ''
+    gender: '',
+    year: '',
+    section: ''
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -209,9 +212,10 @@ function RegisterStudent() {
         'student', 
         '', // employeeID - empty for students
         formData.studentID, // studentID
-        '' // year - not required
+        formData.year, // year level
+        formData.section // section
       );
-      setMessage('Student registered successfully! Default password is their Student ID.');
+      setMessage('Student added successfully! Default password is their Student ID.');
       setFormData({ 
         studentID: '',
         username: '', 
@@ -219,10 +223,12 @@ function RegisterStudent() {
         firstName: '', 
         middleName: '', 
         lastName: '', 
-        gender: ''
+        gender: '',
+        year: '',
+        section: ''
       });
     } catch (error) {
-      setMessage('Failed to register student. Please try again.');
+      setMessage('Failed to add student. Please try again.');
       console.error('Registration error:', error);
     } finally {
       setLoading(false);
@@ -230,13 +236,24 @@ function RegisterStudent() {
   };
 
   return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Register Student</h2>
-        <p className="text-gray-600">Create new student accounts for the system</p>
-      </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl relative">
+        {/* Close Button */}
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
+        >
+          ×
+        </button>
+        
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-blue-600 mb-2">Registration</h2>
+          <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
+          <p className="text-gray-600 mt-4">Create new student accounts for the system</p>
+        </div>
 
-      <div className="bg-white shadow rounded-lg p-6">
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Student ID */}
@@ -249,8 +266,7 @@ function RegisterStudent() {
                 id="studentID"
                 value={formData.studentID}
                 onChange={(e) => handleStudentIDChange(e.target.value)}
-                placeholder="e.g., 2025-1234"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -265,8 +281,7 @@ function RegisterStudent() {
                 id="lastName"
                 value={formData.lastName}
                 onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                placeholder="e.g., Santos"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -281,8 +296,7 @@ function RegisterStudent() {
                 id="firstName"
                 value={formData.firstName}
                 onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                placeholder="e.g., Juan"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -297,8 +311,7 @@ function RegisterStudent() {
                 id="middleName"
                 value={formData.middleName}
                 onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                placeholder="e.g., Miguel"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
 
@@ -311,13 +324,48 @@ function RegisterStudent() {
                 id="gender"
                 value={formData.gender}
                 onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               >
                 <option value="">Select Gender</option>
                 <option value="Male">Male</option>
                 <option value="Female">Female</option>
               </select>
+            </div>
+
+            {/* Year Level */}
+            <div>
+              <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-2">
+                Year Level
+              </label>
+              <select
+                id="year"
+                value={formData.year}
+                onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              >
+                <option value="">Select Year Level</option>
+                <option value="1st Year">1st Year</option>
+                <option value="2nd Year">2nd Year</option>
+                <option value="3rd Year">3rd Year</option>
+                <option value="4th Year">4th Year</option>
+              </select>
+            </div>
+
+            {/* Section */}
+            <div>
+              <label htmlFor="section" className="block text-sm font-medium text-gray-700 mb-2">
+                Section
+              </label>
+              <input
+                type="text"
+                id="section"
+                value={formData.section}
+                onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                required
+              />
             </div>
 
             {/* Username */}
@@ -330,8 +378,7 @@ function RegisterStudent() {
                 id="username"
                 value={formData.username}
                 onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                placeholder="e.g., jsantos"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -346,8 +393,7 @@ function RegisterStudent() {
                 id="password"
                 value={formData.password}
                 onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                placeholder="Default: Student ID"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -383,14 +429,14 @@ function RegisterStudent() {
             </div>
           )}
 
-          <div className="flex justify-end">
+          {/* Submit Button */}
+          <div className="text-center">
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+              className="w-full max-w-xs mx-auto px-8 py-4 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
             >
-              <Save className="h-4 w-4 mr-2" />
-              {loading ? 'Registering...' : 'Register Student'}
+              {loading ? 'Adding...' : 'SUBMIT'}
             </button>
           </div>
         </form>
@@ -427,18 +473,25 @@ function CreateClasslist() {
   };
 
   return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Create Class List</h2>
-        <p className="text-gray-600">Create new subject class lists and assign teachers</p>
-      </div>
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl relative">
+        {/* Close Button */}
+        <Link
+          to="/working-student/view-classlists"
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
+        >
+          ×
+        </Link>
+        
+        {/* Header */}
+        <div className="text-center mb-8">
+          <h2 className="text-2xl font-bold text-blue-600 mb-2">Registration</h2>
+          <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
+          <p className="text-gray-600 mt-4">Create new subject class lists and assign teachers</p>
+        </div>
 
-        {/* Create Form */}
-      <div className="max-w-2xl">
-        <div className="bg-white shadow rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Subject</h3>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-2">
                 Subject Code
@@ -448,8 +501,7 @@ function CreateClasslist() {
                 id="code"
                 value={formData.code}
                 onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-                placeholder="e.g., IT101"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
               </div>
@@ -463,8 +515,7 @@ function CreateClasslist() {
                   id="teacher"
                   value={formData.teacher}
                   onChange={(e) => setFormData({ ...formData, teacher: e.target.value })}
-                  placeholder="e.g., Mr. Reyes"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   required
                 />
               </div>
@@ -479,8 +530,7 @@ function CreateClasslist() {
                 id="name"
                 value={formData.name}
                 onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                placeholder="e.g., Programming Fundamentals"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -494,8 +544,7 @@ function CreateClasslist() {
                 id="room"
                 value={formData.room}
                 onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                placeholder="e.g., Lab A"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 required
               />
             </div>
@@ -508,24 +557,17 @@ function CreateClasslist() {
               </div>
             )}
 
-            <div className="flex justify-between items-center pt-4">
-              <Link
-                to="/working-student/view-classlists"
-                className="text-primary-600 hover:text-primary-900 text-sm font-medium"
-              >
-                ← View All Class Lists
-              </Link>
+          {/* Submit Button */}
+          <div className="text-center">
             <button
               type="submit"
               disabled={loading}
-                className="inline-flex items-center px-6 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+              className="w-full max-w-xs mx-auto px-8 py-4 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
             >
-              <Plus className="h-4 w-4 mr-2" />
-              {loading ? 'Creating...' : 'Create Class List'}
+              {loading ? 'Creating...' : 'SUBMIT'}
             </button>
-            </div>
-          </form>
-        </div>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -1069,7 +1111,7 @@ function WorkingStudentDashboard() {
   
   const navigationItems = [
     { name: 'Dashboard', href: '/working-student', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/working-student' },
-    { name: 'Register Student', href: '/working-student/register-student', icon: <UserPlus className="h-5 w-5" />, current: location.pathname === '/working-student/register-student' },
+    { name: 'Add Student', href: '/working-student/register-student', icon: <UserPlus className="h-5 w-5" />, current: location.pathname === '/working-student/register-student' },
     { name: 'View Class Lists', href: '/working-student/view-classlists', icon: <BookOpen className="h-5 w-5" />, current: location.pathname === '/working-student/view-classlists' },
     { name: 'Create Class List', href: '/working-student/create-classlist', icon: <Plus className="h-5 w-5" />, current: location.pathname === '/working-student/create-classlist' },
   ];

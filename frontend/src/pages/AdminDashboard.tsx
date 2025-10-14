@@ -49,6 +49,7 @@ interface User {
   employee_id?: string;
   student_id?: string;
   year?: string;
+  section?: string;
   photo_url?: string;
   created: string;
 }
@@ -205,7 +206,8 @@ function UserManagement() {
     role: 'teacher',
     employeeId: '',
     studentId: '',
-    year: ''
+    year: '',
+    section: ''
   });
 
   // Excel-like table state: sorting, filtering, selection, pagination
@@ -319,14 +321,14 @@ function UserManagement() {
       let password_to_pass = formData.password || formData.employeeId || formData.studentId;
 
       if (editingUser) {
-        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year);
+        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year, formData.section);
       } else {
-        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year);
+        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year, formData.section);
       }
       
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '' });
+      setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '' });
       loadUsers();
     } catch (error) {
       console.error('Failed to save user:', error);
@@ -346,7 +348,8 @@ function UserManagement() {
       role: user.role,
       employeeId: user.employee_id || '',
       studentId: user.student_id || '',
-      year: user.year || ''
+      year: user.year || '',
+      section: user.section || ''
     });
     setShowForm(true);
   };
@@ -474,50 +477,78 @@ function UserManagement() {
 
       {/* User Form Modal */}
       {showForm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-            <div className="mt-3">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">
-                {editingUser ? 'Edit User' : 'Add New User'}
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowForm(false);
+              setEditingUser(null);
+              setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '' });
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 relative max-h-[90vh] flex flex-col">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm(false);
+                setEditingUser(null);
+                setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '' });
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+            >
+              ×
+            </button>
+            
+            {/* Header */}
+            <div className="text-center p-8 pb-4 flex-shrink-0">
+              <h3 className="text-2xl font-bold text-blue-600 mb-2">
+                {editingUser ? 'Edit User' : 'Registration'}
               </h3>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* Role Selection - First field to determine form layout */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Role</label>
-                  <select
-                    value={formData.role}
-                    onChange={(e) => {
-                      const newRole = e.target.value;
-                      setFormData({ 
-                        ...formData, 
-                        role: newRole,
-                        // Clear fields that might not be relevant for the new role
-                        year: ''
-                      });
-                    }}
-                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
-                    disabled={!!editingUser} // Disable role change when editing
-                  >
-                    <option value="teacher">Teacher</option>
-                    <option value="working_student">Working Student</option>
-                  </select>
-                  <p className="mt-1 text-xs text-gray-500">
-                    Note: Student registration is handled by Working Students
-                  </p>
+              <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto px-8 pb-8 flex-1">
+                {/* Role Selection */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+                    <select
+                      value={formData.role}
+                      onChange={(e) => {
+                        const newRole = e.target.value;
+                        setFormData({ 
+                          ...formData, 
+                          role: newRole,
+                          year: '',
+                          section: ''
+                        });
+                      }}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      disabled={!!editingUser}
+                    >
+                      <option value="teacher">Teacher</option>
+                      <option value="working_student">Working Student</option>
+                    </select>
+                    <p className="mt-1 text-xs text-gray-500">
+                      Note: Student registration is handled by Working Students
+                    </p>
+                  </div>
+                  <div></div>
                 </div>
 
                 {/* Role-specific fields */}
                 {formData.role === 'working_student' ? (
                   // Working Student Form: Student ID, First/Middle/Last Name, Gender
-                  <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Student ID</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Student ID</label>
                       <input
                         type="text"
                         value={formData.studentId}
                         onChange={(e) => setFormData({ ...formData, studentId: e.target.value })}
-                        placeholder="e.g., 2025-1234"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                       <p className="mt-1 text-xs text-gray-500">
@@ -525,43 +556,40 @@ function UserManagement() {
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
                       <input
                         type="text"
                         value={formData.lastName}
                         onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                        placeholder="e.g., Santos"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">First Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
                       <input
                         type="text"
                         value={formData.firstName}
                         onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                        placeholder="e.g., Juan"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Middle Name (Optional)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
                       <input
                         type="text"
                         value={formData.middleName}
                         onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                        placeholder="e.g., Miguel"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Gender</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
                       <select
                         value={formData.gender}
                         onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       >
                         <option value="">Select Gender</option>
@@ -569,18 +597,43 @@ function UserManagement() {
                         <option value="Female">Female</option>
                       </select>
                     </div>
-                  </>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
+                      <select
+                        value={formData.year}
+                        onChange={(e) => setFormData({ ...formData, year: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Select Year Level</option>
+                        <option value="1st Year">1st Year</option>
+                        <option value="2nd Year">2nd Year</option>
+                        <option value="3rd Year">3rd Year</option>
+                        <option value="4th Year">4th Year</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
+                      <input
+                        type="text"
+                        value={formData.section}
+                        onChange={(e) => setFormData({ ...formData, section: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+                    <div></div>
+                  </div>
                 ) : formData.role === 'teacher' ? (
                   // Teacher Form: Employee ID, First/Middle/Last Name, Gender (No Email)
-                  <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Employee ID</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Employee ID</label>
                       <input
                         type="text"
                         value={formData.employeeId}
                         onChange={(e) => setFormData({ ...formData, employeeId: e.target.value })}
-                        placeholder="e.g., teacher1"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                       <p className="mt-1 text-xs text-gray-500">
@@ -588,43 +641,41 @@ function UserManagement() {
                       </p>
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Last Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
                       <input
                         type="text"
                         value={formData.lastName}
                         onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                         placeholder="e.g., Reyes"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">First Name</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
                       <input
                         type="text"
                         value={formData.firstName}
                         onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                        placeholder="e.g., Juan"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Middle Name (Optional)</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
                       <input
                         type="text"
                         value={formData.middleName}
                         onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                        placeholder="e.g., Miguel"
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Gender</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
                       <select
                         value={formData.gender}
                         onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                        className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       >
                         <option value="">Select Gender</option>
@@ -632,29 +683,19 @@ function UserManagement() {
                         <option value="Female">Female</option>
                       </select>
                     </div>
-                  </>
+                    <div></div>
+                  </div>
                 ) : null}
-                <div className="flex justify-end space-x-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowForm(false);
-                      setEditingUser(null);
-                      setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '' });
-                    }}
-                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
+                {/* Submit Button */}
+                <div className="text-center">
                   <button
                     type="submit"
-                    className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700"
+                    className="w-full max-w-xs mx-auto px-8 py-4 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
                   >
-                    {editingUser ? 'Update' : 'Create'}
+                    {editingUser ? 'UPDATE' : 'SUBMIT'}
                   </button>
                 </div>
               </form>
-            </div>
           </div>
         </div>
       )}

@@ -10,8 +10,8 @@ export function CreateSubject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateSubject'](arg1, arg2, arg3, arg4);
 }
 
-export function CreateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
-  return window['go']['main']['App']['CreateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+export function CreateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
+  return window['go']['main']['App']['CreateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 
 export function DeleteUser(arg1) {
@@ -58,6 +58,10 @@ export function GetStudentDashboard(arg1) {
   return window['go']['main']['App']['GetStudentDashboard'](arg1);
 }
 
+export function GetStudentFeedback(arg1) {
+  return window['go']['main']['App']['GetStudentFeedback'](arg1);
+}
+
 export function GetSubjects() {
   return window['go']['main']['App']['GetSubjects']();
 }
@@ -86,12 +90,16 @@ export function RecordAttendance(arg1, arg2, arg3) {
   return window['go']['main']['App']['RecordAttendance'](arg1, arg2, arg3);
 }
 
+export function SaveEquipmentFeedback(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
+  return window['go']['main']['App']['SaveEquipmentFeedback'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
+}
+
 export function SearchUsers(arg1, arg2) {
   return window['go']['main']['App']['SearchUsers'](arg1, arg2);
 }
 
-export function UpdateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10) {
-  return window['go']['main']['App']['UpdateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10);
+export function UpdateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
+  return window['go']['main']['App']['UpdateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 
 export function UpdateUserPhoto(arg1, arg2, arg3) {

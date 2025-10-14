@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UpdateUserPhoto, ChangePassword } from '../../wailsjs/go/main/App';
+import { UpdateUserPhoto, ChangePassword, SaveEquipmentFeedback } from '../../wailsjs/go/main/App';
 import { 
   LayoutDashboard, 
   User,
@@ -11,6 +11,7 @@ import {
   Lock,
   UserCircle
 } from 'lucide-react';
+import LogoutFeedbackModal from './LogoutFeedbackModal';
 
 interface LayoutProps {
   children: React.ReactNode;
@@ -29,6 +30,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   const { user, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string>(user?.photo_url || '');
@@ -45,8 +47,50 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogout = () => {
+    // Show feedback modal only for students
+    if (user?.role === 'student') {
+      setShowFeedbackModal(true);
+    } else {
+      // For non-students, logout directly
+      logout();
+      navigate('/login');
+    }
+  };
+
+  const handleFeedbackSubmit = async (feedbackData: any) => {
+    try {
+      if (!user) return;
+      
+      // Call the backend function to save feedback
+      // Parameters: userID, userName, computerStatus, computerIssue, mouseStatus, mouseIssue, 
+      //             keyboardStatus, keyboardIssue, monitorStatus, monitorIssue, additionalComments
+      await SaveEquipmentFeedback(
+        user.id,
+        user.name,
+        feedbackData.computer.status,
+        feedbackData.computer.issue || '',
+        feedbackData.mouse.status,
+        feedbackData.mouse.issue || '',
+        feedbackData.keyboard.status,
+        feedbackData.keyboard.issue || '',
+        feedbackData.monitor.status,
+        feedbackData.monitor.issue || '',
+        feedbackData.additionalComments || ''
+      );
+      
+      console.log('✓ Feedback saved successfully');
+    } catch (error) {
+      console.error('Failed to save feedback:', error);
+      alert('Failed to save feedback. You will still be logged out.');
+    }
+    
+    setShowFeedbackModal(false);
     logout();
     navigate('/login');
+  };
+
+  const handleFeedbackCancel = () => {
+    setShowFeedbackModal(false);
   };
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -182,14 +226,9 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
           <div className="flex flex-col h-screen bg-gradient-to-b from-blue-900 to-blue-800 shadow-xl">
             <div className="flex-1 pt-6 pb-6 overflow-y-auto">
               <div className="flex items-center flex-shrink-0 px-3 lg:px-4 mb-6">
-                <div className="flex items-center space-x-2">
-                  <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                    <LayoutDashboard className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h1 className="text-lg font-bold text-white">Digital Logbook</h1>
-                    <p className="text-blue-200 text-xs">Monitoring System</p>
-                  </div>
+                <div className="text-center w-full">
+                  <h1 className="text-xl font-extrabold text-white tracking-wide">DIGITAL LOGBOOK</h1>
+                  <p className="text-sm font-extrabold text-white tracking-wide">MONITORING SYSTEM</p>
                 </div>
               </div>
               <nav className="flex-1 px-2 lg:px-3 space-y-1">
@@ -403,29 +442,92 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                     </div>
                   </div>
 
-                  {/* Name Section */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                    <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                      <span className="text-gray-900">{user?.name || 'N/A'}</span>
-                    </div>
-                  </div>
+                  {/* Student/Working Student specific fields */}
+                  {(user?.role === 'student' || user?.role === 'working_student') ? (
+                    <>
+                      {/* Last Name */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                        </div>
+                      </div>
 
-                  {/* Created At Section */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Account Created</label>
-                    <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                      <span className="text-gray-900">
-                        {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        }) : 'N/A'}
-                      </span>
-                    </div>
-                  </div>
+                      {/* First Name */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      {/* Middle Name */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      {/* Student ID */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Student ID</label>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">{user?.student_id || 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      {/* Year Level */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">{user?.year || 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      {/* Account Created */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Created</label>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">
+                            {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {/* For non-students (admin, teacher, etc.) */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">{user?.name || 'N/A'}</span>
+                        </div>
+                      </div>
+
+                      {/* Account Created */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Created</label>
+                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">
+                            {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            }) : 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               )}
 
@@ -512,6 +614,14 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Logout Feedback Modal (for students only) */}
+      {showFeedbackModal && (
+        <LogoutFeedbackModal
+          onClose={handleFeedbackCancel}
+          onSubmit={handleFeedbackSubmit}
+        />
       )}
     </div>
   );
