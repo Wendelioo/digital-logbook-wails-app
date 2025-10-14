@@ -114,21 +114,21 @@ func (a *App) Login(username, password string) (*User, error) {
 	var detailQuery string
 	switch user.Role {
 	case "admin":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, admin_id FROM admins WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, admin_id, profile_photo FROM admins WHERE user_id = ?`
 	case "teacher":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, teacher_id FROM teachers WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, teacher_id, profile_photo FROM teachers WHERE user_id = ?`
 	case "student":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section FROM students WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section, profile_photo FROM students WHERE user_id = ?`
 	case "working_student":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section FROM working_students WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section, profile_photo FROM working_students WHERE user_id = ?`
 	}
 
 	var firstName, middleName, lastName, gender sql.NullString
-	var employeeID, studentID, year, section sql.NullString
+	var employeeID, studentID, year, section, photoURL sql.NullString
 
 	switch user.Role {
 	case "admin", "teacher":
-		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &employeeID)
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &employeeID, &photoURL)
 		if err == nil {
 			if firstName.Valid {
 				user.FirstName = &firstName.String
@@ -145,9 +145,12 @@ func (a *App) Login(username, password string) (*User, error) {
 			if employeeID.Valid {
 				user.EmployeeID = &employeeID.String
 			}
+			if photoURL.Valid {
+				user.PhotoURL = &photoURL.String
+			}
 		}
 	case "student", "working_student":
-		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &studentID, &year, &section)
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &studentID, &year, &section, &photoURL)
 		if err == nil {
 			if firstName.Valid {
 				user.FirstName = &firstName.String
@@ -169,6 +172,9 @@ func (a *App) Login(username, password string) (*User, error) {
 			}
 			if section.Valid {
 				user.Section = &section.String
+			}
+			if photoURL.Valid {
+				user.PhotoURL = &photoURL.String
 			}
 		}
 	}
@@ -691,10 +697,26 @@ func (a *App) GetFeedback() ([]Feedback, error) {
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, student_id, first_name, middle_name, last_name, pc_number, 
-			  equipment_condition, monitor_condition, keyboard_condition, mouse_condition, 
-			  comments, date_submitted 
-			  FROM feedback ORDER BY date_submitted DESC LIMIT 1000`
+	query := `
+		SELECT 
+			f.id, 
+			f.student_id, 
+			COALESCE(s.student_id, ws.student_id, 'N/A') as student_id_str,
+			f.first_name, 
+			f.middle_name, 
+			f.last_name, 
+			f.pc_number, 
+			f.equipment_condition, 
+			f.monitor_condition, 
+			f.keyboard_condition, 
+			f.mouse_condition, 
+			f.comments, 
+			f.date_submitted 
+		FROM feedback f
+		LEFT JOIN students s ON f.student_id = s.user_id
+		LEFT JOIN working_students ws ON f.student_id = ws.user_id
+		ORDER BY f.date_submitted DESC 
+		LIMIT 1000`
 	rows, err := a.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -704,16 +726,21 @@ func (a *App) GetFeedback() ([]Feedback, error) {
 	var feedbacks []Feedback
 	for rows.Next() {
 		var fb Feedback
-		var middleName, comments sql.NullString
+		var middleName, comments, studentIDStr sql.NullString
 		var dateSubmitted time.Time
 
-		err := rows.Scan(&fb.ID, &fb.StudentID, &fb.FirstName, &middleName, &fb.LastName,
+		err := rows.Scan(&fb.ID, &fb.StudentID, &studentIDStr, &fb.FirstName, &middleName, &fb.LastName,
 			&fb.PCNumber, &fb.EquipmentCondition, &fb.MonitorCondition,
 			&fb.KeyboardCondition, &fb.MouseCondition, &comments, &dateSubmitted)
 		if err != nil {
 			continue
 		}
 
+		if studentIDStr.Valid {
+			fb.StudentIDStr = studentIDStr.String
+		} else {
+			fb.StudentIDStr = "N/A"
+		}
 		if middleName.Valid {
 			fb.MiddleName = &middleName.String
 		}
@@ -721,7 +748,6 @@ func (a *App) GetFeedback() ([]Feedback, error) {
 			fb.Comments = &comments.String
 		}
 
-		fb.StudentIDStr = strconv.Itoa(fb.StudentID)
 		fb.StudentName = fmt.Sprintf("%s, %s", fb.LastName, fb.FirstName)
 		if middleName.Valid {
 			fb.StudentName += " " + middleName.String
@@ -740,10 +766,26 @@ func (a *App) GetStudentFeedback(studentID int) ([]Feedback, error) {
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, student_id, first_name, middle_name, last_name, pc_number, 
-			  equipment_condition, monitor_condition, keyboard_condition, mouse_condition, 
-			  comments, date_submitted 
-			  FROM feedback WHERE student_id = ? ORDER BY date_submitted DESC`
+	query := `
+		SELECT 
+			f.id, 
+			f.student_id, 
+			COALESCE(s.student_id, ws.student_id, 'N/A') as student_id_str,
+			f.first_name, 
+			f.middle_name, 
+			f.last_name, 
+			f.pc_number, 
+			f.equipment_condition, 
+			f.monitor_condition, 
+			f.keyboard_condition, 
+			f.mouse_condition, 
+			f.comments, 
+			f.date_submitted 
+		FROM feedback f
+		LEFT JOIN students s ON f.student_id = s.user_id
+		LEFT JOIN working_students ws ON f.student_id = ws.user_id
+		WHERE f.student_id = ? 
+		ORDER BY f.date_submitted DESC`
 	rows, err := a.db.Query(query, studentID)
 	if err != nil {
 		return nil, err
@@ -753,16 +795,21 @@ func (a *App) GetStudentFeedback(studentID int) ([]Feedback, error) {
 	var feedbacks []Feedback
 	for rows.Next() {
 		var fb Feedback
-		var middleName, comments sql.NullString
+		var middleName, comments, studentIDStr sql.NullString
 		var dateSubmitted time.Time
 
-		err := rows.Scan(&fb.ID, &fb.StudentID, &fb.FirstName, &middleName, &fb.LastName,
+		err := rows.Scan(&fb.ID, &fb.StudentID, &studentIDStr, &fb.FirstName, &middleName, &fb.LastName,
 			&fb.PCNumber, &fb.EquipmentCondition, &fb.MonitorCondition,
 			&fb.KeyboardCondition, &fb.MouseCondition, &comments, &dateSubmitted)
 		if err != nil {
 			continue
 		}
 
+		if studentIDStr.Valid {
+			fb.StudentIDStr = studentIDStr.String
+		} else {
+			fb.StudentIDStr = "N/A"
+		}
 		if middleName.Valid {
 			fb.MiddleName = &middleName.String
 		}
@@ -770,7 +817,6 @@ func (a *App) GetStudentFeedback(studentID int) ([]Feedback, error) {
 			fb.Comments = &comments.String
 		}
 
-		fb.StudentIDStr = strconv.Itoa(fb.StudentID)
 		fb.StudentName = fmt.Sprintf("%s, %s", fb.LastName, fb.FirstName)
 		if middleName.Valid {
 			fb.StudentName += " " + middleName.String

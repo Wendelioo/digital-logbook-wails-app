@@ -58,7 +58,7 @@ CREATE TABLE admins (
     middle_name VARCHAR(100),
     last_name VARCHAR(100) NOT NULL,
     gender ENUM('Male', 'Female', 'Other'),
-    profile_photo VARCHAR(255),
+    profile_photo MEDIUMTEXT COMMENT 'Base64-encoded profile photo data URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -77,7 +77,7 @@ CREATE TABLE teachers (
     middle_name VARCHAR(100),
     last_name VARCHAR(100) NOT NULL,
     gender ENUM('Male', 'Female', 'Other'),
-    profile_photo VARCHAR(255),
+    profile_photo MEDIUMTEXT COMMENT 'Base64-encoded profile photo data URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -117,7 +117,7 @@ CREATE TABLE students (
     year_level VARCHAR(20),
     section VARCHAR(50),
     class_id INT,
-    profile_photo VARCHAR(255),
+    profile_photo MEDIUMTEXT COMMENT 'Base64-encoded profile photo data URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -142,7 +142,7 @@ CREATE TABLE working_students (
     year_level VARCHAR(20),
     section VARCHAR(50),
     class_id INT,
-    profile_photo VARCHAR(255),
+    profile_photo MEDIUMTEXT COMMENT 'Base64-encoded profile photo data URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -309,7 +309,13 @@ SELECT
     CASE 
         WHEN u.user_type = 'student' THEN s.section
         WHEN u.user_type = 'working_student' THEN ws.section
-    END AS section
+    END AS section,
+    CASE 
+        WHEN u.user_type = 'admin' THEN a.profile_photo
+        WHEN u.user_type = 'teacher' THEN t.profile_photo
+        WHEN u.user_type = 'student' THEN s.profile_photo
+        WHEN u.user_type = 'working_student' THEN ws.profile_photo
+    END AS profile_photo
 FROM users u
 LEFT JOIN admins a ON u.id = a.user_id AND u.user_type = 'admin'
 LEFT JOIN teachers t ON u.id = t.user_id AND u.user_type = 'teacher'
