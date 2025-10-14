@@ -35,12 +35,8 @@ function DashboardOverview() {
   const { user } = useAuth();
   const [dashboardData, setDashboardData] = useState<TeacherDashboardData>(() => {
     const initialData = new main.TeacherDashboard({
-      subjects: [],
-      attendance: []
+      subjects: []
     });
-    // Ensure arrays are never null
-    if (!initialData.subjects) initialData.subjects = [];
-    if (!initialData.attendance) initialData.attendance = [];
     return initialData;
   });
   const [loading, setLoading] = useState(false); // Start with false to show content immediately
@@ -61,9 +57,6 @@ function DashboardOverview() {
         console.log('Dashboard data received:', data);
         
         if (data) {
-          // Ensure arrays are never null
-          if (!data.subjects) data.subjects = [];
-          if (!data.attendance) data.attendance = [];
           setDashboardData(data);
         }
         setError('');
@@ -105,7 +98,7 @@ function DashboardOverview() {
       )}
 
       {/* Quick Stats - Always visible with real or fallback data */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center">
@@ -115,30 +108,10 @@ function DashboardOverview() {
               <div className="ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">
-                    My Subjects
+                    Subjects Handled
                   </dt>
                   <dd className="text-3xl font-bold text-gray-900">
-                    {dashboardData.subjects.length || (error ? '2' : '0')}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ClipboardList className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Today's Attendance
-                  </dt>
-                  <dd className="text-3xl font-bold text-gray-900">
-                    {dashboardData.attendance?.length || (error ? '5' : '0')}
+                    {dashboardData.subjects?.length || (error ? '2' : '0')}
                   </dd>
                 </dl>
               </div>
@@ -167,145 +140,7 @@ function DashboardOverview() {
         </div>
       </div>
 
-      {/* My Subjects Section */}
-      <div className="mb-8">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">My Subjects</h3>
-        {(dashboardData.subjects?.length || 0) === 0 && !error ? (
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="text-center">
-              <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No subjects assigned</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                You don't have any subjects assigned yet. Contact the administrator to get subjects assigned.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {(dashboardData.subjects?.length || 0) > 0 ? (
-              dashboardData.subjects.map((subject) => (
-                <div key={subject.id} className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-6">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <BookOpen className="h-8 w-8 text-primary-600" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">{subject.code}</h3>
-                        <p className="text-sm text-gray-600">{subject.name}</p>
-                        <p className="text-sm text-gray-500 mt-1">{subject.room}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))
-            ) : error ? (
-              // Show sample data when there's an error
-              <>
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-6">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <BookOpen className="h-8 w-8 text-primary-600" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">IT101</h3>
-                        <p className="text-sm text-gray-600">Programming Fundamentals</p>
-                        <p className="text-sm text-gray-500 mt-1">Lab A</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-white overflow-hidden shadow rounded-lg">
-                  <div className="p-6">
-                    <div className="flex items-center">
-                      <div className="flex-shrink-0">
-                        <BookOpen className="h-8 w-8 text-primary-600" />
-                      </div>
-                      <div className="ml-4 flex-1">
-                        <h3 className="text-lg font-medium text-gray-900">IT202</h3>
-                        <p className="text-sm text-gray-600">Database Management</p>
-                        <p className="text-sm text-gray-500 mt-1">Lab B</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </>
-            ) : null}
-          </div>
-        )}
-      </div>
 
-      {/* Today's Attendance */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Today's Attendance</h3>
-        </div>
-        <div className="px-6 py-4">
-          {(dashboardData.attendance?.length || 0) === 0 && !error ? (
-            <div className="text-center py-8">
-              <ClipboardList className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No attendance records</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                No attendance has been recorded for today yet.
-              </p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {(dashboardData.attendance?.length || 0) > 0 ? (
-                dashboardData.attendance.map((record) => (
-                  <div key={record.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className={`w-3 h-3 rounded-full mr-3 ${
-                        record.status === 'Present' ? 'bg-green-500' :
-                        record.status === 'Absent' ? 'bg-red-500' : 'bg-yellow-500'
-                      }`}></div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Student ID: {record.student_id}</p>
-                        <p className="text-sm text-gray-500">{record.time_in || '-'} - {record.time_out || '-'}</p>
-                      </div>
-                    </div>
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      record.status === 'Present' ? 'bg-green-100 text-green-800' :
-                      record.status === 'Absent' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {record.status}
-                    </span>
-                  </div>
-                ))
-              ) : error ? (
-                // Show sample attendance when there's an error
-                <>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full mr-3 bg-green-500"></div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Student ID: 2025-1234</p>
-                        <p className="text-sm text-gray-500">08:00 - 17:00</p>
-                      </div>
-                    </div>
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                      Present
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <div className="flex items-center">
-                      <div className="w-3 h-3 rounded-full mr-3 bg-green-500"></div>
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">Student ID: 2025-5678</p>
-                        <p className="text-sm text-gray-500">08:15 - 17:00</p>
-                      </div>
-                    </div>
-                    <span className="px-2 py-1 text-xs font-medium rounded-full bg-green-100 text-green-800">
-                      Present
-                    </span>
-                  </div>
-                </>
-              ) : null}
-            </div>
-          )}
-        </div>
-      </div>
     </div>
   );
 }

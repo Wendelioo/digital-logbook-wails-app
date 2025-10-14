@@ -129,6 +129,12 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     setPasswordSuccess('');
   };
 
+  const handleModalBackdropClick = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      handleCloseAccountModal();
+    }
+  };
+
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -143,11 +149,14 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     };
   }, []);
 
-  // Close dropdown on escape key
+  // Close dropdown and modal on escape key
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         setProfileDropdownOpen(false);
+        if (showAccountModal) {
+          handleCloseAccountModal();
+        }
       }
     };
 
@@ -155,27 +164,35 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     return () => {
       document.removeEventListener('keydown', handleEscape);
     };
+  }, [showAccountModal]);
+
+  // Safety mechanism: Force close modal on component unmount
+  useEffect(() => {
+    return () => {
+      setShowAccountModal(false);
+      setProfileDropdownOpen(false);
+    };
   }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
       {/* Static sidebar - always visible */}
       <div className="flex flex-shrink-0">
-        <div className="flex flex-col w-64 lg:w-72">
+        <div className="flex flex-col w-56 lg:w-64">
           <div className="flex flex-col h-screen bg-gradient-to-b from-blue-900 to-blue-800 shadow-xl">
             <div className="flex-1 pt-6 pb-6 overflow-y-auto">
-              <div className="flex items-center flex-shrink-0 px-4 lg:px-6 mb-8">
-                <div className="flex items-center space-x-2 lg:space-x-3">
-                  <div className="h-10 lg:h-12 w-10 lg:w-12 bg-white rounded-xl flex items-center justify-center shadow-lg">
-                    <LayoutDashboard className="h-6 lg:h-7 w-6 lg:w-7 text-blue-600" />
+              <div className="flex items-center flex-shrink-0 px-3 lg:px-4 mb-6">
+                <div className="flex items-center space-x-2">
+                  <div className="h-10 w-10 bg-white rounded-xl flex items-center justify-center shadow-lg">
+                    <LayoutDashboard className="h-6 w-6 text-blue-600" />
                   </div>
                   <div>
-                    <h1 className="text-lg lg:text-xl font-bold text-white">Digital Logbook</h1>
-                    <p className="text-blue-200 text-xs lg:text-sm">Monitoring System</p>
+                    <h1 className="text-lg font-bold text-white">Digital Logbook</h1>
+                    <p className="text-blue-200 text-xs">Monitoring System</p>
                   </div>
                 </div>
               </div>
-              <nav className="flex-1 px-3 lg:px-4 space-y-2">
+              <nav className="flex-1 px-2 lg:px-3 space-y-1">
                 {navigationItems.map((item) => (
                   <Link
                     key={item.name}
@@ -184,9 +201,9 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                       item.current
                         ? 'bg-blue-700 text-white shadow-lg transform scale-105'
                         : 'text-blue-100 hover:bg-blue-700 hover:text-white hover:transform hover:scale-105'
-                    } group flex items-center px-3 lg:px-4 py-3 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out`}
+                    } group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out`}
                   >
-                    <div className={`${item.current ? 'text-white' : 'text-blue-300 group-hover:text-white'} mr-3 lg:mr-4 transition-colors duration-200`}>
+                    <div className={`${item.current ? 'text-white' : 'text-blue-300 group-hover:text-white'} mr-3 transition-colors duration-200`}>
                       {item.icon}
                     </div>
                     <span className="font-medium">{item.name}</span>
@@ -273,9 +290,9 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         </div>
 
         {/* Page content */}
-        <main className="flex-1">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
+        <main className="flex-1 overflow-hidden">
+          <div className="py-4 h-full">
+            <div className="max-w-full mx-auto px-4 sm:px-6 md:px-8 h-full">
               {children}
             </div>
           </div>
@@ -284,11 +301,24 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
 
       {/* Account Modal */}
       {showAccountModal && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
-          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
+        <div 
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-40 flex items-center justify-center p-4"
+          onClick={handleModalBackdropClick}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-50">
             {/* Modal Header */}
-            <div className="border-b border-gray-200 px-6 py-4">
+            <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h3 className="text-xl font-semibold text-gray-900">Account Settings</h3>
+              <button
+                type="button"
+                onClick={handleCloseAccountModal}
+                className="text-gray-400 hover:text-gray-600 focus:outline-none focus:text-gray-600 transition-colors"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
 
             {/* Tabs */}

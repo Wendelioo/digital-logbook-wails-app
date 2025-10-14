@@ -35,14 +35,14 @@ function SimpleDashboardOverview() {
       try {
         console.log('Loading dashboard for teacher:', user?.name);
         
-        // Try to get subjects
+        // Try to get subjects for count
         try {
           const subjectsData = await GetSubjects();
           console.log('Subjects data:', subjectsData);
           setSubjects(subjectsData || []);
         } catch (subjectsError) {
           console.error('Failed to load subjects:', subjectsError);
-          // Use mock data as fallback
+          // Use mock data as fallback for count
           setSubjects([
             {
               id: 1,
@@ -98,7 +98,7 @@ function SimpleDashboardOverview() {
       )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center">
@@ -108,30 +108,10 @@ function SimpleDashboardOverview() {
               <div className="ml-5 w-0 flex-1">
                 <dl>
                   <dt className="text-sm font-medium text-gray-500 truncate">
-                    My Subjects
+                    Subjects Handled
                   </dt>
                   <dd className="text-3xl font-bold text-gray-900">
                     {subjects.length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ClipboardList className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Today's Attendance
-                  </dt>
-                  <dd className="text-3xl font-bold text-gray-900">
-                    0
                   </dd>
                 </dl>
               </div>
@@ -160,43 +140,6 @@ function SimpleDashboardOverview() {
         </div>
       </div>
 
-      {/* My Subjects Section */}
-      <div className="mb-8">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">My Subjects</h3>
-        {subjects.length === 0 ? (
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="text-center">
-              <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No subjects assigned</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                You don't have any subjects assigned yet.
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {subjects.map((subject) => (
-              <div key={subject.id} className="bg-white overflow-hidden shadow rounded-lg">
-                <div className="p-6">
-                  <div className="flex items-center">
-                    <div className="flex-shrink-0">
-                      <BookOpen className="h-8 w-8 text-primary-600" />
-                    </div>
-                    <div className="ml-4 flex-1">
-                      <h3 className="text-lg font-medium text-gray-900">{subject.code}</h3>
-                      <p className="text-sm text-gray-600">{subject.name}</p>
-                      <p className="text-sm text-gray-500 mt-1">{subject.room}</p>
-                      {subject.schedule && (
-                        <p className="text-sm text-gray-500">{subject.schedule}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Simple Class Lists Link */}
       <div className="bg-white shadow rounded-lg p-6">
@@ -249,3 +192,5 @@ function SimpleTeacherDashboard() {
 }
 
 export default SimpleTeacherDashboard;
+
+
