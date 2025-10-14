@@ -1,6 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Login, Logout } from '../../wailsjs/go/main/App';
 
+// Extend Window interface to include Wails runtime
+declare global {
+  interface Window {
+    go?: {
+      main?: {
+        App?: any;
+      };
+    };
+  }
+}
+
 interface User {
   id: number;
   name: string;
@@ -51,6 +62,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsAuthenticated(false);
       localStorage.removeItem('user');
 
+      // Check if Wails runtime is available
+      if (!window.go || !window.go.main || !window.go.main.App) {
+        throw new Error('Application runtime not initialized. Please restart the application.');
+      }
+
       // Call the backend Login function
       const userData = await Login(username, password);
       
@@ -79,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     try {
       // Call backend logout if user exists
-      if (user) {
+      if (user && window.go && window.go.main && window.go.main.App) {
         await Logout(user.id);
       }
     } catch (error) {

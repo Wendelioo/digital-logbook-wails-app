@@ -227,6 +227,7 @@ export namespace main {
 	    section?: string;
 	    photo_url?: string;
 	    created: string;
+	    login_log_id: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new User(source);
@@ -248,6 +249,7 @@ export namespace main {
 	        this.section = source["section"];
 	        this.photo_url = source["photo_url"];
 	        this.created = source["created"];
+	        this.login_log_id = source["login_log_id"];
 	    }
 	}
 	export class WorkingStudentDashboard {

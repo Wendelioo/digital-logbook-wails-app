@@ -12,6 +12,7 @@ import {
   Trash2,
   Edit,
   Eye,
+  EyeOff,
   BookOpen
 } from 'lucide-react';
 import { 
@@ -136,7 +137,7 @@ function DashboardOverview() {
         </Link>
 
         <Link
-          to="view-classlists"
+          to="manage-classlists"
           className="group flex items-center p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-lg transition-all duration-200"
         >
           <div className="flex-shrink-0">
@@ -145,7 +146,7 @@ function DashboardOverview() {
             </div>
           </div>
           <div className="ml-3">
-            <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">View Class Lists</h3>
+            <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Manage Class Lists</h3>
             <p className="text-xs text-gray-500">Manage existing subject class lists</p>
           </div>
         </Link>
@@ -183,6 +184,8 @@ function RegisterStudent() {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   // Auto-set password to student ID when student ID changes
   const handleStudentIDChange = (value: string) => {
@@ -215,6 +218,7 @@ function RegisterStudent() {
         formData.year, // year level
         formData.section // section
       );
+      setNotification({ type: 'success', message: 'Student added successfully! Default password is their Student ID.' });
       setMessage('Student added successfully! Default password is their Student ID.');
       setFormData({ 
         studentID: '',
@@ -227,33 +231,87 @@ function RegisterStudent() {
         year: '',
         section: ''
       });
+      // Auto-dismiss notification after 5 seconds
+      setTimeout(() => setNotification(null), 5000);
     } catch (error) {
+      setNotification({ type: 'error', message: 'Failed to add student. Please try again.' });
       setMessage('Failed to add student. Please try again.');
       console.error('Registration error:', error);
+      // Auto-dismiss notification after 5 seconds
+      setTimeout(() => setNotification(null), 5000);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl relative">
-        {/* Close Button */}
-        <button
-          type="button"
-          onClick={() => window.history.back()}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
-        >
-          ×
-        </button>
-        
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h2 className="text-2xl font-bold text-blue-600 mb-2">Registration</h2>
-          <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
+    <>
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
+          notification.type === 'success' ? 'border-l-4 border-green-400' : 'border-l-4 border-red-400'
+        }`}>
+          <div className="p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <div className="ml-3 w-0 flex-1 pt-0.5">
+                <p className={`text-sm font-medium ${
+                  notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {notification.message}
+                </p>
+              </div>
+              <div className="ml-4 flex-shrink-0 flex">
+                <button
+                  className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onClick={() => setNotification(null)}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
+      )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            window.history.back();
+          }
+        }}
+      >
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 relative max-h-[90vh] flex flex-col">
+          {/* Close Button */}
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+          >
+            ×
+          </button>
+          
+          {/* Header */}
+          <div className="text-center p-8 pb-4 flex-shrink-0">
+            <h2 className="text-2xl font-bold text-blue-600 mb-2">Registration</h2>
+            <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto px-8 pb-8 flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Student ID */}
             <div>
@@ -387,14 +445,23 @@ function RegisterStudent() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
-              <input
-                type="text"
-                id="password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  id="password"
+                  value={formData.password}
+                  onChange={(e) => setFormData({ ...formData, password: e.target.value })}
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                >
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
+              </div>
               <p className="mt-1 text-xs text-gray-500">
                 Default password is the Student ID (automatically filled)
               </p>
@@ -438,9 +505,10 @@ function RegisterStudent() {
               {loading ? 'Adding...' : 'SUBMIT'}
             </button>
           </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -472,24 +540,32 @@ function CreateClasslist() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-xl shadow-xl p-8 w-full max-w-2xl relative">
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          window.history.back();
+        }
+      }}
+    >
+      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 relative max-h-[90vh] flex flex-col">
         {/* Close Button */}
-        <Link
-          to="/working-student/view-classlists"
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
+        <button
+          type="button"
+          onClick={() => window.history.back()}
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
         >
           ×
-        </Link>
+        </button>
         
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center p-8 pb-4 flex-shrink-0">
           <h2 className="text-2xl font-bold text-blue-600 mb-2">Registration</h2>
           <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
           <p className="text-gray-600 mt-4">Create new subject class lists and assign teachers</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto px-8 pb-8 flex-1">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
               <label htmlFor="code" className="block text-sm font-medium text-gray-700 mb-2">
@@ -572,7 +648,7 @@ function CreateClasslist() {
   );
 }
 
-function ViewClasslists() {
+function ManageClasslists() {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [filteredSubjects, setFilteredSubjects] = useState<Subject[]>([]);
   const [loading, setLoading] = useState(true);
@@ -655,8 +731,8 @@ function ViewClasslists() {
       <div className="flex-shrink-0 mb-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">View Class Lists</h2>
-            <p className="text-gray-600">Manage existing subject class lists and student enrollments</p>
+            <h2 className="text-2xl font-bold text-gray-900">Manage Class Lists</h2>
+            <p className="text-gray-600">Manage subject class lists and student enrollments</p>
           </div>
           <Link
             to="/working-student/create-classlist"
@@ -943,7 +1019,7 @@ function ClassListManagement() {
         <div className="text-center py-8">
           <p className="text-gray-500">Class not found</p>
           <button
-            onClick={() => navigate('/working-student/create-classlist')}
+            onClick={() => navigate('/working-student/manage-classlists')}
             className="mt-4 text-primary-600 hover:text-primary-900"
           >
             Back to Class Lists
@@ -961,7 +1037,7 @@ function ClassListManagement() {
           {/* Header with Back Button */}
           <div className="mb-6 flex items-center">
             <button
-              onClick={() => navigate('/working-student/create-classlist')}
+              onClick={() => navigate('/working-student/manage-classlists')}
               className="mr-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
             >
               <ArrowLeft className="h-5 w-5 text-gray-600" />
@@ -1111,8 +1187,7 @@ function WorkingStudentDashboard() {
   const navigationItems = [
     { name: 'Dashboard', href: '/working-student', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/working-student' },
     { name: 'Add Student', href: '/working-student/register-student', icon: <UserPlus className="h-5 w-5" />, current: location.pathname === '/working-student/register-student' },
-    { name: 'View Class Lists', href: '/working-student/view-classlists', icon: <BookOpen className="h-5 w-5" />, current: location.pathname === '/working-student/view-classlists' },
-    { name: 'Create Class List', href: '/working-student/create-classlist', icon: <Plus className="h-5 w-5" />, current: location.pathname === '/working-student/create-classlist' },
+    { name: 'Manage Class Lists', href: '/working-student/manage-classlists', icon: <BookOpen className="h-5 w-5" />, current: location.pathname === '/working-student/manage-classlists' },
   ];
 
   return (
@@ -1120,7 +1195,7 @@ function WorkingStudentDashboard() {
       <Routes>
         <Route index element={<DashboardOverview />} />
         <Route path="register-student" element={<RegisterStudent />} />
-        <Route path="view-classlists" element={<ViewClasslists />} />
+        <Route path="manage-classlists" element={<ManageClasslists />} />
         <Route path="create-classlist" element={<CreateClasslist />} />
         <Route path="classlist/:id" element={<ClassListManagement />} />
       </Routes>

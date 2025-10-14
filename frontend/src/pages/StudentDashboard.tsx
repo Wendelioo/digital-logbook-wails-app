@@ -116,7 +116,7 @@ function DashboardOverview() {
                     Present
                   </dt>
                   <dd className="text-3xl font-bold text-gray-900">
-                    {dashboardData.attendance.filter(a => a.status === 'Present').length}
+                    {(dashboardData.attendance || []).filter(a => a.status === 'Present').length}
                   </dd>
                 </dl>
               </div>
@@ -138,7 +138,7 @@ function DashboardOverview() {
                     Absent
                   </dt>
                   <dd className="text-3xl font-bold text-gray-900">
-                    {dashboardData.attendance.filter(a => a.status === 'Absent').length}
+                    {(dashboardData.attendance || []).filter(a => a.status === 'Absent').length}
                   </dd>
                 </dl>
               </div>
@@ -160,7 +160,7 @@ function DashboardOverview() {
                     Seat-in
                   </dt>
                   <dd className="text-3xl font-bold text-gray-900">
-                    {dashboardData.attendance.filter(a => a.status === 'Seat-in').length}
+                    {(dashboardData.attendance || []).filter(a => a.status === 'Seat-in').length}
                   </dd>
                 </dl>
               </div>
@@ -204,7 +204,7 @@ function LoginHistory() {
       
       try {
         const data = await GetStudentDashboard(user.id);
-        setAttendance(data.attendance);
+        setAttendance(data.attendance || []);
       } catch (error) {
         console.error('Failed to load attendance:', error);
       } finally {

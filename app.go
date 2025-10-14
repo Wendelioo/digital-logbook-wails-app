@@ -60,6 +60,7 @@ type User struct {
 	Section    *string `json:"section"`
 	PhotoURL   *string `json:"photo_url"`
 	Created    string  `json:"created"`
+	LoginLogID int     `json:"login_log_id"` // Track the login session
 }
 
 // Logout logs a user out and records logout time
@@ -69,11 +70,19 @@ func (a *App) Logout(userID int) error {
 	}
 
 	// Update the most recent login log for this user to set logout time
-	query := `UPDATE login_logs SET logout_time = NOW() 
+	query := `UPDATE login_logs 
+			  SET logout_time = NOW(), 
+			      session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
 			  WHERE user_id = ? AND logout_time IS NULL 
 			  ORDER BY login_time DESC LIMIT 1`
 	_, err := a.db.Exec(query, userID)
-	return err
+	if err != nil {
+		log.Printf("⚠ Failed to log logout for user %d: %v", userID, err)
+		return err
+	}
+	
+	log.Printf("✓ User logout successful: user_id=%d", userID)
+	return nil
 }
 
 // Login authenticates a user
@@ -164,7 +173,30 @@ func (a *App) Login(username, password string) (*User, error) {
 		}
 	}
 
-	log.Printf("✓ User login successful: %s (role: %s)", username, user.Role)
+	// Get the hostname (PC number) of this device
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Printf("⚠ Failed to get hostname: %v", err)
+		hostname = "Unknown"
+	}
+
+	// Create a login log entry
+	insertLog := `INSERT INTO login_logs (user_id, user_type, pc_number, login_time, login_status) 
+				  VALUES (?, ?, ?, NOW(), 'success')`
+	result, err := a.db.Exec(insertLog, user.ID, user.Role, hostname)
+	if err != nil {
+		log.Printf("⚠ Failed to create login log: %v", err)
+		// Don't fail the login if logging fails
+	} else {
+		// Get the log ID for this session
+		logID, err := result.LastInsertId()
+		if err == nil {
+			user.LoginLogID = int(logID)
+			log.Printf("✓ Login logged with ID %d for PC: %s", logID, hostname)
+		}
+	}
+
+	log.Printf("✓ User login successful: %s (role: %s, pc: %s)", username, user.Role, hostname)
 	return &user, nil
 }
 
