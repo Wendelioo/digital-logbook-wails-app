@@ -61,7 +61,7 @@ function DashboardOverview() {
   return (
     <div>
       <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Welcome, {user?.name}!</h2>
+        <h2 className="text-2xl font-bold text-gray-900">Welcome, {user?.first_name || user?.name}!</h2>
         <p className="text-gray-600">Here's your attendance overview and today's activity</p>
       </div>
 
@@ -390,152 +390,137 @@ function FeedbackHistory() {
         </div>
       )}
 
-      <div className="space-y-4">
-        {feedbackList.length === 0 ? (
-          <div className="bg-white shadow rounded-lg p-12 text-center">
-            <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Feedback Yet</h3>
-            <p className="text-gray-500 mb-4">
-              You haven't submitted any equipment feedback yet.
-            </p>
-            <p className="text-sm text-gray-400">
-              Feedback is automatically collected when you logout. It will appear here once you submit your first feedback.
-            </p>
-          </div>
-        ) : (
-          feedbackList.map((feedback, index) => (
-            <div 
-              key={feedback.id} 
-              className="bg-white shadow rounded-lg overflow-hidden hover:shadow-lg transition-shadow duration-200"
-            >
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 px-6 py-3 border-b border-blue-200">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-3">
-                    <div className="bg-blue-500 text-white rounded-full w-8 h-8 flex items-center justify-center text-sm font-bold">
+      {feedbackList.length === 0 ? (
+        <div className="bg-white shadow rounded-lg p-12 text-center">
+          <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Feedback Yet</h3>
+          <p className="text-gray-500 mb-4">
+            You haven't submitted any equipment feedback yet.
+          </p>
+          <p className="text-sm text-gray-400">
+            Feedback is automatically collected when you logout. It will appear here once you submit your first feedback.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date & Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PC Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Computer
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Mouse
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Keyboard
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Monitor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">
+                    Comments
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {feedbackList.map((feedback, index) => (
+                  <tr key={feedback.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       {feedbackList.length - index}
-                    </div>
-                    <div>
-                      <p className="text-sm font-semibold text-gray-900">
-                        Feedback Session #{feedbackList.length - index}
-                      </p>
-                      <p className="text-xs text-gray-600">
-                        {new Date(feedback.date_submitted).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="bg-blue-600 text-white text-xs font-medium px-3 py-1 rounded-full">
-                    {feedback.pc_number}
-                  </div>
-                </div>
-              </div>
-
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                  {/* Computer Status */}
-                  <div className="flex items-start space-x-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      feedback.equipment_condition === 'Good' 
-                        ? 'bg-green-100 text-green-600' 
-                        : 'bg-red-100 text-red-600'
-                    }`}>
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">Computer</p>
-                      <p className={`text-sm font-semibold ${
-                        feedback.equipment_condition === 'Good' ? 'text-green-600' : 'text-red-600'
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {new Date(feedback.date_submitted).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(feedback.date_submitted).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">
+                        {feedback.pc_number}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        feedback.equipment_condition === 'Good'
+                          ? 'bg-green-100 text-green-800'
+                          : feedback.equipment_condition === 'Minor Issue'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
                       }`}>
                         {feedback.equipment_condition}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Mouse Status */}
-                  <div className="flex items-start space-x-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      feedback.mouse_condition === 'Good' 
-                        ? 'bg-green-100 text-green-600' 
-                        : 'bg-red-100 text-red-600'
-                    }`}>
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">Mouse</p>
-                      <p className={`text-sm font-semibold ${
-                        feedback.mouse_condition === 'Good' ? 'text-green-600' : 'text-red-600'
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        feedback.mouse_condition === 'Good'
+                          ? 'bg-green-100 text-green-800'
+                          : feedback.mouse_condition === 'Minor Issue'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
                       }`}>
                         {feedback.mouse_condition}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Keyboard Status */}
-                  <div className="flex items-start space-x-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      feedback.keyboard_condition === 'Good' 
-                        ? 'bg-green-100 text-green-600' 
-                        : 'bg-red-100 text-red-600'
-                    }`}>
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">Keyboard</p>
-                      <p className={`text-sm font-semibold ${
-                        feedback.keyboard_condition === 'Good' ? 'text-green-600' : 'text-red-600'
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        feedback.keyboard_condition === 'Good'
+                          ? 'bg-green-100 text-green-800'
+                          : feedback.keyboard_condition === 'Minor Issue'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
                       }`}>
                         {feedback.keyboard_condition}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Monitor Status */}
-                  <div className="flex items-start space-x-3">
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
-                      feedback.monitor_condition === 'Good' 
-                        ? 'bg-green-100 text-green-600' 
-                        : 'bg-red-100 text-red-600'
-                    }`}>
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-700">Monitor</p>
-                      <p className={`text-sm font-semibold ${
-                        feedback.monitor_condition === 'Good' ? 'text-green-600' : 'text-red-600'
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        feedback.monitor_condition === 'Good'
+                          ? 'bg-green-100 text-green-800'
+                          : feedback.monitor_condition === 'Minor Issue'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
                       }`}>
                         {feedback.monitor_condition}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Additional Comments */}
-                {feedback.comments && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-sm font-medium text-gray-700 mb-2">Additional Comments:</p>
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <p className="text-sm text-gray-600 italic">"{feedback.comments}"</p>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))
-        )}
-      </div>
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700">
+                      <div className="max-w-xs overflow-hidden">
+                        {feedback.comments ? (
+                          <span className="text-gray-600">{feedback.comments}</span>
+                        ) : (
+                          <span className="text-gray-400 italic">No comments</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -78,7 +78,7 @@ function DashboardOverview() {
     <div className="p-6">
       {/* Welcome Message - Always visible */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.name || 'Teacher'}!</h1>
+        <h1 className="text-3xl font-bold text-gray-900">Welcome, {user?.first_name || user?.name || 'Teacher'}!</h1>
         <p className="text-gray-600">Here's your teacher dashboard overview</p>
       </div>
 

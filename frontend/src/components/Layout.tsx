@@ -298,7 +298,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                         </div>
                       )}
                       <div className="text-left">
-                        <span className="text-sm font-medium text-gray-700">{user?.name || 'User'}</span>
+                        <span className="text-sm font-medium text-gray-700">{user?.first_name || user?.name || 'User'}</span>
                         <span className="text-xs text-gray-500 capitalize block">{user?.role?.replace('_', ' ') || 'Role'}</span>
                       </div>
                       <ChevronDown className="h-4 w-4 text-gray-400" />

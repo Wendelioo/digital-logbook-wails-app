@@ -80,7 +80,7 @@ func (a *App) Logout(userID int) error {
 		log.Printf("⚠ Failed to log logout for user %d: %v", userID, err)
 		return err
 	}
-	
+
 	log.Printf("✓ User logout successful: user_id=%d", userID)
 	return nil
 }
@@ -789,14 +789,13 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 		return fmt.Errorf("database not connected")
 	}
 
-	// Automatically detect PC number - for now we'll use a placeholder
-	// In a real system, this would be detected from:
-	// - Computer name
-	// - MAC address
-	// - IP address
-	// - Hardware ID
-	// - Login session tracking
-	pcNumber := fmt.Sprintf("PC-%d", userID) // Placeholder - replace with actual PC detection logic
+	// Get the hostname (PC number) of this device
+	hostname, err := os.Hostname()
+	if err != nil {
+		log.Printf("⚠ Failed to get hostname: %v", err)
+		hostname = "Unknown"
+	}
+	pcNumber := hostname
 
 	// Parse user name to get first, middle, and last name
 	// Assuming format: "LastName, FirstName MiddleName" or "LastName, FirstName"
@@ -808,7 +807,7 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 
 	// Get user details from database
 	var userRole string
-	err := a.db.QueryRow("SELECT user_type FROM users WHERE id = ?", userID).Scan(&userRole)
+	err = a.db.QueryRow("SELECT user_type FROM users WHERE id = ?", userID).Scan(&userRole)
 	if err == nil {
 		// Get name details based on role
 		var query string
@@ -831,39 +830,50 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 	}
 
 	// Determine equipment conditions based on status
+	// ENUM values: 'Good', 'Minor Issue', 'Not Working'
 	equipmentCondition := "Good"
 	if computerStatus == "no" {
-		if computerIssue != "" {
-			equipmentCondition = computerIssue
-		} else {
-			equipmentCondition = "Issue"
-		}
+		equipmentCondition = "Not Working"
 	}
 
 	monitorCondition := "Good"
 	if monitorStatus == "no" {
-		if monitorIssue != "" {
-			monitorCondition = monitorIssue
-		} else {
-			monitorCondition = "Issue"
-		}
+		monitorCondition = "Not Working"
 	}
 
 	keyboardCondition := "Good"
 	if keyboardStatus == "no" {
-		if keyboardIssue != "" {
-			keyboardCondition = keyboardIssue
-		} else {
-			keyboardCondition = "Issue"
-		}
+		keyboardCondition = "Not Working"
 	}
 
 	mouseCondition := "Good"
 	if mouseStatus == "no" {
-		if mouseIssue != "" {
-			mouseCondition = mouseIssue
-		} else {
-			mouseCondition = "Issue"
+		mouseCondition = "Not Working"
+	}
+
+	// Build detailed comments with all issues
+	var commentsParts []string
+	if computerIssue != "" {
+		commentsParts = append(commentsParts, fmt.Sprintf("Computer: %s", computerIssue))
+	}
+	if monitorIssue != "" {
+		commentsParts = append(commentsParts, fmt.Sprintf("Monitor: %s", monitorIssue))
+	}
+	if keyboardIssue != "" {
+		commentsParts = append(commentsParts, fmt.Sprintf("Keyboard: %s", keyboardIssue))
+	}
+	if mouseIssue != "" {
+		commentsParts = append(commentsParts, fmt.Sprintf("Mouse: %s", mouseIssue))
+	}
+	if additionalComments != "" {
+		commentsParts = append(commentsParts, fmt.Sprintf("Additional: %s", additionalComments))
+	}
+
+	combinedComments := ""
+	if len(commentsParts) > 0 {
+		combinedComments = commentsParts[0]
+		for i := 1; i < len(commentsParts); i++ {
+			combinedComments = fmt.Sprintf("%s; %s", combinedComments, commentsParts[i])
 		}
 	}
 
@@ -874,7 +884,7 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`
 
 	_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName, pcNumber,
-		equipmentCondition, monitorCondition, keyboardCondition, mouseCondition, nullString(additionalComments))
+		equipmentCondition, monitorCondition, keyboardCondition, mouseCondition, nullString(combinedComments))
 
 	if err != nil {
 		log.Printf("Failed to save equipment feedback: %v", err)
