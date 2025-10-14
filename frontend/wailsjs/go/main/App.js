@@ -6,6 +6,10 @@ export function ChangePassword(arg1, arg2, arg3) {
   return window['go']['main']['App']['ChangePassword'](arg1, arg2, arg3);
 }
 
+export function CreateClass(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9) {
+  return window['go']['main']['App']['CreateClass'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9);
+}
+
 export function CreateSubject(arg1, arg2, arg3, arg4) {
   return window['go']['main']['App']['CreateSubject'](arg1, arg2, arg3, arg4);
 }
@@ -14,8 +18,20 @@ export function CreateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9,
   return window['go']['main']['App']['CreateUser'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11);
 }
 
+export function DeleteClass(arg1) {
+  return window['go']['main']['App']['DeleteClass'](arg1);
+}
+
 export function DeleteUser(arg1) {
   return window['go']['main']['App']['DeleteUser'](arg1);
+}
+
+export function EnrollMultipleStudents(arg1, arg2, arg3) {
+  return window['go']['main']['App']['EnrollMultipleStudents'](arg1, arg2, arg3);
+}
+
+export function EnrollStudentInClass(arg1, arg2, arg3) {
+  return window['go']['main']['App']['EnrollStudentInClass'](arg1, arg2, arg3);
 }
 
 export function ExportAttendanceCSV(arg1) {
@@ -42,8 +58,24 @@ export function GetAdminDashboard() {
   return window['go']['main']['App']['GetAdminDashboard']();
 }
 
+export function GetAllClasses() {
+  return window['go']['main']['App']['GetAllClasses']();
+}
+
 export function GetAllLogs() {
   return window['go']['main']['App']['GetAllLogs']();
+}
+
+export function GetAllStudentsForEnrollment(arg1) {
+  return window['go']['main']['App']['GetAllStudentsForEnrollment'](arg1);
+}
+
+export function GetAllTeachers() {
+  return window['go']['main']['App']['GetAllTeachers']();
+}
+
+export function GetAvailableStudents(arg1) {
+  return window['go']['main']['App']['GetAvailableStudents'](arg1);
 }
 
 export function GetClassStudents(arg1) {
@@ -70,6 +102,10 @@ export function GetSubjects() {
   return window['go']['main']['App']['GetSubjects']();
 }
 
+export function GetTeacherClasses(arg1) {
+  return window['go']['main']['App']['GetTeacherClasses'](arg1);
+}
+
 export function GetTeacherDashboard(arg1) {
   return window['go']['main']['App']['GetTeacherDashboard'](arg1);
 }
@@ -94,8 +130,8 @@ export function Logout(arg1) {
   return window['go']['main']['App']['Logout'](arg1);
 }
 
-export function RecordAttendance(arg1, arg2, arg3) {
-  return window['go']['main']['App']['RecordAttendance'](arg1, arg2, arg3);
+export function RecordAttendance(arg1, arg2, arg3, arg4, arg5, arg6, arg7) {
+  return window['go']['main']['App']['RecordAttendance'](arg1, arg2, arg3, arg4, arg5, arg6, arg7);
 }
 
 export function SaveEquipmentFeedback(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {
@@ -104,6 +140,22 @@ export function SaveEquipmentFeedback(arg1, arg2, arg3, arg4, arg5, arg6, arg7, 
 
 export function SearchUsers(arg1, arg2) {
   return window['go']['main']['App']['SearchUsers'](arg1, arg2);
+}
+
+export function UnenrollStudentFromClass(arg1) {
+  return window['go']['main']['App']['UnenrollStudentFromClass'](arg1);
+}
+
+export function UnenrollStudentFromClassByIDs(arg1, arg2) {
+  return window['go']['main']['App']['UnenrollStudentFromClassByIDs'](arg1, arg2);
+}
+
+export function UpdateAttendanceTime(arg1, arg2, arg3) {
+  return window['go']['main']['App']['UpdateAttendanceTime'](arg1, arg2, arg3);
+}
+
+export function UpdateClass(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['UpdateClass'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
 export function UpdateUser(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8, arg9, arg10, arg11) {

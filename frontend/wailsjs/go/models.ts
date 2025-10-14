@@ -20,12 +20,21 @@ export namespace main {
 	}
 	export class Attendance {
 	    id: number;
+	    classlist_id: number;
 	    class_id: number;
 	    date: string;
 	    student_id: number;
+	    student_code: string;
+	    first_name: string;
+	    middle_name?: string;
+	    last_name: string;
+	    subject_code: string;
+	    subject_name: string;
 	    time_in?: string;
 	    time_out?: string;
 	    status: string;
+	    remarks?: string;
+	    recorded_by?: number;
 	
 	    static createFrom(source: any = {}) {
 	        return new Attendance(source);
@@ -34,12 +43,21 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
+	        this.classlist_id = source["classlist_id"];
 	        this.class_id = source["class_id"];
 	        this.date = source["date"];
 	        this.student_id = source["student_id"];
+	        this.student_code = source["student_code"];
+	        this.first_name = source["first_name"];
+	        this.middle_name = source["middle_name"];
+	        this.last_name = source["last_name"];
+	        this.subject_code = source["subject_code"];
+	        this.subject_name = source["subject_name"];
 	        this.time_in = source["time_in"];
 	        this.time_out = source["time_out"];
 	        this.status = source["status"];
+	        this.remarks = source["remarks"];
+	        this.recorded_by = source["recorded_by"];
 	    }
 	}
 	export class ClassStudent {
@@ -48,7 +66,10 @@ export namespace main {
 	    first_name: string;
 	    middle_name?: string;
 	    last_name: string;
-	    subject_id: number;
+	    year_level?: string;
+	    section?: string;
+	    class_id?: number;
+	    is_enrolled: boolean;
 	
 	    static createFrom(source: any = {}) {
 	        return new ClassStudent(source);
@@ -61,7 +82,86 @@ export namespace main {
 	        this.first_name = source["first_name"];
 	        this.middle_name = source["middle_name"];
 	        this.last_name = source["last_name"];
+	        this.year_level = source["year_level"];
+	        this.section = source["section"];
+	        this.class_id = source["class_id"];
+	        this.is_enrolled = source["is_enrolled"];
+	    }
+	}
+	export class ClasslistEntry {
+	    id: number;
+	    class_id: number;
+	    student_id: number;
+	    student_code: string;
+	    first_name: string;
+	    middle_name?: string;
+	    last_name: string;
+	    year_level?: string;
+	    section?: string;
+	    enrollment_date: string;
+	    status: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new ClasslistEntry(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.class_id = source["class_id"];
+	        this.student_id = source["student_id"];
+	        this.student_code = source["student_code"];
+	        this.first_name = source["first_name"];
+	        this.middle_name = source["middle_name"];
+	        this.last_name = source["last_name"];
+	        this.year_level = source["year_level"];
+	        this.section = source["section"];
+	        this.enrollment_date = source["enrollment_date"];
+	        this.status = source["status"];
+	    }
+	}
+	export class CourseClass {
+	    id: number;
+	    subject_id: number;
+	    subject_code: string;
+	    subject_name: string;
+	    teacher_id: number;
+	    teacher_code?: string;
+	    teacher_name: string;
+	    schedule?: string;
+	    room?: string;
+	    year_level?: string;
+	    section?: string;
+	    semester?: string;
+	    school_year?: string;
+	    enrolled_count: number;
+	    is_active: boolean;
+	    created_by?: number;
+	    created_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new CourseClass(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
 	        this.subject_id = source["subject_id"];
+	        this.subject_code = source["subject_code"];
+	        this.subject_name = source["subject_name"];
+	        this.teacher_id = source["teacher_id"];
+	        this.teacher_code = source["teacher_code"];
+	        this.teacher_name = source["teacher_name"];
+	        this.schedule = source["schedule"];
+	        this.room = source["room"];
+	        this.year_level = source["year_level"];
+	        this.section = source["section"];
+	        this.semester = source["semester"];
+	        this.school_year = source["school_year"];
+	        this.enrolled_count = source["enrolled_count"];
+	        this.is_active = source["is_active"];
+	        this.created_by = source["created_by"];
+	        this.created_at = source["created_at"];
 	    }
 	}
 	export class Feedback {
@@ -162,9 +262,10 @@ export namespace main {
 	    id: number;
 	    code: string;
 	    name: string;
-	    teacher: string;
-	    room: string;
-	    schedule: string;
+	    teacher_id: number;
+	    teacher_name?: string;
+	    description?: string;
+	    created_at: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Subject(source);
@@ -175,13 +276,14 @@ export namespace main {
 	        this.id = source["id"];
 	        this.code = source["code"];
 	        this.name = source["name"];
-	        this.teacher = source["teacher"];
-	        this.room = source["room"];
-	        this.schedule = source["schedule"];
+	        this.teacher_id = source["teacher_id"];
+	        this.teacher_name = source["teacher_name"];
+	        this.description = source["description"];
+	        this.created_at = source["created_at"];
 	    }
 	}
 	export class TeacherDashboard {
-	    subjects: Subject[];
+	    classes: CourseClass[];
 	    attendance: Attendance[];
 	
 	    static createFrom(source: any = {}) {
@@ -190,7 +292,7 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.subjects = this.convertValues(source["subjects"], Subject);
+	        this.classes = this.convertValues(source["classes"], CourseClass);
 	        this.attendance = this.convertValues(source["attendance"], Attendance);
 	    }
 	

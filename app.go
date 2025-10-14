@@ -436,20 +436,44 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 		return fmt.Errorf("database not connected")
 	}
 
+	// Log the incoming data for debugging
+	log.Printf("🔍 CreateUser called - Role: %s, StudentID: %s, Year: %s, Section: %s, Gender: %s", role, studentID, year, section, gender)
+
 	// Determine username based on role
 	username := employeeID
 	if role == "student" || role == "working_student" {
 		username = studentID
+		if username == "" {
+			return fmt.Errorf("student ID is required for %s role", role)
+		}
+	}
+
+	// Validate required fields for working_student
+	if role == "working_student" {
+		if studentID == "" {
+			return fmt.Errorf("student ID is required for working student")
+		}
+		if firstName == "" || lastName == "" {
+			return fmt.Errorf("first name and last name are required")
+		}
+		if year == "" {
+			return fmt.Errorf("year level is required for working student")
+		}
+		if section == "" {
+			return fmt.Errorf("section is required for working student")
+		}
 	}
 
 	// Insert into users table
 	query := `INSERT INTO users (username, password, user_type) VALUES (?, ?, ?)`
 	result, err := a.db.Exec(query, username, password, role)
 	if err != nil {
-		return err
+		log.Printf("❌ Failed to insert into users table: %v", err)
+		return fmt.Errorf("failed to create user account: %w", err)
 	}
 
 	userID, _ := result.LastInsertId()
+	log.Printf("✅ Created user account with ID: %d", userID)
 
 	// Insert into respective table based on role
 	switch role {
@@ -464,10 +488,18 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(year), nullString(section))
 	case "working_student":
 		query = `INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, gender, year_level, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		log.Printf("📝 Inserting working student - user_id: %d, student_id: %s, name: %s %s, gender: %s, year: %s, section: %s",
+			userID, studentID, firstName, lastName, gender, year, section)
 		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(year), nullString(section))
 	}
 
-	return err
+	if err != nil {
+		log.Printf("❌ Failed to insert into %s table: %v", role, err)
+		return fmt.Errorf("failed to create %s profile: %w", role, err)
+	}
+
+	log.Printf("✅ Successfully created %s: %s %s (ID: %d)", role, firstName, lastName, userID)
+	return nil
 }
 
 // UpdateUser updates an existing user
@@ -1129,77 +1161,143 @@ func (a *App) ExportFeedbackPDF() (string, error) {
 }
 
 // ==============================================================================
-// TEACHER DASHBOARD
+// TEACHER DASHBOARD & CLASS MANAGEMENT
 // ==============================================================================
 
 // TeacherDashboard represents teacher dashboard data
 type TeacherDashboard struct {
-	Subjects   []Subject    `json:"subjects"`
-	Attendance []Attendance `json:"attendance"`
+	Classes    []CourseClass `json:"classes"`
+	Attendance []Attendance  `json:"attendance"`
 }
 
-// Subject represents a subject/class
+// Subject represents a course/subject
 type Subject struct {
-	ID       int    `json:"id"`
-	Code     string `json:"code"`
-	Name     string `json:"name"`
-	Teacher  string `json:"teacher"`
-	Room     string `json:"room"`
-	Schedule string `json:"schedule"`
+	ID          int     `json:"id"`
+	Code        string  `json:"code"`
+	Name        string  `json:"name"`
+	TeacherID   int     `json:"teacher_id"`
+	TeacherName *string `json:"teacher_name,omitempty"`
+	Description *string `json:"description,omitempty"`
+	CreatedAt   string  `json:"created_at"`
 }
 
-// ClassStudent represents a student enrolled in a class
+// CourseClass represents a specific instance of a subject (with schedule, room, etc.)
+type CourseClass struct {
+	ID            int     `json:"id"`
+	SubjectID     int     `json:"subject_id"`
+	SubjectCode   string  `json:"subject_code"`
+	SubjectName   string  `json:"subject_name"`
+	TeacherID     int     `json:"teacher_id"`
+	TeacherCode   *string `json:"teacher_code,omitempty"`
+	TeacherName   string  `json:"teacher_name"`
+	Schedule      *string `json:"schedule,omitempty"`
+	Room          *string `json:"room,omitempty"`
+	YearLevel     *string `json:"year_level,omitempty"`
+	Section       *string `json:"section,omitempty"`
+	Semester      *string `json:"semester,omitempty"`
+	SchoolYear    *string `json:"school_year,omitempty"`
+	EnrolledCount int     `json:"enrolled_count"`
+	IsActive      bool    `json:"is_active"`
+	CreatedBy     *int    `json:"created_by,omitempty"`
+	CreatedAt     string  `json:"created_at"`
+}
+
+// ClasslistEntry represents a student's enrollment in a class
+type ClasslistEntry struct {
+	ID             int     `json:"id"`
+	ClassID        int     `json:"class_id"`
+	StudentID      int     `json:"student_id"`
+	StudentCode    string  `json:"student_code"`
+	FirstName      string  `json:"first_name"`
+	MiddleName     *string `json:"middle_name,omitempty"`
+	LastName       string  `json:"last_name"`
+	YearLevel      *string `json:"year_level,omitempty"`
+	Section        *string `json:"section,omitempty"`
+	EnrollmentDate string  `json:"enrollment_date"`
+	Status         string  `json:"status"`
+}
+
+// ClassStudent represents a student (used for enrollment operations)
 type ClassStudent struct {
 	ID         int     `json:"id"`
 	StudentID  string  `json:"student_id"`
 	FirstName  string  `json:"first_name"`
 	MiddleName *string `json:"middle_name"`
 	LastName   string  `json:"last_name"`
-	SubjectID  int     `json:"subject_id"`
+	YearLevel  *string `json:"year_level"`
+	Section    *string `json:"section"`
+	ClassID    *int    `json:"class_id,omitempty"`
+	IsEnrolled bool    `json:"is_enrolled"`
 }
 
 // Attendance represents an attendance record
 type Attendance struct {
-	ID        int     `json:"id"`
-	ClassID   int     `json:"class_id"`
-	Date      string  `json:"date"`
-	StudentID int     `json:"student_id"`
-	TimeIn    *string `json:"time_in"`
-	TimeOut   *string `json:"time_out"`
-	Status    string  `json:"status"`
+	ID          int     `json:"id"`
+	ClasslistID int     `json:"classlist_id"`
+	ClassID     int     `json:"class_id"`
+	Date        string  `json:"date"`
+	StudentID   int     `json:"student_id"`
+	StudentCode string  `json:"student_code"`
+	FirstName   string  `json:"first_name"`
+	MiddleName  *string `json:"middle_name,omitempty"`
+	LastName    string  `json:"last_name"`
+	SubjectCode string  `json:"subject_code"`
+	SubjectName string  `json:"subject_name"`
+	TimeIn      *string `json:"time_in"`
+	TimeOut     *string `json:"time_out"`
+	Status      string  `json:"status"`
+	Remarks     *string `json:"remarks,omitempty"`
+	RecordedBy  *int    `json:"recorded_by,omitempty"`
 }
 
 // GetTeacherDashboard returns teacher dashboard data
-func (a *App) GetTeacherDashboard(teacherName string) (TeacherDashboard, error) {
+func (a *App) GetTeacherDashboard(teacherID int) (TeacherDashboard, error) {
 	var dashboard TeacherDashboard
 
 	if a.db == nil {
 		return dashboard, fmt.Errorf("database not connected")
 	}
 
-	// Get subjects
-	subjects, err := a.GetSubjects()
+	// Get teacher's classes
+	classes, err := a.GetTeacherClasses(teacherID)
 	if err != nil {
-		log.Printf("⚠ Failed to get subjects: %v", err)
+		log.Printf("⚠ Failed to get teacher classes: %v", err)
 		return dashboard, err
 	}
-	dashboard.Subjects = subjects
+	dashboard.Classes = classes
 
-	// Get today's attendance
-	query := `SELECT id, class_id, date, student_id, time_in, time_out, status 
-			  FROM attendance WHERE date = CURDATE() LIMIT 100`
-	rows, err := a.db.Query(query)
+	// Get today's attendance for all teacher's classes
+	query := `
+		SELECT 
+			a.id, a.classlist_id, a.date, a.time_in, a.time_out, a.status, a.remarks,
+			vcl.class_id, vcl.student_id, vcl.student_code, 
+			vcl.first_name, vcl.middle_name, vcl.last_name,
+			vc.subject_code, vc.subject_name
+		FROM attendance a
+		JOIN classlist cl ON a.classlist_id = cl.id
+		JOIN v_classlist_complete vcl ON cl.id = vcl.classlist_id
+		JOIN v_classes_complete vc ON cl.class_id = vc.class_id
+		WHERE vc.teacher_id = ? AND a.date = CURDATE()
+		ORDER BY a.time_in DESC
+		LIMIT 100
+	`
+	rows, err := a.db.Query(query, teacherID)
 	if err != nil {
 		log.Printf("⚠ Failed to query attendance: %v", err)
-		// Return dashboard with just subjects
+		// Return dashboard with just classes
 		return dashboard, nil
 	}
 	defer rows.Close()
 
 	for rows.Next() {
 		var att Attendance
-		var timeIn, timeOut sql.NullString
-		err := rows.Scan(&att.ID, &att.ClassID, &att.Date, &att.StudentID, &timeIn, &timeOut, &att.Status)
+		var timeIn, timeOut, remarks, middleName sql.NullString
+		err := rows.Scan(
+			&att.ID, &att.ClasslistID, &att.Date, &timeIn, &timeOut, &att.Status, &remarks,
+			&att.ClassID, &att.StudentID, &att.StudentCode,
+			&att.FirstName, &middleName, &att.LastName,
+			&att.SubjectCode, &att.SubjectName,
+		)
 		if err != nil {
 			continue
 		}
@@ -1209,6 +1307,12 @@ func (a *App) GetTeacherDashboard(teacherName string) (TeacherDashboard, error) 
 		}
 		if timeOut.Valid {
 			att.TimeOut = &timeOut.String
+		}
+		if remarks.Valid {
+			att.Remarks = &remarks.String
+		}
+		if middleName.Valid {
+			att.MiddleName = &middleName.String
 		}
 
 		dashboard.Attendance = append(dashboard.Attendance, att)
@@ -1223,7 +1327,16 @@ func (a *App) GetSubjects() ([]Subject, error) {
 		return nil, fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, subject_code, subject_title, assigned_teacher, room, schedule FROM classlist ORDER BY subject_code`
+	query := `
+		SELECT 
+			s.id, s.subject_code, s.subject_name, s.teacher_id, s.created_at,
+			CONCAT(t.last_name, ', ', t.first_name, 
+			       CASE WHEN t.middle_name IS NOT NULL THEN CONCAT(' ', t.middle_name) ELSE '' END) AS teacher_name,
+			s.description
+		FROM subjects s
+		JOIN teachers t ON s.teacher_id = t.id
+		ORDER BY s.subject_code
+	`
 	rows, err := a.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -1233,13 +1346,18 @@ func (a *App) GetSubjects() ([]Subject, error) {
 	var subjects []Subject
 	for rows.Next() {
 		var subj Subject
-		var schedule sql.NullString
-		err := rows.Scan(&subj.ID, &subj.Code, &subj.Name, &subj.Teacher, &subj.Room, &schedule)
+		var teacherName, description sql.NullString
+		var createdAt time.Time
+		err := rows.Scan(&subj.ID, &subj.Code, &subj.Name, &subj.TeacherID, &createdAt, &teacherName, &description)
 		if err != nil {
 			continue
 		}
-		if schedule.Valid {
-			subj.Schedule = schedule.String
+		subj.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		if teacherName.Valid {
+			subj.TeacherName = &teacherName.String
+		}
+		if description.Valid {
+			subj.Description = &description.String
 		}
 		subjects = append(subjects, subj)
 	}
@@ -1247,27 +1365,390 @@ func (a *App) GetSubjects() ([]Subject, error) {
 	return subjects, nil
 }
 
+// GetTeacherClasses returns all classes for a specific teacher
+func (a *App) GetTeacherClasses(teacherID int) ([]CourseClass, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `SELECT * FROM v_teacher_classes WHERE teacher_id = ? ORDER BY subject_code, year_level, section`
+	rows, err := a.db.Query(query, teacherID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var classes []CourseClass
+	for rows.Next() {
+		var class CourseClass
+		var schedule, room, yearLevel, section, semester, schoolYear sql.NullString
+		err := rows.Scan(
+			&class.ID, &class.SubjectID, &class.SubjectCode, &class.SubjectName,
+			&class.TeacherID, &class.TeacherName,
+			&schedule, &room, &yearLevel, &section, &semester, &schoolYear,
+			&class.EnrolledCount, &class.IsActive,
+		)
+		if err != nil {
+			continue
+		}
+		if schedule.Valid {
+			class.Schedule = &schedule.String
+		}
+		if room.Valid {
+			class.Room = &room.String
+		}
+		if yearLevel.Valid {
+			class.YearLevel = &yearLevel.String
+		}
+		if section.Valid {
+			class.Section = &section.String
+		}
+		if semester.Valid {
+			class.Semester = &semester.String
+		}
+		if schoolYear.Valid {
+			class.SchoolYear = &schoolYear.String
+		}
+		classes = append(classes, class)
+	}
+
+	return classes, nil
+}
+
+// GetAllClasses returns all active classes
+func (a *App) GetAllClasses() ([]CourseClass, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `SELECT * FROM v_teacher_classes WHERE is_active = TRUE ORDER BY subject_code, year_level, section`
+	rows, err := a.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var classes []CourseClass
+	for rows.Next() {
+		var class CourseClass
+		var schedule, room, yearLevel, section, semester, schoolYear sql.NullString
+		err := rows.Scan(
+			&class.ID, &class.SubjectID, &class.SubjectCode, &class.SubjectName,
+			&class.TeacherID, &class.TeacherName,
+			&schedule, &room, &yearLevel, &section, &semester, &schoolYear,
+			&class.EnrolledCount, &class.IsActive,
+		)
+		if err != nil {
+			continue
+		}
+		if schedule.Valid {
+			class.Schedule = &schedule.String
+		}
+		if room.Valid {
+			class.Room = &room.String
+		}
+		if yearLevel.Valid {
+			class.YearLevel = &yearLevel.String
+		}
+		if section.Valid {
+			class.Section = &section.String
+		}
+		if semester.Valid {
+			class.Semester = &semester.String
+		}
+		if schoolYear.Valid {
+			class.SchoolYear = &schoolYear.String
+		}
+		classes = append(classes, class)
+	}
+
+	return classes, nil
+}
+
 // GetClassStudents returns students enrolled in a specific class
-func (a *App) GetClassStudents(subjectID int) ([]ClassStudent, error) {
+func (a *App) GetClassStudents(classID int) ([]ClasslistEntry, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not connected")
 	}
 
 	query := `
-		SELECT s.id, s.student_id, s.first_name, s.middle_name, s.last_name, s.class_id
+		SELECT 
+			vcl.classlist_id, vcl.class_id, vcl.student_id, vcl.student_code,
+			vcl.first_name, vcl.middle_name, vcl.last_name,
+			vcl.year_level, vcl.section, vcl.enrollment_status,
+			cl.enrollment_date
+		FROM v_classlist_complete vcl
+		JOIN classlist cl ON vcl.classlist_id = cl.id
+		WHERE vcl.class_id = ? AND vcl.enrollment_status = 'active'
+		ORDER BY vcl.last_name, vcl.first_name
+	`
+
+	rows, err := a.db.Query(query, classID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var students []ClasslistEntry
+	for rows.Next() {
+		var student ClasslistEntry
+		var middleName, yearLevel, section sql.NullString
+		var enrollmentDate time.Time
+		err := rows.Scan(
+			&student.ID, &student.ClassID, &student.StudentID, &student.StudentCode,
+			&student.FirstName, &middleName, &student.LastName,
+			&yearLevel, &section, &student.Status,
+			&enrollmentDate,
+		)
+		if err != nil {
+			continue
+		}
+		if middleName.Valid {
+			student.MiddleName = &middleName.String
+		}
+		if yearLevel.Valid {
+			student.YearLevel = &yearLevel.String
+		}
+		if section.Valid {
+			student.Section = &section.String
+		}
+		student.EnrollmentDate = enrollmentDate.Format("2006-01-02")
+		students = append(students, student)
+	}
+
+	return students, nil
+}
+
+// CreateSubject creates a new subject (or updates if exists)
+func (a *App) CreateSubject(code, name string, teacherID int, description string) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	// Use INSERT ... ON DUPLICATE KEY UPDATE to handle existing subjects gracefully
+	query := `
+		INSERT INTO subjects (subject_code, subject_name, teacher_id, description) 
+		VALUES (?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE 
+			subject_name = VALUES(subject_name),
+			teacher_id = VALUES(teacher_id),
+			description = VALUES(description)
+	`
+	_, err := a.db.Exec(query, code, name, teacherID, nullString(description))
+	if err != nil {
+		log.Printf("⚠ Failed to create/update subject: %v", err)
+		return err
+	}
+	log.Printf("✓ Subject created/updated: %s - %s", code, name)
+	return nil
+}
+
+// CreateClass creates a new class instance (by working student)
+func (a *App) CreateClass(subjectID, teacherID int, schedule, room, yearLevel, section, semester, schoolYear string, createdBy int) (int, error) {
+	if a.db == nil {
+		return 0, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		INSERT INTO classes (subject_id, teacher_id, schedule, room, year_level, section, semester, school_year, created_by, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+	`
+	result, err := a.db.Exec(
+		query,
+		subjectID, teacherID,
+		nullString(schedule), nullString(room),
+		nullString(yearLevel), nullString(section),
+		nullString(semester), nullString(schoolYear),
+		nullInt(createdBy),
+	)
+	if err != nil {
+		log.Printf("⚠ Failed to create class: %v", err)
+		return 0, err
+	}
+
+	classID, err := result.LastInsertId()
+	if err != nil {
+		return 0, err
+	}
+
+	log.Printf("✓ Class created: ID=%d, Subject=%d, Teacher=%d", classID, subjectID, teacherID)
+	return int(classID), nil
+}
+
+// UpdateClass updates a class
+func (a *App) UpdateClass(classID int, schedule, room, yearLevel, section, semester, schoolYear string, isActive bool) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	query := `
+		UPDATE classes 
+		SET schedule = ?, room = ?, year_level = ?, section = ?, semester = ?, school_year = ?, is_active = ?
+		WHERE id = ?
+	`
+	_, err := a.db.Exec(
+		query,
+		nullString(schedule), nullString(room),
+		nullString(yearLevel), nullString(section),
+		nullString(semester), nullString(schoolYear),
+		isActive, classID,
+	)
+	if err != nil {
+		log.Printf("⚠ Failed to update class: %v", err)
+		return err
+	}
+
+	log.Printf("✓ Class updated: ID=%d", classID)
+	return nil
+}
+
+// DeleteClass soft-deletes a class by setting is_active to false
+func (a *App) DeleteClass(classID int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	query := `UPDATE classes SET is_active = FALSE WHERE id = ?`
+	_, err := a.db.Exec(query, classID)
+	if err != nil {
+		log.Printf("⚠ Failed to delete class: %v", err)
+		return err
+	}
+
+	log.Printf("✓ Class deactivated: ID=%d", classID)
+	return nil
+}
+
+// EnrollStudentInClass enrolls a student in a specific class
+func (a *App) EnrollStudentInClass(studentID int, classID int, enrolledBy int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	query := `
+		INSERT INTO classlist (class_id, student_id, enrolled_by, status)
+		VALUES (?, ?, ?, 'active')
+		ON DUPLICATE KEY UPDATE status = 'active', updated_at = CURRENT_TIMESTAMP
+	`
+	_, err := a.db.Exec(query, classID, studentID, nullInt(enrolledBy))
+	if err != nil {
+		log.Printf("⚠ Failed to enroll student %d in class %d: %v", studentID, classID, err)
+		return err
+	}
+
+	log.Printf("✓ Student %d enrolled in class %d", studentID, classID)
+	return nil
+}
+
+// EnrollMultipleStudents enrolls multiple students in a class at once
+func (a *App) EnrollMultipleStudents(studentIDs []int, classID int, enrolledBy int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	tx, err := a.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	stmt, err := tx.Prepare(`
+		INSERT INTO classlist (class_id, student_id, enrolled_by, status)
+		VALUES (?, ?, ?, 'active')
+		ON DUPLICATE KEY UPDATE status = 'active', updated_at = CURRENT_TIMESTAMP
+	`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, studentID := range studentIDs {
+		_, err = stmt.Exec(classID, studentID, nullInt(enrolledBy))
+		if err != nil {
+			log.Printf("⚠ Failed to enroll student %d: %v", studentID, err)
+			return err
+		}
+	}
+
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	log.Printf("✓ Enrolled %d students in class %d", len(studentIDs), classID)
+	return nil
+}
+
+// UnenrollStudentFromClass removes a student from a class
+func (a *App) UnenrollStudentFromClass(classlistID int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	query := `UPDATE classlist SET status = 'dropped' WHERE id = ?`
+	_, err := a.db.Exec(query, classlistID)
+	if err != nil {
+		log.Printf("⚠ Failed to unenroll student (classlist_id=%d): %v", classlistID, err)
+		return err
+	}
+
+	log.Printf("✓ Student unenrolled (classlist_id=%d)", classlistID)
+	return nil
+}
+
+// UnenrollStudentFromClassByIDs removes a student from a specific class by student_id and class_id
+func (a *App) UnenrollStudentFromClassByIDs(studentID int, classID int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	query := `UPDATE classlist SET status = 'dropped' WHERE student_id = ? AND class_id = ?`
+	_, err := a.db.Exec(query, studentID, classID)
+	if err != nil {
+		log.Printf("⚠ Failed to unenroll student %d from class %d: %v", studentID, classID, err)
+		return err
+	}
+
+	log.Printf("✓ Student %d unenrolled from class %d", studentID, classID)
+	return nil
+}
+
+// GetAvailableStudents returns students not enrolled in a specific class
+func (a *App) GetAvailableStudents(classID int) ([]ClassStudent, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			s.user_id as id, s.student_id, s.first_name, s.middle_name, s.last_name, s.year_level, s.section,
+			EXISTS(
+				SELECT 1 FROM classlist cl 
+				WHERE cl.student_id = s.user_id AND cl.class_id = ? AND cl.status = 'active'
+			) as is_enrolled
 		FROM students s
-		WHERE s.class_id = ?
+		WHERE NOT EXISTS (
+			SELECT 1 FROM classlist cl 
+			WHERE cl.student_id = s.user_id AND cl.class_id = ? AND cl.status = 'active'
+		)
 		
 		UNION ALL
 		
-		SELECT ws.id, ws.student_id, ws.first_name, ws.middle_name, ws.last_name, ws.class_id
+		SELECT 
+			ws.user_id as id, ws.student_id, ws.first_name, ws.middle_name, ws.last_name, ws.year_level, ws.section,
+			EXISTS(
+				SELECT 1 FROM classlist cl 
+				WHERE cl.student_id = ws.user_id AND cl.class_id = ? AND cl.status = 'active'
+			) as is_enrolled
 		FROM working_students ws
-		WHERE ws.class_id = ?
+		WHERE NOT EXISTS (
+			SELECT 1 FROM classlist cl 
+			WHERE cl.student_id = ws.user_id AND cl.class_id = ? AND cl.status = 'active'
+		)
 		
 		ORDER BY last_name, first_name
 	`
 
-	rows, err := a.db.Query(query, subjectID, subjectID)
+	rows, err := a.db.Query(query, classID, classID, classID, classID)
 	if err != nil {
 		return nil, err
 	}
@@ -1276,17 +1757,19 @@ func (a *App) GetClassStudents(subjectID int) ([]ClassStudent, error) {
 	var students []ClassStudent
 	for rows.Next() {
 		var student ClassStudent
-		var middleName sql.NullString
-		var classID sql.NullInt32
-		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName, &student.LastName, &classID)
+		var middleName, yearLevel, section sql.NullString
+		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName, &student.LastName, &yearLevel, &section, &student.IsEnrolled)
 		if err != nil {
 			continue
 		}
 		if middleName.Valid {
 			student.MiddleName = &middleName.String
 		}
-		if classID.Valid {
-			student.SubjectID = int(classID.Int32)
+		if yearLevel.Valid {
+			student.YearLevel = &yearLevel.String
+		}
+		if section.Valid {
+			student.Section = &section.String
 		}
 		students = append(students, student)
 	}
@@ -1294,37 +1777,191 @@ func (a *App) GetClassStudents(subjectID int) ([]ClassStudent, error) {
 	return students, nil
 }
 
-// CreateSubject creates a new subject
-func (a *App) CreateSubject(code, name, teacher, room string) error {
+// GetAllStudentsForEnrollment returns all students with their enrollment status for a specific class
+func (a *App) GetAllStudentsForEnrollment(classID int) ([]ClassStudent, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			s.user_id as id, s.student_id, s.first_name, s.middle_name, s.last_name, 
+			s.year_level, s.section,
+			EXISTS(
+				SELECT 1 FROM classlist cl 
+				WHERE cl.student_id = s.user_id AND cl.class_id = ? AND cl.status = 'active'
+			) as is_enrolled
+		FROM students s
+		
+		UNION ALL
+		
+		SELECT 
+			ws.user_id as id, ws.student_id, ws.first_name, ws.middle_name, ws.last_name,
+			ws.year_level, ws.section,
+			EXISTS(
+				SELECT 1 FROM classlist cl 
+				WHERE cl.student_id = ws.user_id AND cl.class_id = ? AND cl.status = 'active'
+			) as is_enrolled
+		FROM working_students ws
+		
+		ORDER BY last_name, first_name
+	`
+
+	rows, err := a.db.Query(query, classID, classID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var students []ClassStudent
+	for rows.Next() {
+		var student ClassStudent
+		var middleName, yearLevel, section sql.NullString
+		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName,
+			&student.LastName, &yearLevel, &section, &student.IsEnrolled)
+		if err != nil {
+			continue
+		}
+		if middleName.Valid {
+			student.MiddleName = &middleName.String
+		}
+		if yearLevel.Valid {
+			student.YearLevel = &yearLevel.String
+		}
+		if section.Valid {
+			student.Section = &section.String
+		}
+		students = append(students, student)
+	}
+
+	return students, nil
+}
+
+// GetAllTeachers returns all teachers for assignment purposes
+func (a *App) GetAllTeachers() ([]User, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			t.id, t.user_id, t.teacher_id, t.first_name, t.middle_name, t.last_name, t.gender
+		FROM teachers t
+		ORDER BY t.last_name, t.first_name
+	`
+
+	rows, err := a.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var teachers []User
+	for rows.Next() {
+		var teacher User
+		var middleName, gender, employeeID sql.NullString
+		var dbID int
+		err := rows.Scan(&dbID, &teacher.ID, &employeeID, &teacher.FirstName, &middleName, &teacher.LastName, &gender)
+		if err != nil {
+			continue
+		}
+		if middleName.Valid {
+			teacher.MiddleName = &middleName.String
+		}
+		if gender.Valid {
+			teacher.Gender = &gender.String
+		}
+		if employeeID.Valid {
+			teacher.EmployeeID = &employeeID.String
+		}
+		teacher.Role = "teacher"
+		teachers = append(teachers, teacher)
+	}
+
+	return teachers, nil
+}
+
+// RecordAttendance records attendance for a student in a class
+func (a *App) RecordAttendance(classID, studentID int, timeIn, timeOut, status, remarks string, recordedBy int) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
 	}
 
-	query := `INSERT INTO classlist (subject_code, subject_title, assigned_teacher, room) VALUES (?, ?, ?, ?)`
-	_, err := a.db.Exec(query, code, name, teacher, room)
-	return err
+	// First, get the classlist_id for this student-class combination
+	var classlistID int
+	err := a.db.QueryRow(
+		`SELECT id FROM classlist WHERE class_id = ? AND student_id = ? AND status = 'active' LIMIT 1`,
+		classID, studentID,
+	).Scan(&classlistID)
+	if err != nil {
+		log.Printf("⚠ Student %d not enrolled in class %d: %v", studentID, classID, err)
+		return fmt.Errorf("student not enrolled in this class")
+	}
+
+	// Record or update attendance
+	query := `
+		INSERT INTO attendance (classlist_id, date, time_in, time_out, status, remarks, recorded_by)
+		VALUES (?, CURDATE(), ?, ?, ?, ?, ?)
+		ON DUPLICATE KEY UPDATE 
+			time_in = COALESCE(VALUES(time_in), time_in),
+			time_out = COALESCE(VALUES(time_out), time_out),
+			status = VALUES(status),
+			remarks = VALUES(remarks),
+			recorded_by = VALUES(recorded_by),
+			updated_at = CURRENT_TIMESTAMP
+	`
+	_, err = a.db.Exec(query, classlistID, nullString(timeIn), nullString(timeOut), status, nullString(remarks), nullInt(recordedBy))
+	if err != nil {
+		log.Printf("⚠ Failed to record attendance: %v", err)
+		return err
+	}
+
+	log.Printf("✓ Attendance recorded: student=%d, class=%d, status=%s", studentID, classID, status)
+	return nil
 }
 
-// RecordAttendance records attendance
-func (a *App) RecordAttendance(classID, studentID int, status string) error {
+// UpdateAttendanceTime updates time in/out for an attendance record
+func (a *App) UpdateAttendanceTime(attendanceID int, timeIn, timeOut string) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
 	}
 
-	query := `INSERT INTO attendance (class_id, date, student_id, status) VALUES (?, CURDATE(), ?, ?)`
-	_, err := a.db.Exec(query, classID, studentID, status)
-	return err
+	query := `
+		UPDATE attendance 
+		SET time_in = COALESCE(?, time_in), 
+		    time_out = COALESCE(?, time_out),
+		    updated_at = CURRENT_TIMESTAMP
+		WHERE id = ?
+	`
+	_, err := a.db.Exec(query, nullString(timeIn), nullString(timeOut), attendanceID)
+	if err != nil {
+		log.Printf("⚠ Failed to update attendance time: %v", err)
+		return err
+	}
+
+	log.Printf("✓ Attendance time updated: ID=%d", attendanceID)
+	return nil
 }
 
-// ExportAttendanceCSV exports attendance to CSV
-func (a *App) ExportAttendanceCSV(subjectID int) (string, error) {
+// ExportAttendanceCSV exports attendance to CSV for a specific class
+func (a *App) ExportAttendanceCSV(classID int) (string, error) {
 	if a.db == nil {
 		return "", fmt.Errorf("database not connected")
 	}
 
-	query := `SELECT id, class_id, date, student_id, time_in, time_out, status 
-			  FROM attendance WHERE class_id = ? ORDER BY date DESC`
-	rows, err := a.db.Query(query, subjectID)
+	query := `
+		SELECT 
+			a.id, a.date, a.time_in, a.time_out, a.status, a.remarks,
+			vcl.student_code, vcl.first_name, vcl.middle_name, vcl.last_name,
+			vc.subject_code, vc.subject_name
+		FROM attendance a
+		JOIN classlist cl ON a.classlist_id = cl.id
+		JOIN v_classlist_complete vcl ON cl.id = vcl.classlist_id
+		JOIN v_classes_complete vc ON cl.class_id = vc.class_id
+		WHERE cl.class_id = ?
+		ORDER BY a.date DESC, vcl.last_name, vcl.first_name
+	`
+	rows, err := a.db.Query(query, classID)
 	if err != nil {
 		return "", err
 	}
@@ -1333,8 +1970,12 @@ func (a *App) ExportAttendanceCSV(subjectID int) (string, error) {
 	var attendances []Attendance
 	for rows.Next() {
 		var att Attendance
-		var timeIn, timeOut sql.NullString
-		err := rows.Scan(&att.ID, &att.ClassID, &att.Date, &att.StudentID, &timeIn, &timeOut, &att.Status)
+		var timeIn, timeOut, remarks, middleName sql.NullString
+		err := rows.Scan(
+			&att.ID, &att.Date, &timeIn, &timeOut, &att.Status, &remarks,
+			&att.StudentCode, &att.FirstName, &middleName, &att.LastName,
+			&att.SubjectCode, &att.SubjectName,
+		)
 		if err != nil {
 			continue
 		}
@@ -1344,6 +1985,12 @@ func (a *App) ExportAttendanceCSV(subjectID int) (string, error) {
 		}
 		if timeOut.Valid {
 			att.TimeOut = &timeOut.String
+		}
+		if remarks.Valid {
+			att.Remarks = &remarks.String
+		}
+		if middleName.Valid {
+			att.MiddleName = &middleName.String
 		}
 
 		attendances = append(attendances, att)
@@ -1362,7 +2009,7 @@ func (a *App) ExportAttendanceCSV(subjectID int) (string, error) {
 	defer writer.Flush()
 
 	// Write header
-	writer.Write([]string{"ID", "Class ID", "Date", "Student ID", "Time In", "Time Out", "Status"})
+	writer.Write([]string{"Date", "Student ID", "First Name", "Middle Name", "Last Name", "Subject", "Time In", "Time Out", "Status", "Remarks"})
 
 	// Write data
 	for _, att := range attendances {
@@ -1374,18 +2021,30 @@ func (a *App) ExportAttendanceCSV(subjectID int) (string, error) {
 		if att.TimeOut != nil {
 			timeOut = *att.TimeOut
 		}
+		middleName := ""
+		if att.MiddleName != nil {
+			middleName = *att.MiddleName
+		}
+		remarks := ""
+		if att.Remarks != nil {
+			remarks = *att.Remarks
+		}
 
 		writer.Write([]string{
-			strconv.Itoa(att.ID),
-			strconv.Itoa(att.ClassID),
 			att.Date,
-			strconv.Itoa(att.StudentID),
+			att.StudentCode,
+			att.FirstName,
+			middleName,
+			att.LastName,
+			fmt.Sprintf("%s - %s", att.SubjectCode, att.SubjectName),
 			timeIn,
 			timeOut,
 			att.Status,
+			remarks,
 		})
 	}
 
+	log.Printf("✓ Attendance exported to CSV: %s", filename)
 	return filename, nil
 }
 
@@ -1533,4 +2192,12 @@ func nullString(s string) sql.NullString {
 		return sql.NullString{Valid: false}
 	}
 	return sql.NullString{String: s, Valid: true}
+}
+
+// nullInt converts 0 or negative values to sql.NullInt64
+func nullInt(i int) sql.NullInt64 {
+	if i <= 0 {
+		return sql.NullInt64{Valid: false}
+	}
+	return sql.NullInt64{Int64: int64(i), Valid: true}
 }

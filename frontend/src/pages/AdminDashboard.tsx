@@ -268,9 +268,12 @@ function UserManagement() {
   const copySelected = async (rows: User[]) => {
     try {
       const header = ['Name', 'ID', 'Role', 'Year', 'Created'];
-      const lines = rows.map((u) =>
-        [u.name, u.employee_id || u.student_id || '-', u.role.replace('_', ' '), u.year || '', u.created].join('\t')
-      );
+      const lines = rows.map((u) => {
+        const fullName = u.first_name && u.last_name 
+          ? `${u.last_name}, ${u.first_name}${u.middle_name ? ' ' + u.middle_name : ''}`
+          : u.name;
+        return [fullName, u.employee_id || u.student_id || '-', u.role.replace('_', ' '), u.year || '', u.created].join('\t');
+      });
       const text = [header.join('\t'), ...lines].join('\n');
       await navigator.clipboard.writeText(text);
       alert(`Copied ${rows.length} row(s) to clipboard`);
@@ -318,9 +321,12 @@ function UserManagement() {
         data = await GetUsers();
       }
       
-      setUsers(data);
+      // Ensure data is always an array, even if API returns null/undefined
+      setUsers(data || []);
     } catch (error) {
       console.error('Failed to load users:', error);
+      // Set empty array on error to prevent blank screen
+      setUsers([]);
     } finally {
       setLoading(false);
     }
@@ -329,6 +335,36 @@ function UserManagement() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Validate required fields based on role
+      if (!formData.firstName || !formData.lastName) {
+        showNotification('error', 'First Name and Last Name are required');
+        return;
+      }
+
+      if (formData.role === 'working_student') {
+        if (!formData.studentId) {
+          showNotification('error', 'Student ID is required for Working Students');
+          return;
+        }
+        if (!formData.year) {
+          showNotification('error', 'Year Level is required for Working Students');
+          return;
+        }
+        if (!formData.section) {
+          showNotification('error', 'Section is required for Working Students');
+          return;
+        }
+        if (!formData.gender) {
+          showNotification('error', 'Gender is required for Working Students');
+          return;
+        }
+      } else if (formData.role === 'teacher') {
+        if (!formData.employeeId) {
+          showNotification('error', 'Employee ID is required for Teachers');
+          return;
+        }
+      }
+
       // Build name from lastName, firstName, middleName
       const fullName = `${formData.lastName}, ${formData.firstName}${formData.middleName ? ' ' + formData.middleName : ''}`;
       
@@ -341,6 +377,18 @@ function UserManagement() {
         showNotification('error', 'Password is required for new users');
         return;
       }
+
+      console.log('Submitting user with data:', {
+        role: formData.role,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        middleName: formData.middleName,
+        gender: formData.gender,
+        employeeId: formData.employeeId,
+        studentId: formData.studentId,
+        year: formData.year,
+        section: formData.section
+      });
 
       if (editingUser) {
         await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year, formData.section);
@@ -472,15 +520,15 @@ function UserManagement() {
 
       {/* Filters Section */}
       <div className="bg-white shadow rounded-lg p-4 mb-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+        <div className="flex flex-col sm:flex-row gap-4 items-end">
+          <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Filter by User Type
             </label>
             <select
               value={userTypeFilter}
               onChange={(e) => setUserTypeFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             >
               <option value="">All</option>
               <option value="teacher">Teacher</option>
@@ -488,7 +536,7 @@ function UserManagement() {
               <option value="working_student">Working Student</option>
             </select>
           </div>
-          <div>
+          <div className="flex-1">
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Search (Name, Student ID, Employee ID, Gender, Date)
             </label>
@@ -497,7 +545,7 @@ function UserManagement() {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search users..."
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
         </div>
@@ -821,24 +869,9 @@ function UserManagement() {
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="px-3 py-2 w-10">
-                    <input
-                      type="checkbox"
-                      checked={allSelectedOnPage}
-                      onChange={() => {
-                        setSelectedIds((prev) => {
-                          const next = new Set(prev);
-                          if (allSelectedOnPage) {
-                            pagedUsers.forEach((u) => next.delete(u.id));
-                          } else {
-                            pagedUsers.forEach((u) => next.add(u.id));
-                          }
-                          return next;
-                        });
-                      }}
-                    />
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('name')}>
-                    Name <span className="ml-1">{sortIndicator('name')}</span>
+                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
                   </th>
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
@@ -846,76 +879,37 @@ function UserManagement() {
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('role')}>
                     Role <span className="ml-1">{sortIndicator('role')}</span>
                   </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('year')}>
-                    Year <span className="ml-1">{sortIndicator('year')}</span>
-                  </th>
+                  {(userTypeFilter === 'student' || userTypeFilter === 'working_student') && (
+                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('year')}>
+                      Year <span className="ml-1">{sortIndicator('year')}</span>
+                    </th>
+                  )}
                   <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('created')}>
                     Created <span className="ml-1">{sortIndicator('created')}</span>
                   </th>
                   <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
-                <tr>
-                  <th className="px-3 py-2"></th>
-                  <th className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={filters.name}
-                      onChange={(e) => onFilterChange('name', e.target.value)}
-                      placeholder="Filter name"
-                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                    />
-                  </th>
-                  <th className="px-3 py-2">
-                    {/* ID column - no filter */}
-                  </th>
-                  <th className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={filters.role}
-                      onChange={(e) => onFilterChange('role', e.target.value)}
-                      placeholder="Filter role"
-                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                    />
-                  </th>
-                  <th className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={filters.year}
-                      onChange={(e) => onFilterChange('year', e.target.value)}
-                      placeholder="Filter year"
-                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                    />
-                  </th>
-                  <th className="px-3 py-2">
-                    <input
-                      type="text"
-                      value={filters.created}
-                      onChange={(e) => onFilterChange('created', e.target.value)}
-                      placeholder="Filter created"
-                      className="w-full border border-gray-300 rounded px-2 py-1 text-sm"
-                    />
-                  </th>
-                  <th className="px-3 py-2 text-right">
-                    <button onClick={clearFilters} className="text-sm text-gray-600 hover:text-gray-900 underline">
-                      Clear filters
-                    </button>
-                  </th>
-                </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {pagedUsers.map((user) => (
                   <tr key={user.id} className={selectedIds.has(user.id) ? 'bg-primary-50' : ''}>
-                    <td className="px-3 py-2">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.has(user.id)}
-                        onChange={() => toggleSelectRow(user.id)}
+                  <td className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(user.id)}
+                      onChange={() => toggleSelectRow(user.id)}
                     />
                   </td>
-                  <td className="px-3 py-2 text-sm text-gray-900">{user.name}</td>
+                  <td className="px-3 py-2 text-sm text-gray-900">
+                    {user.first_name && user.last_name 
+                      ? `${user.last_name}, ${user.first_name}${user.middle_name ? ' ' + user.middle_name : ''}`
+                      : user.name}
+                  </td>
                   <td className="px-3 py-2 text-sm text-gray-900">{user.employee_id || user.student_id || '-'}</td>
                     <td className="px-3 py-2 text-sm text-gray-900">{user.role.replace('_', ' ')}</td>
-                    <td className="px-3 py-2 text-sm text-gray-900">{user.year || ''}</td>
+                    {(userTypeFilter === 'student' || userTypeFilter === 'working_student') && (
+                      <td className="px-3 py-2 text-sm text-gray-900">{user.year || ''}</td>
+                    )}
                     <td className="px-3 py-2 text-sm text-gray-900">{user.created}</td>
                     <td className="px-3 py-2">
                       <div className="flex items-center space-x-2 justify-end">
@@ -939,7 +933,7 @@ function UserManagement() {
                 ))}
                 {pagedUsers.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-6 text-center text-gray-500">
+                    <td colSpan={(userTypeFilter === 'student' || userTypeFilter === 'working_student') ? 7 : 6} className="px-3 py-6 text-center text-gray-500">
                       No users found
                     </td>
                   </tr>
