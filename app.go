@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/jung-kurt/gofpdf"
@@ -118,7 +119,7 @@ func (a *App) Login(username, password string) (*User, error) {
 	case "admin":
 		detailQuery = `SELECT first_name, middle_name, last_name, gender, admin_id, email, profile_photo FROM admins WHERE user_id = ?`
 	case "teacher":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, teacher_id, email, profile_photo FROM teachers WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, teacher_id, email, contact_number, profile_photo FROM teachers WHERE user_id = ?`
 	case "student":
 		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section, email, contact_number, profile_photo FROM students WHERE user_id = ?`
 	case "working_student":
@@ -130,7 +131,7 @@ func (a *App) Login(username, password string) (*User, error) {
 	var email, contactNumber sql.NullString
 
 	switch user.Role {
-	case "admin", "teacher":
+	case "admin":
 		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &employeeID, &email, &photoURL)
 		if err == nil {
 			if firstName.Valid {
@@ -150,6 +151,34 @@ func (a *App) Login(username, password string) (*User, error) {
 			}
 			if email.Valid {
 				user.Email = &email.String
+			}
+			if photoURL.Valid {
+				user.PhotoURL = &photoURL.String
+			}
+		}
+	case "teacher":
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &employeeID, &email, &contactNumber, &photoURL)
+		if err == nil {
+			if firstName.Valid {
+				user.FirstName = &firstName.String
+			}
+			if middleName.Valid {
+				user.MiddleName = &middleName.String
+			}
+			if lastName.Valid {
+				user.LastName = &lastName.String
+			}
+			if gender.Valid {
+				user.Gender = &gender.String
+			}
+			if employeeID.Valid {
+				user.EmployeeID = &employeeID.String
+			}
+			if email.Valid {
+				user.Email = &email.String
+			}
+			if contactNumber.Valid {
+				user.ContactNumber = &contactNumber.String
 			}
 			if photoURL.Valid {
 				user.PhotoURL = &photoURL.String
@@ -1862,9 +1891,16 @@ func (a *App) GetClassStudents(classID int) ([]ClasslistEntry, error) {
 }
 
 // CreateSubject creates a new subject (or updates if exists)
-func (a *App) CreateSubject(code, name string, teacherID int, description string) error {
+func (a *App) CreateSubject(code, name string, teacherUserID int, description string) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
+	}
+
+	// Convert teacher user ID to teacher ID
+	teacherID, err := a.GetTeacherID(teacherUserID)
+	if err != nil {
+		log.Printf("⚠ Failed to get teacher ID for user %d: %v", teacherUserID, err)
+		return fmt.Errorf("teacher not found for user ID %d: %v", teacherUserID, err)
 	}
 
 	// Use INSERT ... ON DUPLICATE KEY UPDATE to handle existing subjects gracefully
@@ -1876,19 +1912,26 @@ func (a *App) CreateSubject(code, name string, teacherID int, description string
 			teacher_id = VALUES(teacher_id),
 			description = VALUES(description)
 	`
-	_, err := a.db.Exec(query, code, name, teacherID, nullString(description))
+	_, err = a.db.Exec(query, code, name, teacherID, nullString(description))
 	if err != nil {
 		log.Printf("⚠ Failed to create/update subject: %v", err)
 		return err
 	}
-	log.Printf("✓ Subject created/updated: %s - %s", code, name)
+	log.Printf("✓ Subject created/updated: %s - %s (teacher_id=%d, user_id=%d)", code, name, teacherID, teacherUserID)
 	return nil
 }
 
 // CreateClass creates a new class instance (by working student)
-func (a *App) CreateClass(subjectID, teacherID int, schedule, room, yearLevel, section, semester, schoolYear string, createdBy int) (int, error) {
+func (a *App) CreateClass(subjectID, teacherUserID int, schedule, room, yearLevel, section, semester, schoolYear string, createdBy int) (int, error) {
 	if a.db == nil {
 		return 0, fmt.Errorf("database not connected")
+	}
+
+	// Convert teacher user ID to teacher ID
+	teacherID, err := a.GetTeacherID(teacherUserID)
+	if err != nil {
+		log.Printf("⚠ Failed to get teacher ID for user %d: %v", teacherUserID, err)
+		return 0, fmt.Errorf("teacher not found for user ID %d: %v", teacherUserID, err)
 	}
 
 	query := `
@@ -1928,7 +1971,7 @@ func (a *App) CreateClass(subjectID, teacherID int, schedule, room, yearLevel, s
 		return 0, err
 	}
 
-	log.Printf("✓ Class created: ID=%d, Subject=%d, Teacher=%d", classID, subjectID, teacherID)
+	log.Printf("✓ Class created: ID=%d, Subject=%d, Teacher=%d (user_id=%d)", classID, subjectID, teacherID, teacherUserID)
 	return int(classID), nil
 }
 
@@ -1982,12 +2025,27 @@ func (a *App) EnrollStudentInClass(studentID int, classID int, enrolledBy int) e
 		return fmt.Errorf("database not connected")
 	}
 
+	// Handle enrolled_by: convert user ID to working student ID if needed
+	var enrolledByValue interface{}
+	if enrolledBy == 0 {
+		enrolledByValue = nil
+	} else {
+		// Get the working student ID for this user
+		workingStudentID, err := a.GetWorkingStudentID(enrolledBy)
+		if err != nil {
+			log.Printf("⚠ Warning: Could not get working student ID for user %d: %v", enrolledBy, err)
+			enrolledByValue = nil
+		} else {
+			enrolledByValue = workingStudentID
+		}
+	}
+
 	query := `
 		INSERT INTO classlist (class_id, student_id, enrolled_by, status)
 		VALUES (?, ?, ?, 'active')
 		ON DUPLICATE KEY UPDATE status = 'active', updated_at = CURRENT_TIMESTAMP
 	`
-	_, err := a.db.Exec(query, classID, studentID, nullInt(enrolledBy))
+	_, err := a.db.Exec(query, classID, studentID, enrolledByValue)
 	if err != nil {
 		log.Printf("⚠ Failed to enroll student %d in class %d: %v", studentID, classID, err)
 		return err
@@ -2019,14 +2077,22 @@ func (a *App) EnrollMultipleStudents(studentIDs []int, classID int, enrolledBy i
 	}
 	defer stmt.Close()
 
-	for _, studentID := range studentIDs {
-		// Handle enrolled_by: if 0, set to NULL, otherwise use the value
-		var enrolledByValue interface{}
-		if enrolledBy == 0 {
+	// Handle enrolled_by: convert user ID to working student ID if needed
+	var enrolledByValue interface{}
+	if enrolledBy == 0 {
+		enrolledByValue = nil
+	} else {
+		// Get the working student ID for this user
+		workingStudentID, err := a.GetWorkingStudentID(enrolledBy)
+		if err != nil {
+			log.Printf("⚠ Warning: Could not get working student ID for user %d: %v", enrolledBy, err)
 			enrolledByValue = nil
 		} else {
-			enrolledByValue = enrolledBy
+			enrolledByValue = workingStudentID
 		}
+	}
+
+	for _, studentID := range studentIDs {
 
 		_, err = stmt.Exec(classID, studentID, enrolledByValue)
 		if err != nil {
@@ -2210,7 +2276,7 @@ func (a *App) GetAllTeachers() ([]User, error) {
 
 	query := `
 		SELECT 
-			t.id, t.user_id, t.teacher_id, t.first_name, t.middle_name, t.last_name, t.gender
+			t.user_id, t.id, t.teacher_id, t.first_name, t.middle_name, t.last_name, t.gender
 		FROM teachers t
 		ORDER BY t.last_name, t.first_name
 	`
@@ -2225,8 +2291,8 @@ func (a *App) GetAllTeachers() ([]User, error) {
 	for rows.Next() {
 		var teacher User
 		var middleName, gender, employeeID sql.NullString
-		var dbID int
-		err := rows.Scan(&teacher.ID, &dbID, &employeeID, &teacher.FirstName, &middleName, &teacher.LastName, &gender)
+		var teachersTableID int
+		err := rows.Scan(&teacher.ID, &teachersTableID, &employeeID, &teacher.FirstName, &middleName, &teacher.LastName, &gender)
 		if err != nil {
 			continue
 		}
@@ -2247,7 +2313,7 @@ func (a *App) GetAllTeachers() ([]User, error) {
 }
 
 // GetAllRegisteredStudents returns all registered students with optional year level filter
-func (a *App) GetAllRegisteredStudents(yearLevelFilter string) ([]ClassStudent, error) {
+func (a *App) GetAllRegisteredStudents(yearLevelFilter, sectionFilter string) ([]ClassStudent, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not connected")
 	}
@@ -2260,19 +2326,32 @@ func (a *App) GetAllRegisteredStudents(yearLevelFilter string) ([]ClassStudent, 
 		FROM students s
 	`
 
-	// Add WHERE clause if year level filter is provided
-	whereClause := ""
+	// Build WHERE clause based on filters
+	var whereConditions []string
+	var args []interface{}
+
 	if yearLevelFilter != "" && yearLevelFilter != "All" {
-		whereClause = " WHERE s.year_level = ?"
+		whereConditions = append(whereConditions, "s.year_level = ?")
+		args = append(args, yearLevelFilter)
 	}
 
-	query := baseQuery + whereClause + " ORDER BY s.year_level, s.last_name, s.first_name"
+	if sectionFilter != "" && sectionFilter != "All" {
+		whereConditions = append(whereConditions, "s.section = ?")
+		args = append(args, sectionFilter)
+	}
+
+	whereClause := ""
+	if len(whereConditions) > 0 {
+		whereClause = " WHERE " + strings.Join(whereConditions, " AND ")
+	}
+
+	query := baseQuery + whereClause + " ORDER BY s.year_level, s.section, s.last_name, s.first_name"
 
 	var rows *sql.Rows
 	var err error
 
-	if yearLevelFilter != "" && yearLevelFilter != "All" {
-		rows, err = a.db.Query(query, yearLevelFilter)
+	if len(args) > 0 {
+		rows, err = a.db.Query(query, args...)
 	} else {
 		rows, err = a.db.Query(query)
 	}
@@ -2304,6 +2383,41 @@ func (a *App) GetAllRegisteredStudents(yearLevelFilter string) ([]ClassStudent, 
 	}
 
 	return students, nil
+}
+
+// GetAvailableSections returns all unique sections from students and working_students tables
+func (a *App) GetAvailableSections() ([]string, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT DISTINCT section 
+		FROM (
+			SELECT section FROM students WHERE section IS NOT NULL AND section != ''
+			UNION
+			SELECT section FROM working_students WHERE section IS NOT NULL AND section != ''
+		) as all_sections
+		ORDER BY section
+	`
+
+	rows, err := a.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var sections []string
+	for rows.Next() {
+		var section string
+		err := rows.Scan(&section)
+		if err != nil {
+			continue
+		}
+		sections = append(sections, section)
+	}
+
+	return sections, nil
 }
 
 // RecordAttendance records attendance for a student in a class

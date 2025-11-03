@@ -70,8 +70,8 @@ export function GetAllLogs() {
   return window['go']['main']['App']['GetAllLogs']();
 }
 
-export function GetAllRegisteredStudents(arg1) {
-  return window['go']['main']['App']['GetAllRegisteredStudents'](arg1);
+export function GetAllRegisteredStudents(arg1, arg2) {
+  return window['go']['main']['App']['GetAllRegisteredStudents'](arg1, arg2);
 }
 
 export function GetAllStudentsForEnrollment(arg1) {
@@ -80,6 +80,10 @@ export function GetAllStudentsForEnrollment(arg1) {
 
 export function GetAllTeachers() {
   return window['go']['main']['App']['GetAllTeachers']();
+}
+
+export function GetAvailableSections() {
+  return window['go']['main']['App']['GetAvailableSections']();
 }
 
 export function GetAvailableStudents(arg1) {

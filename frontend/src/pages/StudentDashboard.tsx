@@ -62,7 +62,6 @@ function DashboardOverview() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900">Welcome, {user?.first_name || user?.name}!</h2>
-        <p className="text-gray-600">Here's your attendance overview and today's activity</p>
       </div>
 
       {/* Today's Log */}
@@ -96,8 +95,6 @@ function DashboardOverview() {
         ) : (
           <div className="bg-white shadow rounded-lg p-6 text-center">
             <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <p className="text-gray-500">No log entry for today yet</p>
-            <p className="text-sm text-gray-400">Your attendance will appear here once recorded</p>
           </div>
         )}
       </div>
@@ -198,8 +195,11 @@ function DashboardOverview() {
 function LoginHistory() {
   const { user } = useAuth();
   const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
+  const [filteredLogs, setFilteredLogs] = useState<LoginLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   useEffect(() => {
     const loadLoginLogs = async () => {
@@ -208,6 +208,7 @@ function LoginHistory() {
       try {
         const data = await GetStudentLoginLogs(user.id);
         setLoginLogs(data || []);
+        setFilteredLogs(data || []);
         setError('');
       } catch (error) {
         console.error('Failed to load login logs:', error);
@@ -219,6 +220,34 @@ function LoginHistory() {
 
     loadLoginLogs();
   }, [user]);
+
+  // Filter logs based on date range
+  useEffect(() => {
+    if (!startDate && !endDate) {
+      setFilteredLogs(loginLogs);
+      return;
+    }
+
+    const filtered = loginLogs.filter(log => {
+      if (!log.login_time) return false;
+      
+      const logDate = new Date(log.login_time);
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+      
+      if (start && logDate < start) return false;
+      if (end && logDate > end) return false;
+      
+      return true;
+    });
+    
+    setFilteredLogs(filtered);
+  }, [loginLogs, startDate, endDate]);
+
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+  };
 
   if (loading) {
     return (
@@ -232,7 +261,6 @@ function LoginHistory() {
     <div>
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Login History</h2>
-        <p className="text-gray-600">View your complete login and logout history with PC information</p>
       </div>
 
       {error && (
@@ -241,17 +269,55 @@ function LoginHistory() {
         </div>
       )}
 
+      {/* Date Filter */}
+      <div className="mb-6 bg-white shadow rounded-lg p-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Filter by Date</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
+            <input
+              type="date"
+              id="startDate"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
+            <input
+              type="date"
+              id="endDate"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={clearFilters}
+              className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+        {(startDate || endDate) && (
+          <div className="mt-3 text-sm text-gray-600">
+            Showing {filteredLogs.length} of {loginLogs.length} records
+          </div>
+        )}
+      </div>
+
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        {loginLogs.length === 0 ? (
+        {filteredLogs.length === 0 ? (
           <div className="text-center py-12">
             <ClipboardList className="h-12 w-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">No Login History Yet</h3>
-            <p className="text-gray-500 mb-4">
-              Your login and logout activities will appear here.
-            </p>
-            <p className="text-sm text-gray-400">
-              This tracks when you log in and out of the system, including which PC you used.
-            </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -276,7 +342,7 @@ function LoginHistory() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {loginLogs.map((log) => (
+                {filteredLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
@@ -347,8 +413,11 @@ function LoginHistory() {
 function FeedbackHistory() {
   const { user } = useAuth();
   const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+  const [filteredFeedback, setFilteredFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
 
   useEffect(() => {
     const loadFeedback = async () => {
@@ -357,6 +426,7 @@ function FeedbackHistory() {
       try {
         const data = await GetStudentFeedback(user.id);
         setFeedbackList(data || []);
+        setFilteredFeedback(data || []);
         setError('');
       } catch (error) {
         console.error('Failed to load feedback:', error);
@@ -369,6 +439,34 @@ function FeedbackHistory() {
     loadFeedback();
   }, [user]);
 
+  // Filter feedback based on date range
+  useEffect(() => {
+    if (!startDate && !endDate) {
+      setFilteredFeedback(feedbackList);
+      return;
+    }
+
+    const filtered = feedbackList.filter(feedback => {
+      if (!feedback.date_submitted) return false;
+      
+      const feedbackDate = new Date(feedback.date_submitted);
+      const start = startDate ? new Date(startDate) : null;
+      const end = endDate ? new Date(endDate) : null;
+      
+      if (start && feedbackDate < start) return false;
+      if (end && feedbackDate > end) return false;
+      
+      return true;
+    });
+    
+    setFilteredFeedback(filtered);
+  }, [feedbackList, startDate, endDate]);
+
+  const clearFilters = () => {
+    setStartDate('');
+    setEndDate('');
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -380,8 +478,7 @@ function FeedbackHistory() {
   return (
     <div>
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">My Feedback History</h2>
-        <p className="text-gray-600">View all equipment feedback you've submitted during logout</p>
+        <h2 className="text-2xl font-bold text-gray-900">Feedback History</h2>
       </div>
 
       {error && (
@@ -390,16 +487,54 @@ function FeedbackHistory() {
         </div>
       )}
 
-      {feedbackList.length === 0 ? (
+      {/* Date Filter */}
+      <div className="mb-6 bg-white shadow rounded-lg p-4">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Filter by Date</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label htmlFor="feedbackStartDate" className="block text-sm font-medium text-gray-700 mb-1">
+              Start Date
+            </label>
+            <input
+              type="date"
+              id="feedbackStartDate"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+          <div>
+            <label htmlFor="feedbackEndDate" className="block text-sm font-medium text-gray-700 mb-1">
+              End Date
+            </label>
+            <input
+              type="date"
+              id="feedbackEndDate"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+          </div>
+          <div className="flex items-end">
+            <button
+              onClick={clearFilters}
+              className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
+            >
+              Clear Filters
+            </button>
+          </div>
+        </div>
+        {(startDate || endDate) && (
+          <div className="mt-3 text-sm text-gray-600">
+            Showing {filteredFeedback.length} of {feedbackList.length} records
+          </div>
+        )}
+      </div>
+
+      {filteredFeedback.length === 0 ? (
         <div className="bg-white shadow rounded-lg p-12 text-center">
           <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">No Feedback Yet</h3>
-          <p className="text-gray-500 mb-4">
-            You haven't submitted any equipment feedback yet.
-          </p>
-          <p className="text-sm text-gray-400">
-            Feedback is automatically collected when you logout. It will appear here once you submit your first feedback.
-          </p>
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">
@@ -434,10 +569,10 @@ function FeedbackHistory() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {feedbackList.map((feedback, index) => (
+                {filteredFeedback.map((feedback, index) => (
                   <tr key={feedback.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {feedbackList.length - index}
+                      {filteredFeedback.length - index}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       <div className="flex flex-col">

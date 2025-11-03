@@ -36,6 +36,7 @@ import {
   EnrollMultipleStudents,
   UnenrollStudentFromClassByIDs,
   GetAllRegisteredStudents,
+  GetAvailableSections,
   GetPendingFeedback,
   ForwardFeedbackToAdmin
 } from '../../wailsjs/go/main/App';
@@ -1141,7 +1142,7 @@ function ManageClasslists() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col">
       <div className="flex-shrink-0 mb-4">
         <div className="flex items-center justify-between">
           <div>
@@ -1248,9 +1249,9 @@ function ManageClasslists() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
+      <div className="flex-1">
         {viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 h-full overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {filteredClasses.map((cls) => (
               <div key={cls.id} className="bg-white shadow-lg rounded-xl overflow-hidden hover:shadow-xl transition-shadow duration-200">
                 <div className="p-4">
@@ -1425,11 +1426,13 @@ function ManageUsers() {
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
   const [yearLevelFilter, setYearLevelFilter] = useState('All');
+  const [sectionFilter, setSectionFilter] = useState('All');
+  const [availableSections, setAvailableSections] = useState<string[]>([]);
   const [showAddModal, setShowAddModal] = useState(false);
 
   const loadStudents = async () => {
     try {
-      const data = await GetAllRegisteredStudents(yearLevelFilter);
+      const data = await GetAllRegisteredStudents(yearLevelFilter, sectionFilter);
       setStudents(data || []);
       setFilteredStudents(data || []);
       setError('');
@@ -1441,9 +1444,22 @@ function ManageUsers() {
     }
   };
 
+  const loadAvailableSections = async () => {
+    try {
+      const sections = await GetAvailableSections();
+      setAvailableSections(sections || []);
+    } catch (error) {
+      console.error('Failed to load sections:', error);
+    }
+  };
+
   useEffect(() => {
     loadStudents();
-  }, [yearLevelFilter]);
+  }, [yearLevelFilter, sectionFilter]);
+
+  useEffect(() => {
+    loadAvailableSections();
+  }, []);
 
   useEffect(() => {
     if (!searchTerm) {
@@ -1469,11 +1485,11 @@ function ManageUsers() {
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="flex flex-col">
       <div className="flex-shrink-0 mb-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Manage Registered Students</h2>
+            <h2 className="text-2xl font-bold text-gray-900">Manage Students</h2>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
@@ -1527,6 +1543,26 @@ function ManageUsers() {
                 <option value="4th Year">4th Year</option>
               </select>
             </div>
+            
+            <div className="flex items-center gap-2">
+              <label htmlFor="section" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                Section:
+              </label>
+              <select
+                id="section"
+                value={sectionFilter}
+                onChange={(e) => setSectionFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="All">All Sections</option>
+                {availableSections.map((section) => (
+                  <option key={section} value={section}>
+                    {section}
+                  </option>
+                ))}
+              </select>
+            </div>
+            
             <span className="text-sm text-gray-500">
               {filteredStudents.length} of {students.length} students
             </span>
@@ -1534,8 +1570,8 @@ function ManageUsers() {
         </div>
       </div>
 
-      <div className="flex-1 overflow-hidden">
-        <div className="bg-white shadow rounded-lg overflow-hidden h-full overflow-y-auto">
+      <div className="flex-1">
+        <div className="bg-white shadow rounded-lg overflow-hidden">
           {filteredStudents.length > 0 ? (
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50 sticky top-0 z-10">

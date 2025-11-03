@@ -33,13 +33,10 @@ DROP TABLE IF EXISTS users;
 -- ============================================================================
 -- DROP EXISTING VIEWS
 -- ============================================================================
-DROP VIEW IF EXISTS v_attendance_complete;
-DROP VIEW IF EXISTS v_teacher_classes;
 DROP VIEW IF EXISTS v_classlist_complete;
 DROP VIEW IF EXISTS v_classes_complete;
 DROP VIEW IF EXISTS v_users_complete;
 DROP VIEW IF EXISTS v_login_logs_complete;
-DROP VIEW IF EXISTS v_feedback;
 
 -- ============================================================================
 -- USERS TABLE (Main authentication table)
@@ -611,13 +608,18 @@ ENTITY SUMMARY:
 - FEEDBACK: Equipment feedback (15 fields) - streamlined from 18
 
 VIEW SUMMARY:
-- v_users_complete: Unified user information
-- v_login_logs_complete: Login logs with user details
-- v_classes_complete: Complete class information
-- v_classlist_complete: Enrollment with student details
+- v_users_complete: Unified user information (USED in app)
+- v_login_logs_complete: Login logs with user details (USED in app)
+- v_classes_complete: Complete class information (USED in app)
+- v_classlist_complete: Enrollment with student details (USED in app)
+
+REMOVED UNUSED VIEWS:
+❌ v_attendance_complete (not used in application)
+❌ v_teacher_classes (not used in application)
+❌ v_feedback (not used in application)
 
 TOTAL TABLES: 11
-TOTAL VIEWS: 4 (streamlined from 7)
+TOTAL VIEWS: 4 (only views actually used in application)
 TOTAL INDEXES: 40+ (streamlined from 60+)
 PERFORMANCE: Optimized for production use
 */

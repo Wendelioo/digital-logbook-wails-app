@@ -36,11 +36,13 @@ export function GetAllClasses():Promise<Array<main.CourseClass>>;
 
 export function GetAllLogs():Promise<Array<main.LoginLog>>;
 
-export function GetAllRegisteredStudents(arg1:string):Promise<Array<main.ClassStudent>>;
+export function GetAllRegisteredStudents(arg1:string,arg2:string):Promise<Array<main.ClassStudent>>;
 
 export function GetAllStudentsForEnrollment(arg1:number):Promise<Array<main.ClassStudent>>;
 
 export function GetAllTeachers():Promise<Array<main.User>>;
+
+export function GetAvailableSections():Promise<Array<string>>;
 
 export function GetAvailableStudents(arg1:number):Promise<Array<main.ClassStudent>>;
 
