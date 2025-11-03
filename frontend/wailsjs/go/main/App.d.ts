@@ -8,7 +8,7 @@ export function CreateClass(arg1:number,arg2:number,arg3:string,arg4:string,arg5
 
 export function CreateSubject(arg1:string,arg2:string,arg3:number,arg4:string):Promise<void>;
 
-export function CreateUser(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;
+export function CreateUser(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string):Promise<void>;
 
 export function DeleteClass(arg1:number):Promise<void>;
 
@@ -28,11 +28,15 @@ export function ExportLogsCSV():Promise<string>;
 
 export function ExportLogsPDF():Promise<string>;
 
+export function ForwardFeedbackToAdmin(arg1:number,arg2:number,arg3:string):Promise<void>;
+
 export function GetAdminDashboard():Promise<main.AdminDashboard>;
 
 export function GetAllClasses():Promise<Array<main.CourseClass>>;
 
 export function GetAllLogs():Promise<Array<main.LoginLog>>;
+
+export function GetAllRegisteredStudents(arg1:string):Promise<Array<main.ClassStudent>>;
 
 export function GetAllStudentsForEnrollment(arg1:number):Promise<Array<main.ClassStudent>>;
 
@@ -40,9 +44,15 @@ export function GetAllTeachers():Promise<Array<main.User>>;
 
 export function GetAvailableStudents(arg1:number):Promise<Array<main.ClassStudent>>;
 
+export function GetClassAttendance(arg1:number,arg2:string):Promise<Array<main.Attendance>>;
+
 export function GetClassStudents(arg1:number):Promise<Array<main.ClasslistEntry>>;
 
+export function GetClassesByCreator(arg1:number):Promise<Array<main.CourseClass>>;
+
 export function GetFeedback():Promise<Array<main.Feedback>>;
+
+export function GetPendingFeedback():Promise<Array<main.Feedback>>;
 
 export function GetStudentDashboard(arg1:number):Promise<main.StudentDashboard>;
 
@@ -54,7 +64,11 @@ export function GetSubjects():Promise<Array<main.Subject>>;
 
 export function GetTeacherClasses(arg1:number):Promise<Array<main.CourseClass>>;
 
+export function GetTeacherClassesByUserID(arg1:number):Promise<Array<main.CourseClass>>;
+
 export function GetTeacherDashboard(arg1:number):Promise<main.TeacherDashboard>;
+
+export function GetTeacherID(arg1:number):Promise<number>;
 
 export function GetUsers():Promise<Array<main.User>>;
 
@@ -62,11 +76,17 @@ export function GetUsersByType(arg1:string):Promise<Array<main.User>>;
 
 export function GetWorkingStudentDashboard():Promise<main.WorkingStudentDashboard>;
 
+export function GetWorkingStudentID(arg1:number):Promise<number>;
+
+export function InitializeAttendanceForClass(arg1:number,arg2:string,arg3:number):Promise<void>;
+
 export function Login(arg1:string,arg2:string):Promise<main.User>;
 
 export function Logout(arg1:number):Promise<void>;
 
 export function RecordAttendance(arg1:number,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:number):Promise<void>;
+
+export function RecordStudentLogin(arg1:number,arg2:number,arg3:string):Promise<void>;
 
 export function SaveEquipmentFeedback(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;
 
@@ -76,10 +96,12 @@ export function UnenrollStudentFromClass(arg1:number):Promise<void>;
 
 export function UnenrollStudentFromClassByIDs(arg1:number,arg2:number):Promise<void>;
 
+export function UpdateAttendanceRecord(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<void>;
+
 export function UpdateAttendanceTime(arg1:number,arg2:string,arg3:string):Promise<void>;
 
 export function UpdateClass(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<void>;
 
-export function UpdateUser(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;
+export function UpdateUser(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string):Promise<void>;
 
 export function UpdateUserPhoto(arg1:number,arg2:string,arg3:string):Promise<void>;

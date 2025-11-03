@@ -23,6 +23,9 @@ interface User {
   employee_id?: string;
   student_id?: string;
   year?: string;
+  section?: string;
+  email?: string;
+  contact_number?: string;
   photo_url?: string;
   created?: string;
 }

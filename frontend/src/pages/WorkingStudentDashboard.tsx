@@ -15,7 +15,12 @@ import {
   EyeOff,
   BookOpen,
   Clock,
-  MapPin
+  MapPin,
+  AlertCircle,
+  Send,
+  FileText,
+  CheckCircle,
+  XCircle
 } from 'lucide-react';
 import { 
   GetWorkingStudentDashboard,
@@ -25,10 +30,14 @@ import {
   GetAllTeachers,
   CreateClass,
   GetAllClasses,
+  GetClassesByCreator,
   GetClassStudents,
   GetAllStudentsForEnrollment,
   EnrollMultipleStudents,
-  UnenrollStudentFromClassByIDs
+  UnenrollStudentFromClassByIDs,
+  GetAllRegisteredStudents,
+  GetPendingFeedback,
+  ForwardFeedbackToAdmin
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
 import { main } from '../../wailsjs/go/models';
@@ -39,6 +48,7 @@ type Class = main.CourseClass;
 type ClasslistEntry = main.ClasslistEntry;
 type ClassStudent = main.ClassStudent;
 type User = main.User;
+type Feedback = main.Feedback;
 
 interface DashboardStats {
   students_registered: number;
@@ -79,7 +89,6 @@ function DashboardOverview() {
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900">Working Student Dashboard</h2>
-        <p className="text-gray-600">Quick summary of your activities and management tools</p>
       </div>
 
       {/* Stats Cards */}
@@ -132,17 +141,16 @@ function DashboardOverview() {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         <Link
-          to="register-student"
+          to="manage-users"
           className="group flex items-center p-4 bg-white border border-gray-200 rounded-xl hover:border-blue-300 hover:shadow-lg transition-all duration-200"
         >
           <div className="flex-shrink-0">
-            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-green-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
-              <UserPlus className="h-5 w-5 text-white" />
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
+              <Users className="h-5 w-5 text-white" />
             </div>
           </div>
           <div className="ml-3">
-            <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Add Student</h3>
-            <p className="text-xs text-gray-500">Add new student accounts</p>
+            <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Manage Students</h3>
           </div>
         </Link>
 
@@ -152,12 +160,11 @@ function DashboardOverview() {
         >
           <div className="flex-shrink-0">
             <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center group-hover:scale-105 transition-transform duration-200">
-              <Users className="h-5 w-5 text-white" />
+              <BookOpen className="h-5 w-5 text-white" />
             </div>
           </div>
           <div className="ml-3">
             <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Manage Class Lists</h3>
-            <p className="text-xs text-gray-500">Manage existing class lists</p>
           </div>
         </Link>
 
@@ -171,8 +178,7 @@ function DashboardOverview() {
             </div>
           </div>
           <div className="ml-3">
-            <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Create Class</h3>
-            <p className="text-xs text-gray-500">Create new class instance</p>
+            <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors">Add New Class</h3>
           </div>
         </Link>
       </div>
@@ -180,15 +186,21 @@ function DashboardOverview() {
   );
 }
 
-function RegisterStudent() {
+interface RegisterStudentModalProps {
+  onClose: () => void;
+  onSuccess: () => void;
+}
+
+function RegisterStudentModal({ onClose, onSuccess }: RegisterStudentModalProps) {
   const [formData, setFormData] = useState({
     studentID: '',
-    username: '',
     password: '',
     firstName: '',
     middleName: '',
     lastName: '',
     gender: '',
+    email: '',
+    contactNumber: '',
     year: '',
     section: ''
   });
@@ -224,22 +236,18 @@ function RegisterStudent() {
         '',
         formData.studentID,
         formData.year,
-        formData.section
+        formData.section,
+        formData.email,
+        formData.contactNumber
       );
       setNotification({ type: 'success', message: 'Student added successfully! Default password is their Student ID.' });
       setMessage('Student added successfully! Default password is their Student ID.');
-      setFormData({ 
-        studentID: '',
-        username: '', 
-        password: '',
-        firstName: '', 
-        middleName: '', 
-        lastName: '', 
-        gender: '',
-        year: '',
-        section: ''
-      });
-      setTimeout(() => setNotification(null), 5000);
+      
+      // Wait a bit to show the success message, then call onSuccess
+      setTimeout(() => {
+        setNotification(null);
+        onSuccess();
+      }, 2000);
     } catch (error) {
       setNotification({ type: 'error', message: 'Failed to add student. Please try again.' });
       setMessage('Failed to add student. Please try again.');
@@ -297,21 +305,21 @@ function RegisterStudent() {
         className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
-            window.history.back();
+            onClose();
           }
         }}
       >
         <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 relative max-h-[90vh] flex flex-col">
           <button
             type="button"
-            onClick={() => window.history.back()}
+            onClick={onClose}
             className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
           >
             ×
           </button>
           
           <div className="text-center p-8 pb-4 flex-shrink-0">
-            <h2 className="text-2xl font-bold text-blue-600 mb-2">Student Registration</h2>
+            <h2 className="text-2xl font-bold text-blue-600 mb-2">Add Student</h2>
             <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
           </div>
 
@@ -390,6 +398,33 @@ function RegisterStudent() {
             </div>
 
             <div>
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                Email Address
+              </label>
+              <input
+                type="email"
+                id="email"
+                value={formData.email}
+                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="contactNumber" className="block text-sm font-medium text-gray-700 mb-2">
+                Contact Number
+              </label>
+              <input
+                type="tel"
+                id="contactNumber"
+                value={formData.contactNumber}
+                onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="09XX-XXX-XXXX"
+              />
+            </div>
+
+            <div>
               <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-2">
                 Year Level
               </label>
@@ -422,21 +457,8 @@ function RegisterStudent() {
               />
             </div>
 
-            <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
-                Username
-              </label>
-              <input
-                type="text"
-                id="username"
-                value={formData.username}
-                onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
 
-            <div className="md:col-span-2">
+            <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Password
               </label>
@@ -457,29 +479,9 @@ function RegisterStudent() {
                   {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-500">
-                Default password is the Student ID (automatically filled)
-              </p>
             </div>
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-medium text-blue-800">
-                  Default Password Policy
-                </h3>
-                <div className="mt-2 text-sm text-blue-700">
-                  <p>The student's ID will be automatically set as their default password. Students can change this later after their first login.</p>
-                </div>
-              </div>
-            </div>
-          </div>
 
           {message && (
             <div className={`p-4 rounded-md ${
@@ -493,7 +495,7 @@ function RegisterStudent() {
             <button
               type="submit"
               disabled={loading}
-              className="w-full max-w-xs mx-auto px-8 py-4 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
+              className="w-full max-w-sm mx-auto px-6 py-3 bg-red-600 text-white text-base font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
             >
               {loading ? 'Adding...' : 'SUBMIT'}
             </button>
@@ -505,22 +507,35 @@ function RegisterStudent() {
   );
 }
 
+interface StudentRow {
+  id: string;
+  ctrlNo: number;
+  studentId: string;
+  fullName: string;
+  yearLevel: string;
+}
+
 function CreateClasslist() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [teachers, setTeachers] = useState<User[]>([]);
   const [formData, setFormData] = useState({
+    schoolYear: '2024-2025',
+    semester: '1st Semester',
+    offeringCode: '',
     subjectCode: '',
     subjectName: '',
     teacherId: '',
     schedule: '',
     room: '',
     yearLevel: '',
-    section: '',
-    semester: '1st Semester',
-    schoolYear: '2024-2025'
+    section: ''
   });
+  const [students, setStudents] = useState<StudentRow[]>([]);
+  const [nextCtrlNo, setNextCtrlNo] = useState(1);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
 
   useEffect(() => {
     const loadData = async () => {
@@ -533,6 +548,88 @@ function CreateClasslist() {
     };
     loadData();
   }, []);
+
+  const handleAddStudentRow = () => {
+    const newStudent: StudentRow = {
+      id: `student-${Date.now()}`,
+      ctrlNo: nextCtrlNo,
+      studentId: '',
+      fullName: '',
+      yearLevel: ''
+    };
+    setStudents([...students, newStudent]);
+    setNextCtrlNo(nextCtrlNo + 1);
+  };
+
+  const handleRemoveStudent = (id: string) => {
+    setStudents(students.filter(s => s.id !== id));
+  };
+
+  const handleStudentChange = (id: string, field: keyof StudentRow, value: string) => {
+    setStudents(students.map(s => 
+      s.id === id ? { ...s, [field]: value } : s
+    ));
+  };
+
+  const handleImportFromFile = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.csv,.txt';
+    input.onchange = async (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const text = event.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+        
+        // Skip header if present
+        const startIndex = lines[0].toLowerCase().includes('student') ? 1 : 0;
+        
+        const importedStudents: StudentRow[] = [];
+        for (let i = startIndex; i < lines.length; i++) {
+          const parts = lines[i].split(/[,\t]/).map(p => p.trim());
+          if (parts.length >= 2) {
+            importedStudents.push({
+              id: `student-${Date.now()}-${i}`,
+              ctrlNo: nextCtrlNo + importedStudents.length,
+              studentId: parts[0],
+              fullName: parts[1] || '',
+              yearLevel: parts[2] || ''
+            });
+          }
+        }
+        
+        setStudents([...students, ...importedStudents]);
+        setNextCtrlNo(nextCtrlNo + importedStudents.length);
+        setNotification({ type: 'success', message: `Imported ${importedStudents.length} students successfully!` });
+        setTimeout(() => setNotification(null), 3000);
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  const handleClearForm = () => {
+    if (confirm('Are you sure you want to clear the entire form?')) {
+      setFormData({
+        schoolYear: '2024-2025',
+        semester: '1st Semester',
+        offeringCode: '',
+        subjectCode: '',
+        subjectName: '',
+        teacherId: '',
+        schedule: '',
+        room: '',
+        yearLevel: '',
+        section: ''
+      });
+      setStudents([]);
+      setNextCtrlNo(1);
+      setMessage('');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -553,35 +650,23 @@ function CreateClasslist() {
         return;
       }
 
-      console.log('Step 1: Creating subject...', {
-        code: formData.subjectCode,
-        name: formData.subjectName,
-        teacherId: formData.teacherId
-      });
-
-      // First, create the subject (or get existing subject ID)
+      // Create the subject
       await CreateSubject(
         formData.subjectCode,
         formData.subjectName,
         parseInt(formData.teacherId),
-        '' // description (optional)
+        ''
       );
 
-      console.log('Step 2: Fetching subjects to get ID...');
-
-      // Then get the subject ID
+      // Get the subject ID
       const subjects = await GetSubjects();
-      console.log('All subjects:', subjects);
-      
       const subject = subjects.find(s => s.code === formData.subjectCode);
       
       if (!subject) {
-        console.error('Subject not found. Available subjects:', subjects.map(s => s.code));
         throw new Error(`Subject with code "${formData.subjectCode}" not found after creation`);
       }
 
-      console.log('Step 3: Creating class with subject ID:', subject.id);
-
+      // Create the class
       await CreateClass(
         subject.id,
         parseInt(formData.teacherId),
@@ -591,25 +676,61 @@ function CreateClasslist() {
         formData.section,
         formData.semester,
         formData.schoolYear,
-        user?.id || 0 // working student's ID
+        user?.id || 0  // Use user ID, backend will handle working student ID conversion
       );
 
-      console.log('Step 4: Class created successfully!');
-      setMessage('Class created successfully!');
-      setFormData({
-        subjectCode: '',
-        subjectName: '',
-        teacherId: '',
-        schedule: '',
-        room: '',
-        yearLevel: '',
-        section: '',
-        semester: '1st Semester',
-        schoolYear: '2024-2025'
-      });
+      // Get the newly created class ID
+      let classes;
+      try {
+        classes = await GetAllClasses();
+      } catch (error) {
+        console.error('Failed to get classes:', error);
+        throw new Error('Failed to retrieve classes after creation');
+      }
+      
+      if (!classes || !Array.isArray(classes)) {
+        throw new Error('Failed to retrieve classes after creation');
+      }
+      const newClass = classes.find(c => 
+        c.subject_code === formData.subjectCode && 
+        c.teacher_id === parseInt(formData.teacherId) &&
+        c.school_year === formData.schoolYear &&
+        c.semester === formData.semester
+      );
+
+      // Enroll students if any were added
+      if (students.length > 0 && newClass) {
+        // First, get all students from the system
+        const allStudents = await GetAllStudentsForEnrollment(newClass.id);
+        
+        // Match imported students with system students by student ID
+        const studentIdsToEnroll: number[] = [];
+        for (const studentRow of students) {
+          if (studentRow.studentId) {
+            const matchedStudent = allStudents.find(s => s.student_id === studentRow.studentId);
+            if (matchedStudent) {
+              studentIdsToEnroll.push(matchedStudent.id);
+            }
+          }
+        }
+
+        if (studentIdsToEnroll.length > 0) {
+          await EnrollMultipleStudents(studentIdsToEnroll, newClass.id, user?.id || 0);
+        }
+      }
+
+      setNotification({ type: 'success', message: `Class created successfully${students.length > 0 ? ` with ${students.length} students enrolled!` : '!'}` });
+      setMessage(`Class created successfully${students.length > 0 ? ` with ${students.length} students enrolled!` : '!'}`);
+      
+      setTimeout(() => {
+        navigate('/working-student/manage-classlists');
+      }, 2000);
+
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       setMessage(`Failed to create class: ${errorMessage}`);
+      setNotification({ type: 'error', message: `Failed to create class: ${errorMessage}` });
+      setTimeout(() => setNotification(null), 5000);
       console.error('Creation error:', error);
     } finally {
       setLoading(false);
@@ -617,239 +738,397 @@ function CreateClasslist() {
   };
 
   return (
-    <div 
-      className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
-      onClick={(e) => {
-        if (e.target === e.currentTarget) {
-          window.history.back();
-        }
-      }}
-    >
-      <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 relative max-h-[90vh] flex flex-col">
-        <button
-          type="button"
-          onClick={() => window.history.back()}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
-        >
-          ×
-        </button>
-        
-        <div className="text-center p-8 pb-4 flex-shrink-0">
-          <h2 className="text-2xl font-bold text-blue-600 mb-2">Create New Class</h2>
-          <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
-          <p className="text-gray-600 mt-4">Create a new class instance with schedule and room assignment</p>
+    <>
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
+          notification.type === 'success' ? 'border-l-4 border-green-400' : 'border-l-4 border-red-400'
+        }`}>
+          <div className="p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <div className="ml-3 w-0 flex-1 pt-0.5">
+                <p className={`text-sm font-medium ${
+                  notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {notification.message}
+                </p>
+              </div>
+              <div className="ml-4 flex-shrink-0 flex">
+                <button
+                  className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onClick={() => setNotification(null)}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
+      )}
 
-        <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto px-8 pb-8 flex-1">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label htmlFor="subjectCode" className="block text-sm font-medium text-gray-700 mb-2">
-                Subject Code
-              </label>
-              <input
-                type="text"
-                id="subjectCode"
-                value={formData.subjectCode}
-                onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value })}
-                placeholder="e.g., IT301, CS101"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="subjectName" className="block text-sm font-medium text-gray-700 mb-2">
-                Subject Name
-              </label>
-              <input
-                type="text"
-                id="subjectName"
-                value={formData.subjectName}
-                onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
-                placeholder="e.g., Web Development"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="teacher" className="block text-sm font-medium text-gray-700 mb-2">
-                Teacher
-              </label>
-              <select
-                id="teacher"
-                value={formData.teacherId}
-                onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select Teacher</option>
-                {teachers.map((teacher) => (
-                  <option key={teacher.id} value={teacher.id}>
-                    {teacher.last_name}, {teacher.first_name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="schedule" className="block text-sm font-medium text-gray-700 mb-2">
-                Schedule
-              </label>
-              <input
-                type="text"
-                id="schedule"
-                value={formData.schedule}
-                onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
-                placeholder="e.g., MWF 1:00-2:00 PM"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="room" className="block text-sm font-medium text-gray-700 mb-2">
-                Room
-              </label>
-              <input
-                type="text"
-                id="room"
-                value={formData.room}
-                onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                placeholder="e.g., Lab 2"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="yearLevel" className="block text-sm font-medium text-gray-700 mb-2">
-                Year Level
-              </label>
-              <select
-                id="yearLevel"
-                value={formData.yearLevel}
-                onChange={(e) => setFormData({ ...formData, yearLevel: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              >
-                <option value="">Select Year Level</option>
-                <option value="1st Year">1st Year</option>
-                <option value="2nd Year">2nd Year</option>
-                <option value="3rd Year">3rd Year</option>
-                <option value="4th Year">4th Year</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="section" className="block text-sm font-medium text-gray-700 mb-2">
-                Section
-              </label>
-              <input
-                type="text"
-                id="section"
-                value={formData.section}
-                onChange={(e) => setFormData({ ...formData, section: e.target.value })}
-                placeholder="e.g., A, B, C"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="semester" className="block text-sm font-medium text-gray-700 mb-2">
-                Semester
-              </label>
-              <select
-                id="semester"
-                value={formData.semester}
-                onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="1st Semester">1st Semester</option>
-                <option value="2nd Semester">2nd Semester</option>
-                <option value="Summer">Summer</option>
-              </select>
-            </div>
-
-            <div>
-              <label htmlFor="schoolYear" className="block text-sm font-medium text-gray-700 mb-2">
-                School Year
-              </label>
-              <input
-                type="text"
-                id="schoolYear"
-                value={formData.schoolYear}
-                onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })}
-                placeholder="e.g., 2024-2025"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            window.history.back();
+          }
+        }}
+      >
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-7xl relative max-h-[95vh] flex flex-col">
+          <button
+            type="button"
+            onClick={() => window.history.back()}
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+          >
+            ×
+          </button>
+          
+          <div className="text-center p-6 pb-4 flex-shrink-0 border-b">
+            <h2 className="text-2xl font-bold text-gray-800 uppercase">Add New Classlist</h2>
           </div>
 
-          {message && (
-            <div className={`p-4 rounded-md ${
-              message.includes('successfully') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-            }`}>
-              {message}
-            </div>
-          )}
+          <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="max-w-4xl mx-auto">
+                {/* Class Details */}
+                <div className="space-y-6 bg-gray-50 p-6 rounded-lg border">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-6">Class Details</h3>
+                  
+                  {/* Row 1: School Year and Semester */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="schoolYear" className="block text-sm font-medium text-gray-700 mb-2">
+                        School Year
+                      </label>
+                      <select
+                        id="schoolYear"
+                        value={formData.schoolYear}
+                        onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="2023-2024">2023-2024</option>
+                        <option value="2024-2025">2024-2025</option>
+                        <option value="2025-2026">2025-2026</option>
+                      </select>
+                    </div>
 
-          <div className="text-center">
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full max-w-xs mx-auto px-8 py-4 bg-red-600 text-white text-lg font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors disabled:opacity-50"
-            >
-              {loading ? 'Creating...' : 'CREATE CLASS'}
-            </button>
-          </div>
-        </form>
+                    <div>
+                      <label htmlFor="semester" className="block text-sm font-medium text-gray-700 mb-2">
+                        Semester
+                      </label>
+                      <select
+                        id="semester"
+                        value={formData.semester}
+                        onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="1st Semester">1st Semester</option>
+                        <option value="2nd Semester">2nd Semester</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Row 2: Offering Code and Subject Code */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="offeringCode" className="block text-sm font-medium text-gray-700 mb-2">
+                        Offering Code
+                      </label>
+                      <input
+                        type="text"
+                        id="offeringCode"
+                        value={formData.offeringCode}
+                        onChange={(e) => setFormData({ ...formData, offeringCode: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="subjectCode" className="block text-sm font-medium text-gray-700 mb-2">
+                        Subject Code
+                      </label>
+                      <input
+                        type="text"
+                        id="subjectCode"
+                        value={formData.subjectCode}
+                        onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 3: Subject Name and Schedule */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="subjectName" className="block text-sm font-medium text-gray-700 mb-2">
+                        Subject Name
+                      </label>
+                      <input
+                        type="text"
+                        id="subjectName"
+                        value={formData.subjectName}
+                        onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="schedule" className="block text-sm font-medium text-gray-700 mb-2">
+                        Schedule
+                      </label>
+                      <input
+                        type="text"
+                        id="schedule"
+                        value={formData.schedule}
+                        onChange={(e) => setFormData({ ...formData, schedule: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Row 4: Room and Teacher */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <label htmlFor="room" className="block text-sm font-medium text-gray-700 mb-2">
+                        Room
+                      </label>
+                      <input
+                        type="text"
+                        id="room"
+                        value={formData.room}
+                        onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="teacher" className="block text-sm font-medium text-gray-700 mb-2">
+                        Teacher
+                      </label>
+                      <select
+                        id="teacher"
+                        value={formData.teacherId}
+                        onChange={(e) => setFormData({ ...formData, teacherId: e.target.value })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        required
+                      >
+                        <option value="">Select Teacher</option>
+                        {teachers.map((teacher) => (
+                          <option key={teacher.id} value={teacher.id}>
+                            {teacher.last_name}, {teacher.first_name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Student List */}
+                <div className="mt-8 space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-700 mb-4">Student List</h3>
+                  
+                  <div className="border border-gray-300 rounded-md overflow-hidden">
+                    <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-blue-900 text-white sticky top-0">
+                          <tr>
+                            <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Ctrl No.</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">ID Number</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Full Name</th>
+                            <th className="px-4 py-2 text-left text-xs font-medium uppercase tracking-wider">Year Level</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {students.map((student, index) => (
+                            <tr key={student.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                              <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-900">
+                                {String(student.ctrlNo).padStart(3, '0')}
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  value={student.studentId}
+                                  onChange={(e) => handleStudentChange(student.id, 'studentId', e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Student ID"
+                                />
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  value={student.fullName}
+                                  onChange={(e) => handleStudentChange(student.id, 'fullName', e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Full Name"
+                                />
+                              </td>
+                              <td className="px-4 py-2 whitespace-nowrap">
+                                <input
+                                  type="text"
+                                  value={student.yearLevel}
+                                  onChange={(e) => handleStudentChange(student.id, 'yearLevel', e.target.value)}
+                                  className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                  placeholder="Year"
+                                />
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAddStudentRow}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      Add Student Row
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => students.length > 0 && handleRemoveStudent(students[students.length - 1].id)}
+                      disabled={students.length === 0}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Remove
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleImportFromFile}
+                      className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      Import From File
+                    </button>
+                  </div>
+
+                  <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded p-3">
+                    <p className="font-medium mb-1">Import Instructions:</p>
+                    <ul className="list-disc list-inside space-y-1">
+                      <li>CSV or TXT file with comma or tab separated values</li>
+                      <li>Format: StudentID, FullName, YearLevel</li>
+                      <li>Example: 2022-0101, John Doe, 3rd Year</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              {message && (
+                <div className={`mt-4 p-4 rounded-md ${
+                  message.includes('successfully') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  {message}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex-shrink-0 border-t bg-gray-50 px-6 py-4 flex justify-between">
+              <button
+                type="button"
+                onClick={handleClearForm}
+                className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                Clear Form
+              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => window.history.back()}
+                  className="px-6 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={loading}
+                  className="px-6 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {loading ? 'Saving...' : 'Save Class'}
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
 function ManageClasslists() {
+  const { user } = useAuth();
   const [classes, setClasses] = useState<Class[]>([]);
   const [filteredClasses, setFilteredClasses] = useState<Class[]>([]);
+  const [teachers, setTeachers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTeacher, setSelectedTeacher] = useState<string>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
-    const loadClasses = async () => {
+    const loadData = async () => {
       try {
-        const data = await GetAllClasses();
-        setClasses(data || []);
-        setFilteredClasses(data || []);
+        // Get all classes for working student to manage
+        const [classesData, teachersData] = await Promise.all([
+          GetAllClasses(), // Show all classes for working student to manage
+          GetAllTeachers()
+        ]);
+        setClasses(classesData || []);
+        setFilteredClasses(classesData || []);
+        setTeachers(teachersData || []);
         setError('');
       } catch (error) {
-        console.error('Failed to load classes:', error);
-        setError('Unable to load classes from server.');
+        console.error('Failed to load data:', error);
+        setError('Unable to load data from server.');
       } finally {
         setLoading(false);
       }
     };
 
-    loadClasses();
-  }, []);
+    loadData();
+  }, [user?.id]);
 
   useEffect(() => {
-    if (!searchTerm) {
-      setFilteredClasses(classes);
-    } else {
-      const filtered = classes.filter(cls =>
+    let filtered = classes;
+
+    // Filter by teacher
+    if (selectedTeacher !== 'all') {
+      filtered = filtered.filter(cls => cls.teacher_id === parseInt(selectedTeacher));
+    }
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(cls =>
         cls.subject_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cls.subject_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         cls.teacher_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (cls.room && cls.room.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (cls.section && cls.section.toLowerCase().includes(searchTerm.toLowerCase()))
       );
-      setFilteredClasses(filtered);
     }
-  }, [searchTerm, classes]);
+
+    setFilteredClasses(filtered);
+  }, [searchTerm, selectedTeacher, classes]);
 
   if (loading) {
     return (
@@ -867,14 +1146,13 @@ function ManageClasslists() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-2xl font-bold text-gray-900">Manage Classes</h2>
-            <p className="text-gray-600">Manage class instances and student enrollments</p>
           </div>
           <Link
             to="/working-student/create-classlist"
             className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
           >
             <Plus className="h-4 w-4 mr-2" />
-            Create New Class
+            Add New Class
           </Link>
         </div>
       </div>
@@ -886,49 +1164,86 @@ function ManageClasslists() {
       )}
 
       <div className="flex-shrink-0 mb-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+        <div className="flex flex-col gap-4">
+          {/* Search and Filter Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+            <div className="flex-1 max-w-md">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
-              <input
-                type="text"
-                placeholder="Search by code, name, teacher, room, or section..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <label htmlFor="teacherFilter" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                Teacher:
+              </label>
+              <select
+                id="teacherFilter"
+                value={selectedTeacher}
+                onChange={(e) => setSelectedTeacher(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+              >
+                <option value="all">All Teachers</option>
+                {teachers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.last_name}, {teacher.first_name}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
-          <div className="flex items-center gap-4">
-            <div className="flex items-center bg-gray-100 rounded-lg p-1">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 rounded-md transition-colors ${
-                  viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </button>
-              <button
-                onClick={() => setViewMode('list')}
-                className={`p-2 rounded-md transition-colors ${
-                  viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-                </svg>
-              </button>
+
+          {/* View Mode and Count Row */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center bg-gray-100 rounded-lg p-1">
+                <button
+                  onClick={() => setViewMode('grid')}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => setViewMode('list')}
+                  className={`p-2 rounded-md transition-colors ${
+                    viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                  </svg>
+                </button>
+              </div>
+              <span className="text-sm text-gray-500">
+                {filteredClasses.length} of {classes.length} classes
+              </span>
             </div>
-            <span className="text-sm text-gray-500">
-              {filteredClasses.length} of {classes.length} classes
-            </span>
+            
+            {selectedTeacher !== 'all' && (
+              <button
+                onClick={() => {
+                  setSelectedTeacher('all');
+                  setSearchTerm('');
+                }}
+                className="text-sm text-blue-600 hover:text-blue-800 font-medium"
+              >
+                Clear Filters
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -1062,21 +1377,21 @@ function ManageClasslists() {
 
       {filteredClasses.length === 0 && !error && (
         <div className="text-center py-12">
-          {searchTerm ? (
+          {searchTerm || selectedTeacher !== 'all' ? (
             <>
               <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No matching classes found</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Try adjusting your search terms or clear the search to see all classes.
-              </p>
               <div className="mt-6">
                 <button
-                  onClick={() => setSearchTerm('')}
+                  onClick={() => {
+                    setSearchTerm('');
+                    setSelectedTeacher('all');
+                  }}
                   className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
                 >
-                  Clear Search
+                  Clear All Filters
                 </button>
               </div>
             </>
@@ -1086,21 +1401,227 @@ function ManageClasslists() {
                 <Users className="h-8 w-8 text-gray-400" />
               </div>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No classes found</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                Get started by creating your first class.
-              </p>
               <div className="mt-6">
                 <Link
                   to="/working-student/create-classlist"
                   className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
                 >
                   <Plus className="h-4 w-4 mr-2" />
-                  Create Class
+                  Add New Class
                 </Link>
               </div>
             </>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+function ManageUsers() {
+  const [students, setStudents] = useState<ClassStudent[]>([]);
+  const [filteredStudents, setFilteredStudents] = useState<ClassStudent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [yearLevelFilter, setYearLevelFilter] = useState('All');
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const loadStudents = async () => {
+    try {
+      const data = await GetAllRegisteredStudents(yearLevelFilter);
+      setStudents(data || []);
+      setFilteredStudents(data || []);
+      setError('');
+    } catch (error) {
+      console.error('Failed to load students:', error);
+      setError('Unable to load students from server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStudents();
+  }, [yearLevelFilter]);
+
+  useEffect(() => {
+    if (!searchTerm) {
+      setFilteredStudents(students);
+    } else {
+      const filtered = students.filter(student =>
+        student.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (student.middle_name && student.middle_name.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (student.section && student.section.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+      setFilteredStudents(filtered);
+    }
+  }, [searchTerm, students]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex-shrink-0 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Manage Registered Students</h2>
+          </div>
+          <button
+            onClick={() => setShowAddModal(true)}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+          >
+            <UserPlus className="h-4 w-4 mr-2" />
+            Add Student
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="flex-shrink-0 mb-4 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          <p>{error}</p>
+        </div>
+      )}
+
+      <div className="flex-shrink-0 mb-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <label htmlFor="yearLevel" className="text-sm font-medium text-gray-700 whitespace-nowrap">
+                Year Level:
+              </label>
+              <select
+                id="yearLevel"
+                value={yearLevelFilter}
+                onChange={(e) => setYearLevelFilter(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="All">All Years</option>
+                <option value="1st Year">1st Year</option>
+                <option value="2nd Year">2nd Year</option>
+                <option value="3rd Year">3rd Year</option>
+                <option value="4th Year">4th Year</option>
+              </select>
+            </div>
+            <span className="text-sm text-gray-500">
+              {filteredStudents.length} of {students.length} students
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-hidden">
+        <div className="bg-white shadow rounded-lg overflow-hidden h-full overflow-y-auto">
+          {filteredStudents.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50 sticky top-0 z-10">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Student ID
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Name
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Year Level
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Section
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredStudents.map((student) => (
+                  <tr key={student.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {student.student_id}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {student.last_name}, {student.first_name} {student.middle_name || ''}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {student.year_level || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {student.section || '-'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="px-6 py-12 text-center">
+              {searchTerm || yearLevelFilter !== 'All' ? (
+                <>
+                  <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">No matching students found</h3>
+                  <div className="mt-6">
+                    <button
+                      onClick={() => {
+                        setSearchTerm('');
+                        setYearLevelFilter('All');
+                      }}
+                      className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                    >
+                      Clear Filters
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <Users className="mx-auto h-12 w-12 text-gray-400" />
+                  <h3 className="mt-2 text-sm font-medium text-gray-900">No students found</h3>
+                  <div className="mt-6">
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+                    >
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Add Student
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Add Student Modal */}
+      {showAddModal && (
+        <RegisterStudentModal 
+          onClose={() => setShowAddModal(false)}
+          onSuccess={() => {
+            setShowAddModal(false);
+            loadStudents();
+          }}
+        />
       )}
     </div>
   );
@@ -1434,7 +1955,6 @@ function ClassListManagement() {
                   </div>
                   <input
                     type="text"
-                    placeholder="Search by name, student ID, year level, or section..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
@@ -1553,23 +2073,440 @@ function ClassListManagement() {
   );
 }
 
+function EquipmentReports() {
+  const { user } = useAuth();
+  const [feedbackList, setFeedbackList] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [selectedFeedback, setSelectedFeedback] = useState<Feedback | null>(null);
+  const [showForwardModal, setShowForwardModal] = useState(false);
+  const [forwardNotes, setForwardNotes] = useState('');
+  const [forwarding, setForwarding] = useState(false);
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+  useEffect(() => {
+    loadPendingFeedback();
+  }, []);
+
+  const loadPendingFeedback = async () => {
+    try {
+      const data = await GetPendingFeedback();
+      setFeedbackList(data || []);
+      setError('');
+    } catch (error) {
+      console.error('Failed to load pending feedback:', error);
+      setError('Unable to load pending feedback. Make sure you are connected to the database.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 5000);
+  };
+
+  const handleForwardClick = (feedback: Feedback) => {
+    setSelectedFeedback(feedback);
+    setForwardNotes('');
+    setShowForwardModal(true);
+  };
+
+  const handleForwardSubmit = async () => {
+    if (!selectedFeedback || !user) return;
+
+    setForwarding(true);
+    try {
+      await ForwardFeedbackToAdmin(selectedFeedback.id, user.id, forwardNotes);
+      showNotification('success', 'Feedback forwarded to admin successfully!');
+      setShowForwardModal(false);
+      setSelectedFeedback(null);
+      setForwardNotes('');
+      await loadPendingFeedback(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to forward feedback:', error);
+      showNotification('error', 'Failed to forward feedback. Please try again.');
+    } finally {
+      setForwarding(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900">Equipment Reports</h2>
+        <p className="text-gray-600">Review student-submitted equipment feedback and forward to admin</p>
+      </div>
+
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
+          notification.type === 'success' ? 'border-l-4 border-green-400' : 'border-l-4 border-red-400'
+        }`}>
+          <div className="p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <CheckCircle className="h-6 w-6 text-green-400" />
+                ) : (
+                  <XCircle className="h-6 w-6 text-red-400" />
+                )}
+              </div>
+              <div className="ml-3 w-0 flex-1 pt-0.5">
+                <p className={`text-sm font-medium ${
+                  notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {notification.message}
+                </p>
+              </div>
+              <div className="ml-4 flex-shrink-0 flex">
+                <button
+                  className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500"
+                  onClick={() => setNotification(null)}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      {feedbackList.length === 0 ? (
+        <div className="bg-white shadow rounded-lg p-12 text-center">
+          <FileText className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Pending Reports</h3>
+          <p className="text-gray-500 mb-4">
+            There are no pending equipment reports at the moment.
+          </p>
+          <p className="text-sm text-gray-400">
+            Student-submitted equipment feedback will appear here for your review.
+          </p>
+        </div>
+      ) : (
+        <div className="bg-white shadow rounded-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    #
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Date & Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Student
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    PC Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Equipment
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Monitor
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Keyboard
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Mouse
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Comments
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {feedbackList.map((feedback, index) => (
+                  <tr key={feedback.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {feedbackList.length - index}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      <div className="flex flex-col">
+                        <span className="font-medium">
+                          {new Date(feedback.date_submitted).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'short',
+                            day: 'numeric'
+                          })}
+                        </span>
+                        <span className="text-xs text-gray-500">
+                          {new Date(feedback.date_submitted).toLocaleTimeString('en-US', {
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{feedback.student_name}</span>
+                        <span className="text-xs text-gray-500">{feedback.student_id_str}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full font-medium">
+                        {feedback.pc_number}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        feedback.equipment_condition === 'Good'
+                          ? 'bg-green-100 text-green-800'
+                          : feedback.equipment_condition === 'Minor Issue'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {feedback.equipment_condition}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        feedback.monitor_condition === 'Good'
+                          ? 'bg-green-100 text-green-800'
+                          : feedback.monitor_condition === 'Minor Issue'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {feedback.monitor_condition}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        feedback.keyboard_condition === 'Good'
+                          ? 'bg-green-100 text-green-800'
+                          : feedback.keyboard_condition === 'Minor Issue'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {feedback.keyboard_condition}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                        feedback.mouse_condition === 'Good'
+                          ? 'bg-green-100 text-green-800'
+                          : feedback.mouse_condition === 'Minor Issue'
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {feedback.mouse_condition}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-sm text-gray-700 max-w-xs">
+                      {feedback.comments ? (
+                        <span className="text-gray-600">{feedback.comments}</span>
+                      ) : (
+                        <span className="text-gray-400 italic">No comments</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => handleForwardClick(feedback)}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        <Send className="h-4 w-4 mr-1" />
+                        Forward
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-6 py-3 bg-gray-50 border-t border-gray-200">
+            <div className="text-sm text-gray-700">
+              Showing <span className="font-medium">{feedbackList.length}</span> pending report{feedbackList.length !== 1 ? 's' : ''}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Forward Modal */}
+      {showForwardModal && selectedFeedback && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowForwardModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 relative">
+            <button
+              type="button"
+              onClick={() => setShowForwardModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors"
+            >
+              ×
+            </button>
+            
+            <div className="text-center p-8 pb-4">
+              <Send className="h-12 w-12 text-blue-600 mx-auto mb-4" />
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">
+                Forward to Admin
+              </h3>
+              <p className="text-gray-600">
+                Review the equipment report and add notes before forwarding to admin
+              </p>
+            </div>
+
+            <div className="px-8 pb-8">
+              {/* Feedback Summary */}
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <h4 className="text-sm font-semibold text-gray-700 mb-3">Report Summary</h4>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <span className="text-gray-600">Student:</span>
+                    <p className="font-medium text-gray-900">{selectedFeedback.student_name}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">PC Number:</span>
+                    <p className="font-medium text-gray-900">{selectedFeedback.pc_number}</p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Date:</span>
+                    <p className="font-medium text-gray-900">
+                      {new Date(selectedFeedback.date_submitted).toLocaleDateString()}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-gray-600">Time:</span>
+                    <p className="font-medium text-gray-900">
+                      {new Date(selectedFeedback.date_submitted).toLocaleTimeString()}
+                    </p>
+                  </div>
+                </div>
+                <div className="mt-4 grid grid-cols-4 gap-3">
+                  <div>
+                    <span className="text-xs text-gray-600">Equipment</span>
+                    <p className={`text-xs font-semibold mt-1 ${
+                      selectedFeedback.equipment_condition === 'Good' ? 'text-green-700' :
+                      selectedFeedback.equipment_condition === 'Minor Issue' ? 'text-yellow-700' : 'text-red-700'
+                    }`}>
+                      {selectedFeedback.equipment_condition}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-600">Monitor</span>
+                    <p className={`text-xs font-semibold mt-1 ${
+                      selectedFeedback.monitor_condition === 'Good' ? 'text-green-700' :
+                      selectedFeedback.monitor_condition === 'Minor Issue' ? 'text-yellow-700' : 'text-red-700'
+                    }`}>
+                      {selectedFeedback.monitor_condition}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-600">Keyboard</span>
+                    <p className={`text-xs font-semibold mt-1 ${
+                      selectedFeedback.keyboard_condition === 'Good' ? 'text-green-700' :
+                      selectedFeedback.keyboard_condition === 'Minor Issue' ? 'text-yellow-700' : 'text-red-700'
+                    }`}>
+                      {selectedFeedback.keyboard_condition}
+                    </p>
+                  </div>
+                  <div>
+                    <span className="text-xs text-gray-600">Mouse</span>
+                    <p className={`text-xs font-semibold mt-1 ${
+                      selectedFeedback.mouse_condition === 'Good' ? 'text-green-700' :
+                      selectedFeedback.mouse_condition === 'Minor Issue' ? 'text-yellow-700' : 'text-red-700'
+                    }`}>
+                      {selectedFeedback.mouse_condition}
+                    </p>
+                  </div>
+                </div>
+                {selectedFeedback.comments && (
+                  <div className="mt-4">
+                    <span className="text-xs text-gray-600">Student Comments:</span>
+                    <p className="text-sm text-gray-900 mt-1">{selectedFeedback.comments}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Notes Input */}
+              <div className="mb-6">
+                <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-2">
+                  Add Notes (Optional)
+                </label>
+                <textarea
+                  id="notes"
+                  rows={4}
+                  value={forwardNotes}
+                  onChange={(e) => setForwardNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  placeholder="Add any observations or recommendations for the admin..."
+                />
+              </div>
+
+              {/* Actions */}
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowForwardModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  disabled={forwarding}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleForwardSubmit}
+                  disabled={forwarding}
+                  className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {forwarding ? 'Forwarding...' : 'Forward to Admin'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function WorkingStudentDashboard() {
   const location = useLocation();
   
   const navigationItems = [
     { name: 'Dashboard', href: '/working-student', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/working-student' },
-    { name: 'Add Student', href: '/working-student/register-student', icon: <UserPlus className="h-5 w-5" />, current: location.pathname === '/working-student/register-student' },
+    { name: 'Manage Students', href: '/working-student/manage-users', icon: <Users className="h-5 w-5" />, current: location.pathname === '/working-student/manage-users' },
     { name: 'Manage Classes', href: '/working-student/manage-classlists', icon: <BookOpen className="h-5 w-5" />, current: location.pathname === '/working-student/manage-classlists' },
+    { name: 'Equipment Reports', href: '/working-student/equipment-reports', icon: <AlertCircle className="h-5 w-5" />, current: location.pathname === '/working-student/equipment-reports' },
   ];
 
   return (
     <Layout navigationItems={navigationItems} title="Working Student Dashboard">
       <Routes>
         <Route index element={<DashboardOverview />} />
-        <Route path="register-student" element={<RegisterStudent />} />
+        <Route path="manage-users" element={<ManageUsers />} />
         <Route path="manage-classlists" element={<ManageClasslists />} />
         <Route path="create-classlist" element={<CreateClasslist />} />
         <Route path="classlist/:id" element={<ClassListManagement />} />
+        <Route path="equipment-reports" element={<EquipmentReports />} />
       </Routes>
     </Layout>
   );

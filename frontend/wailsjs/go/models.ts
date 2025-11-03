@@ -22,6 +22,7 @@ export namespace main {
 	    id: number;
 	    classlist_id: number;
 	    class_id: number;
+	    ctrl_no: number;
 	    date: string;
 	    student_id: number;
 	    student_code: string;
@@ -32,6 +33,7 @@ export namespace main {
 	    subject_name: string;
 	    time_in?: string;
 	    time_out?: string;
+	    pc_number?: string;
 	    status: string;
 	    remarks?: string;
 	    recorded_by?: number;
@@ -45,6 +47,7 @@ export namespace main {
 	        this.id = source["id"];
 	        this.classlist_id = source["classlist_id"];
 	        this.class_id = source["class_id"];
+	        this.ctrl_no = source["ctrl_no"];
 	        this.date = source["date"];
 	        this.student_id = source["student_id"];
 	        this.student_code = source["student_code"];
@@ -55,6 +58,7 @@ export namespace main {
 	        this.subject_name = source["subject_name"];
 	        this.time_in = source["time_in"];
 	        this.time_out = source["time_out"];
+	        this.pc_number = source["pc_number"];
 	        this.status = source["status"];
 	        this.remarks = source["remarks"];
 	        this.recorded_by = source["recorded_by"];
@@ -179,6 +183,11 @@ export namespace main {
 	    mouse_condition: string;
 	    comments?: string;
 	    date_submitted: string;
+	    status: string;
+	    forwarded_by?: number;
+	    forwarded_by_name?: string;
+	    forwarded_at?: string;
+	    working_student_notes?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new Feedback(source);
@@ -200,6 +209,11 @@ export namespace main {
 	        this.mouse_condition = source["mouse_condition"];
 	        this.comments = source["comments"];
 	        this.date_submitted = source["date_submitted"];
+	        this.status = source["status"];
+	        this.forwarded_by = source["forwarded_by"];
+	        this.forwarded_by_name = source["forwarded_by_name"];
+	        this.forwarded_at = source["forwarded_at"];
+	        this.working_student_notes = source["working_student_notes"];
 	    }
 	}
 	export class LoginLog {
@@ -327,6 +341,8 @@ export namespace main {
 	    student_id?: string;
 	    year?: string;
 	    section?: string;
+	    email?: string;
+	    contact_number?: string;
 	    photo_url?: string;
 	    created: string;
 	    login_log_id: number;
@@ -349,6 +365,8 @@ export namespace main {
 	        this.student_id = source["student_id"];
 	        this.year = source["year"];
 	        this.section = source["section"];
+	        this.email = source["email"];
+	        this.contact_number = source["contact_number"];
 	        this.photo_url = source["photo_url"];
 	        this.created = source["created"];
 	        this.login_log_id = source["login_log_id"];

@@ -30,6 +30,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   const { user, logout } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
@@ -47,9 +48,9 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleLogout = async () => {
-    // Show feedback modal only for students
+    // Show confirmation modal for students
     if (user?.role === 'student') {
-      setShowFeedbackModal(true);
+      setShowLogoutConfirmModal(true);
     } else {
       // For non-students, logout directly
       try {
@@ -61,6 +62,17 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         navigate('/login');
       }
     }
+  };
+
+  const handleLogoutConfirm = () => {
+    // User confirmed logout, now show feedback modal
+    setShowLogoutConfirmModal(false);
+    setShowFeedbackModal(true);
+  };
+
+  const handleLogoutCancel = () => {
+    // User cancelled logout
+    setShowLogoutConfirmModal(false);
   };
 
   const handleFeedbackSubmit = async (feedbackData: any) => {
@@ -229,26 +241,31 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
       {/* Static sidebar - always visible */}
       <div className="flex flex-shrink-0">
         <div className="flex flex-col w-56 lg:w-64">
-          <div className="flex flex-col h-screen bg-gradient-to-b from-blue-900 to-blue-800 shadow-xl">
-            <div className="flex-1 pt-6 pb-6 overflow-y-auto">
-              <div className="flex items-center flex-shrink-0 px-3 lg:px-4 mb-6">
+          <div className="flex flex-col h-screen bg-gradient-to-b from-gray-800 to-gray-900 shadow-2xl border-r border-gray-300">
+            {/* Header Section with Border */}
+            <div className="flex-shrink-0 pt-6 pb-4 border-b border-gray-300">
+              <div className="flex items-center flex-shrink-0 px-3 lg:px-4">
                 <div className="text-center w-full">
                   <h1 className="text-xl font-extrabold text-white tracking-wide">DIGITAL LOGBOOK</h1>
-                  <p className="text-sm font-extrabold text-white tracking-wide">MONITORING SYSTEM</p>
+                  <p className="text-sm font-extrabold text-gray-300 tracking-wide">MONITORING SYSTEM</p>
                 </div>
               </div>
-              <nav className="flex-1 px-2 lg:px-3 space-y-1">
+            </div>
+            
+            {/* Navigation Section with Border */}
+            <div className="flex-1 pt-4 pb-6 overflow-y-auto">
+              <nav className="flex-1 px-2 lg:px-3 space-y-2">
                 {navigationItems.map((item) => (
                   <Link
                     key={item.name}
                     to={item.href}
                     className={`${
                       item.current
-                        ? 'bg-blue-700 text-white shadow-lg transform scale-105'
-                        : 'text-blue-100 hover:bg-blue-700 hover:text-white hover:transform hover:scale-105'
-                    } group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ease-in-out`}
+                        ? 'bg-gray-700 text-white shadow-lg border-l-4 border-blue-500'
+                        : 'text-gray-300 hover:bg-gray-700 hover:text-white hover:border-l-4 hover:border-gray-400'
+                    } group flex items-center px-3 py-3 text-sm font-medium transition-all duration-200 ease-in-out border-l-4 border-transparent`}
                   >
-                    <div className={`${item.current ? 'text-white' : 'text-blue-300 group-hover:text-white'} mr-3 transition-colors duration-200`}>
+                    <div className={`${item.current ? 'text-white' : 'text-gray-400 group-hover:text-white'} mr-3 transition-colors duration-200`}>
                       {item.icon}
                     </div>
                     <span className="font-medium">{item.name}</span>
@@ -256,14 +273,21 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                 ))}
               </nav>
             </div>
+            
+            {/* Footer Section with Border */}
+            <div className="flex-shrink-0 border-t border-gray-300 p-4">
+              <div className="text-xs text-gray-400 text-center">
+                © 2024 Digital Logbook
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 bg-gray-50">
         {/* Top navigation */}
-        <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow">
+        <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow-md border-b border-gray-300">
           <div className="flex-1 px-4 flex justify-between">
             <div className="flex-1 flex">
               <div className="w-full flex md:ml-0">
@@ -335,10 +359,12 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 overflow-hidden">
-          <div className="py-4 h-full">
+        <main className="flex-1 overflow-hidden bg-gray-50">
+          <div className="py-6 h-full">
             <div className="max-w-full mx-auto px-4 sm:px-6 md:px-8 h-full">
-              {children}
+              <div className="bg-white rounded-lg shadow-sm border border-gray-300 min-h-full p-6">
+                {children}
+              </div>
             </div>
           </div>
         </main>
@@ -402,22 +428,25 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
             <div className="p-6">
               {activeTab === 'profile' && (
                 <div className="space-y-6">
-                  {/* Avatar Section */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-3">Avatar</label>
-                    <div className="flex items-center space-x-6">
-                      {photoPreview ? (
-                        <img 
-                          src={photoPreview} 
-                          alt="Profile" 
-                          className="h-24 w-24 rounded-full object-cover border-4 border-blue-200"
-                        />
-                      ) : (
-                        <div className="h-24 w-24 rounded-full bg-blue-100 flex items-center justify-center border-4 border-blue-200">
-                          <User className="h-12 w-12 text-blue-600" />
-                        </div>
-                      )}
-                      <div className="flex-1">
+                  {/* Basic Information Section */}
+                  <div className="mb-8">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-6">Basic Information</h4>
+                    
+                    {/* Profile Picture and Student ID Row */}
+                    <div className="flex items-center gap-8 mb-6">
+                      {/* Profile Picture */}
+                      <div className="flex flex-col items-center">
+                        {photoPreview ? (
+                          <img 
+                            src={photoPreview} 
+                            alt="Profile" 
+                            className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
+                          />
+                        ) : (
+                          <div className="h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-300">
+                            <User className="h-14 w-14 text-gray-600" />
+                          </div>
+                        )}
                         <input
                           ref={fileInputRef}
                           type="file"
@@ -428,7 +457,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                         <button
                           type="button"
                           onClick={() => fileInputRef.current?.click()}
-                          className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                          className="mt-3 text-sm text-blue-600 hover:text-blue-800 underline font-medium"
                         >
                           Change Photo
                         </button>
@@ -436,104 +465,163 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                           <button
                             type="button"
                             onClick={handlePhotoSave}
-                            className="ml-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+                            className="mt-1 text-sm text-green-600 hover:text-green-800 underline font-medium"
                           >
                             Save Photo
                           </button>
                         )}
-                        <span className="text-xs text-gray-500 mt-2 block">
-                          JPG, PNG or GIF (max. 5MB)
-                        </span>
+                      </div>
+                      
+                      {/* ID - positioned next to profile picture */}
+                      <div className="flex-1">
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          {user?.role === 'admin' ? 'Admin ID' : 
+                           user?.role === 'teacher' ? 'Teacher ID' : 'Student ID'}
+                        </label>
+                        <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">
+                            {user?.role === 'admin' ? (user?.employee_id || 'N/A') :
+                             user?.role === 'teacher' ? (user?.employee_id || 'N/A') :
+                             user?.student_id || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Student/Working Student specific fields */}
+                    {(user?.role === 'student' || user?.role === 'working_student') ? (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Last Name */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                            <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                          </div>
+                        </div>
+
+                        {/* First Name */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                            <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
+                          </div>
+                        </div>
+
+                        {/* Middle Name */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
+                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                            <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                          </div>
+                        </div>
+
+                        {/* Year Level */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
+                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                            <span className="text-gray-900">{user?.year || 'N/A'}</span>
+                          </div>
+                        </div>
+
+                        {/* Section */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
+                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                            <span className="text-gray-900">{user?.section || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {/* For admins */}
+                        {user?.role === 'admin' ? (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Admin ID */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Admin ID</label>
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                <span className="text-gray-900">{user?.employee_id || 'N/A'}</span>
+                              </div>
+                            </div>
+
+                            {/* Last Name */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                              </div>
+                            </div>
+
+                            {/* First Name */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
+                              </div>
+                            </div>
+
+                            {/* Middle Name */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                              </div>
+                            </div>
+                          </div>
+                        ) : (
+                          /* For teachers */
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+                            <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                              <span className="text-gray-900">{user?.name || 'N/A'}</span>
+                            </div>
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Contact Details Section */}
+                  <div className="mb-8">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Details</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Contact Number - only show for students, working students, and teachers */}
+                      {(user?.role === 'student' || user?.role === 'working_student' || user?.role === 'teacher') && (
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Contact No.</label>
+                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                            <span className="text-gray-900">{user?.contact_number || 'N/A'}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Email */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                        <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                          <span className="text-gray-900">{user?.email || 'N/A'}</span>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Student/Working Student specific fields */}
-                  {(user?.role === 'student' || user?.role === 'working_student') ? (
-                    <>
-                      {/* Last Name */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
-                        </div>
+                  {/* Account Created Section */}
+                  <div className="mb-8">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Account Created</h4>
+                    <div>
+                      <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                        <span className="text-gray-900">
+                          {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          }) : 'N/A'}
+                        </span>
                       </div>
-
-                      {/* First Name */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
-                        </div>
-                      </div>
-
-                      {/* Middle Name */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
-                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
-                        </div>
-                      </div>
-
-                      {/* Student ID */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Student ID</label>
-                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">{user?.student_id || 'N/A'}</span>
-                        </div>
-                      </div>
-
-                      {/* Year Level */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
-                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">{user?.year || 'N/A'}</span>
-                        </div>
-                      </div>
-
-                      {/* Account Created */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Created</label>
-                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">
-                            {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      {/* For non-students (admin, teacher, etc.) */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">{user?.name || 'N/A'}</span>
-                        </div>
-                      </div>
-
-                      {/* Account Created */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Account Created</label>
-                        <div className="px-4 py-3 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">
-                            {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -608,15 +696,58 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
               )}
             </div>
 
-            {/* Modal Footer */}
-            <div className="border-t border-gray-200 px-6 py-4 flex justify-end">
-              <button
-                type="button"
-                onClick={handleCloseAccountModal}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors font-medium"
-              >
-                Close
-              </button>
+          </div>
+        </div>
+      )}
+
+      {/* Logout Confirmation Modal (for students only) */}
+      {showLogoutConfirmModal && (
+        <div 
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleLogoutCancel();
+            }
+          }}
+          style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
+        >
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-md">
+            {/* Modal Content */}
+            <div className="p-6">
+              {/* Icon */}
+              <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-yellow-100 rounded-full">
+                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              
+              {/* Title */}
+              <h3 className="text-xl font-bold text-gray-900 text-center mb-2">
+                Are you sure you want to logout?
+              </h3>
+              
+              {/* Description */}
+              <p className="text-sm text-gray-600 text-center mb-6">
+                You'll be asked to provide equipment feedback before logging out.
+              </p>
+              
+              {/* Buttons */}
+              <div className="flex space-x-3">
+                <button
+                  type="button"
+                  onClick={handleLogoutCancel}
+                  className="flex-1 px-4 py-2.5 border-2 border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors font-medium text-sm"
+                >
+                  No, Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleLogoutConfirm}
+                  className="flex-1 px-4 py-2.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium text-sm shadow-md"
+                >
+                  Yes, Logout
+                </button>
+              </div>
             </div>
           </div>
         </div>
