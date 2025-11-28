@@ -18,15 +18,15 @@ func main() {
 
 	// Create application with options
 	err := wails.Run(&options.App{
-		Title:  "Logbook Monitoring System",
-		Width:  1000,
-		Height: 700,
-		MinWidth:  800,
-		MinHeight: 600,
-		DisableResize: false,
-		Fullscreen: false,
-		Frameless: false,
-		StartHidden: false,
+		Title:             "Digital Logbook Monitoring System",
+		Width:             1000,
+		Height:            700,
+		MinWidth:          800,
+		MinHeight:         600,
+		DisableResize:     false,
+		Fullscreen:        false,
+		Frameless:         false,
+		StartHidden:       false,
 		HideWindowOnClose: false,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
