@@ -9,7 +9,8 @@ import {
   LogOut,
   ChevronDown,
   Lock,
-  UserCircle
+  UserCircle,
+  Sprout
 } from 'lucide-react';
 import LogoutFeedbackModal from './LogoutFeedbackModal';
 
@@ -238,47 +239,93 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
 
   return (
     <div className="min-h-screen bg-gray-50 flex">
-      {/* Static sidebar - always visible */}
-      <div className="flex flex-shrink-0">
-        <div className="flex flex-col w-56 lg:w-64">
-          <div className="flex flex-col h-screen bg-gradient-to-b from-gray-800 to-gray-900 shadow-2xl border-r border-gray-300">
-            {/* Header Section with Border */}
-            <div className="flex-shrink-0 pt-6 pb-4 border-b border-gray-300">
-              <div className="flex items-center flex-shrink-0 px-3 lg:px-4">
-                <div className="text-center w-full">
-                  <h1 className="text-xl font-extrabold text-white tracking-wide">DIGITAL LOGBOOK</h1>
-                  <p className="text-sm font-extrabold text-gray-300 tracking-wide">MONITORING SYSTEM</p>
+      {/* Static sidebar - always visible - Icon-only design */}
+      <div className="flex flex-shrink-0 relative">
+        <div className="flex flex-col w-16">
+          <div className="flex flex-col h-screen bg-gray-200 shadow-lg border-r border-gray-300 overflow-visible">
+            {/* Header Section - Logo */}
+            <div className="flex-shrink-0 pt-4 pb-4">
+              <div className="flex items-center justify-center">
+                <div className="w-10 h-10 flex items-center justify-center">
+                  <Sprout className="w-6 h-6 text-green-600" />
                 </div>
               </div>
             </div>
             
-            {/* Navigation Section with Border */}
-            <div className="flex-1 pt-4 pb-6 overflow-y-auto">
-              <nav className="flex-1 px-2 lg:px-3 space-y-2">
+            {/* Navigation Section - Icon only */}
+            <div className="flex-1 pt-2 pb-4 overflow-y-auto">
+              <nav className="flex flex-col items-center space-y-3 px-2">
                 {navigationItems.map((item) => (
                   <Link
                     key={item.name}
                     to={item.href}
+                    title={item.name}
                     className={`${
                       item.current
-                        ? 'bg-gray-700 text-white shadow-lg border-l-4 border-blue-500'
-                        : 'text-gray-300 hover:bg-gray-700 hover:text-white hover:border-l-4 hover:border-gray-400'
-                    } group flex items-center px-3 py-3 text-sm font-medium transition-all duration-200 ease-in-out border-l-4 border-transparent`}
+                        ? 'bg-purple-100 rounded-lg'
+                        : 'hover:bg-gray-300 rounded-lg'
+                    } group flex items-center justify-center w-12 h-12 transition-all duration-200 ease-in-out`}
                   >
-                    <div className={`${item.current ? 'text-white' : 'text-gray-400 group-hover:text-white'} mr-3 transition-colors duration-200`}>
+                    <div className={`${item.current ? 'text-purple-700' : 'text-gray-600 group-hover:text-gray-800'} transition-colors duration-200 [&>svg]:w-6 [&>svg]:h-6`}>
                       {item.icon}
                     </div>
-                    <span className="font-medium">{item.name}</span>
                   </Link>
                 ))}
               </nav>
             </div>
             
-            {/* Footer Section with Border */}
-            <div className="flex-shrink-0 border-t border-gray-300 p-4">
+            {/* Footer Section - User Profile */}
+            <div className="flex-shrink-0 pb-4 flex items-center justify-center" ref={dropdownRef}>
+              {user?.photo_url || photoPreview ? (
+                <img 
+                  src={photoPreview || user?.photo_url} 
+                  alt="Profile" 
+                  className="h-10 w-10 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-gray-400 transition-all"
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                />
+              ) : (
+                <div 
+                  className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-gray-400 transition-all"
+                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                >
+                  <User className="h-6 w-6 text-gray-600" />
+                </div>
+              )}
             </div>
           </div>
         </div>
+        {/* Profile dropdown - positioned outside sidebar to avoid clipping */}
+        {profileDropdownOpen && (
+          <div className="absolute left-full bottom-4 ml-2 w-48 rounded-md shadow-xl py-1 bg-white ring-1 ring-black ring-opacity-5 z-[9999]">
+            <div className="px-4 py-2 border-b border-gray-200">
+              <div className="text-sm font-medium text-gray-900">{user?.first_name || user?.name || 'User'}</div>
+              <div className="text-xs text-gray-500 capitalize">{user?.role?.replace('_', ' ') || 'Role'}</div>
+            </div>
+            <button
+              type="button"
+              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAccountModal(true);
+                setProfileDropdownOpen(false);
+              }}
+            >
+              <Settings className="h-4 w-4 mr-3" />
+              Account
+            </button>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleLogout();
+              }}
+              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
+            >
+              <LogOut className="h-4 w-4 mr-3" />
+              Sign out
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Main content */}
@@ -296,61 +343,6 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
               </div>
             </div>
             <div className="ml-4 flex items-center md:ml-6">
-              {/* Profile dropdown */}
-              <div className="ml-3 relative" ref={dropdownRef}>
-                <div>
-                  <button
-                    type="button"
-                    className="max-w-xs bg-white flex items-center text-sm rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                    aria-expanded={profileDropdownOpen}
-                    aria-haspopup="true"
-                  >
-                    <div className="flex items-center space-x-3">
-                      {user?.photo_url || photoPreview ? (
-                        <img 
-                          src={photoPreview || user?.photo_url} 
-                          alt="Profile" 
-                          className="h-8 w-8 rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center">
-                          <User className="h-5 w-5 text-blue-600" />
-                        </div>
-                      )}
-                      <div className="text-left">
-                        <span className="text-sm font-medium text-gray-700">{user?.first_name || user?.name || 'User'}</span>
-                        <span className="text-xs text-gray-500 capitalize block">{user?.role?.replace('_', ' ') || 'Role'}</span>
-                      </div>
-                      <ChevronDown className="h-4 w-4 text-gray-400" />
-                    </div>
-                  </button>
-                </div>
-                
-                {profileDropdownOpen && (
-                  <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-50">
-                    <button
-                      type="button"
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
-                      onClick={() => {
-                        setShowAccountModal(true);
-                        setProfileDropdownOpen(false);
-                      }}
-                    >
-                      <Settings className="h-4 w-4 mr-3" />
-                      Account
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleLogout}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 text-left"
-                    >
-                      <LogOut className="h-4 w-4 mr-3" />
-                      Sign out
-                    </button>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
         </div>
@@ -370,11 +362,11 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
       {/* Account Modal */}
       {showAccountModal && (
         <div 
-          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-40 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-[10000] flex items-center justify-center p-4"
           onClick={handleModalBackdropClick}
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
         >
-          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-50">
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-[10001]"
             {/* Modal Header */}
             <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h3 className="text-xl font-semibold text-gray-900">Account Settings</h3>
