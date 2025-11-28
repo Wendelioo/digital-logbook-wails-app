@@ -71,15 +71,15 @@ function LoginPage() {
   const getPlaceholderText = () => {
     switch (selectedRole) {
       case 'student':
-        return 'Enter your Student ID';
+        return 'e.g., 2024-12345';
       case 'working_student':
-        return 'Enter your Student ID';
+        return 'e.g., 2024-12345';
       case 'teacher':
-        return 'Enter your Teacher ID';
+        return 'e.g., T-2024-001';
       case 'admin':
-        return 'Enter your Admin ID';
+        return 'e.g., A-2024-001';
       default:
-        return 'Enter your credentials';
+        return 'Enter your ID';
     }
   };
 
@@ -87,7 +87,7 @@ function LoginPage() {
     <div className="min-h-screen flex">
       {/* Left Section - Background Image with Title and Text */}
       <div 
-        className="w-1/2 relative flex-col justify-center p-12"
+        className="w-1/2 relative flex flex-col justify-center items-start p-12"
         style={{
           backgroundImage: `url(${backgroundImage})`,
           backgroundSize: 'cover',
@@ -98,29 +98,46 @@ function LoginPage() {
         {/* Dark Overlay for readability */}
         <div className="absolute inset-0 bg-black/40"></div>
         
-        {/* Title */}
-        <div className="relative z-10 mb-8">
-          <h1 className="text-4xl font-bold text-white">
-            Digital Logbook
-          </h1>
-        </div>
-        
-        {/* Text */}
-        <div className="relative z-10">
-          <p className="text-white text-lg leading-relaxed">
-            Easily record your computer lab attendance and activity with our digital monitoring system. Log in using your assigned ID to begin your session. This helps us maintain secure, accurate, and paperless records for all users in the IT Department.
-          </p>
+        {/* Content Container */}
+        <div className="relative z-10 max-w-xl">
+          {/* Title */}
+          <div className="mb-12">
+            <h1 className="text-6xl font-bold text-white mb-4 tracking-tight leading-tight">
+              Digital Logbook
+            </h1>
+            <div className="w-24 h-1.5 bg-teal-400 rounded-full"></div>
+          </div>
+          
+          {/* Text Content */}
+          <div className="space-y-5">
+            <p className="text-white text-lg leading-relaxed font-normal">
+              Track your computer laboratory attendance and activity with our Digital Logbook.
+            </p>
+            <p className="text-white/95 text-base leading-relaxed font-normal">
+              Log in with your school credentials to view your records and access the system made for all IT students and staff.
+            </p>
+          </div>
         </div>
       </div>
 
       {/* Right Section - White Background with Login Form */}
       <div className="w-1/2 bg-white flex items-center justify-center p-12">
         <div className="w-full max-w-md">
-          <form onSubmit={handleLogin} className="space-y-6">
+          {/* Form Header */}
+          <div className="mb-8">
+            <h2 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">
+              Welcome Back
+            </h2>
+            <p className="text-gray-500 text-sm">
+              Sign in to continue and access your account.
+            </p>
+          </div>
+
+          <form onSubmit={handleLogin} className="space-y-5">
             {/* Role Selection */}
             <div>
-              <label htmlFor="role" className="block text-sm font-medium text-gray-700 mb-2">
-                Login Type
+              <label htmlFor="role" className="block text-sm font-semibold text-gray-800 mb-2.5">
+                Account Type
               </label>
               <select
                 id="role"
@@ -138,7 +155,7 @@ function LoginPage() {
 
             {/* Username/ID Field */}
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="username" className="block text-sm font-semibold text-gray-800 mb-2.5">
                 {getLabelText()}
               </label>
               <div className="relative">
@@ -147,7 +164,6 @@ function LoginPage() {
                   id="username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  placeholder={getPlaceholderText()}
                   className="w-full pl-11 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   required
                 />
@@ -157,7 +173,7 @@ function LoginPage() {
 
             {/* Password Field */}
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-semibold text-gray-800 mb-2.5">
                 Password
               </label>
               <div className="relative">
@@ -166,7 +182,6 @@ function LoginPage() {
                   id="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
                   className="w-full pl-11 pr-11 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent"
                   required
                 />
@@ -184,22 +199,24 @@ function LoginPage() {
 
             {/* Error Message */}
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+              <div className="bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded-r-lg text-sm font-medium">
                 {error}
               </div>
             )}
 
             {/* Remember Me & Forgot Password */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center">
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center cursor-pointer group">
                 <input 
                   type="checkbox" 
-                  className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500" 
+                  className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500 cursor-pointer" 
                 />
-                <span className="ml-2 text-sm text-gray-600">Remember me</span>
+                <span className="ml-2.5 text-sm text-gray-700 font-medium group-hover:text-gray-900 transition-colors">
+                  Remember me
+                </span>
               </label>
-              <a href="#" className="text-sm text-teal-600 hover:text-teal-700">
-                Forgot Password?
+              <a href="#" className="text-sm text-teal-600 hover:text-teal-700 font-medium transition-colors">
+                Forgot password?
               </a>
             </div>
 
@@ -207,7 +224,7 @@ function LoginPage() {
             <button
               type="submit"
               disabled={loading || !selectedRole}
-              className="w-full bg-teal-600 text-white py-3 px-4 rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold"
+              className="w-full bg-teal-600 text-white py-3.5 px-4 rounded-lg hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all font-semibold text-base shadow-md hover:shadow-lg"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
@@ -217,7 +234,7 @@ function LoginPage() {
                   </svg>
                   Signing in...
                 </span>
-              ) : 'Login'}
+              ) : 'Sign In'}
             </button>
           </form>
         </div>
