@@ -9,8 +9,7 @@ import {
   LogOut,
   ChevronDown,
   Lock,
-  UserCircle,
-  Sprout
+  UserCircle
 } from 'lucide-react';
 import LogoutFeedbackModal from './LogoutFeedbackModal';
 
@@ -202,15 +201,22 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setProfileDropdownOpen(false);
+        // Also check if click is on profile icon
+        const target = event.target as HTMLElement;
+        const isProfileIcon = target.closest('[data-profile-icon]');
+        if (!isProfileIcon) {
+          setProfileDropdownOpen(false);
+        }
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
+    if (profileDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [profileDropdownOpen]);
 
   // Close dropdown and modal on escape key
   useEffect(() => {
@@ -243,15 +249,6 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
       <div className="flex flex-shrink-0 relative">
         <div className="flex flex-col w-16">
           <div className="flex flex-col h-screen bg-gray-200 shadow-lg border-r border-gray-300 overflow-visible">
-            {/* Header Section - Logo */}
-            <div className="flex-shrink-0 pt-4 pb-4">
-              <div className="flex items-center justify-center">
-                <div className="w-10 h-10 flex items-center justify-center">
-                  <Sprout className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-            </div>
-            
             {/* Navigation Section - Icon only */}
             <div className="flex-1 pt-2 pb-4 overflow-y-auto">
               <nav className="flex flex-col items-center space-y-3 px-2">
@@ -275,18 +272,26 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
             </div>
             
             {/* Footer Section - User Profile */}
-            <div className="flex-shrink-0 pb-4 flex items-center justify-center" ref={dropdownRef}>
+            <div className="flex-shrink-0 pb-4 flex items-center justify-center">
               {user?.photo_url || photoPreview ? (
                 <img 
                   src={photoPreview || user?.photo_url} 
                   alt="Profile" 
                   className="h-10 w-10 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-gray-400 transition-all"
-                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  data-profile-icon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProfileDropdownOpen(!profileDropdownOpen);
+                  }}
                 />
               ) : (
                 <div 
                   className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-gray-400 transition-all"
-                  onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+                  data-profile-icon
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setProfileDropdownOpen(!profileDropdownOpen);
+                  }}
                 >
                   <User className="h-6 w-6 text-gray-600" />
                 </div>
@@ -296,7 +301,11 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         </div>
         {/* Profile dropdown - positioned outside sidebar to avoid clipping */}
         {profileDropdownOpen && (
-          <div className="absolute left-full bottom-4 ml-2 w-48 rounded-md shadow-xl py-1 bg-white ring-1 ring-black ring-opacity-5 z-[9999]">
+          <div 
+            className="absolute left-full bottom-4 ml-2 w-48 rounded-md shadow-xl py-1 bg-white ring-1 ring-black ring-opacity-5 z-[9999]"
+            ref={dropdownRef}
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="px-4 py-2 border-b border-gray-200">
               <div className="text-sm font-medium text-gray-900">{user?.first_name || user?.name || 'User'}</div>
               <div className="text-xs text-gray-500 capitalize">{user?.role?.replace('_', ' ') || 'Role'}</div>
@@ -366,7 +375,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
           onClick={handleModalBackdropClick}
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
         >
-          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-[10001]"
+          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-[10001]">
             {/* Modal Header */}
             <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
               <h3 className="text-xl font-semibold text-gray-900">Account Settings</h3>

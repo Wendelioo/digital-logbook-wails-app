@@ -14,7 +14,8 @@ import {
   Filter,
   X,
   Eye,
-  EyeOff
+  EyeOff,
+  Building2
 } from 'lucide-react';
 import { 
   GetAdminDashboard, 
@@ -29,7 +30,11 @@ import {
   ExportLogsCSV,
   ExportLogsPDF,
   ExportFeedbackCSV,
-  ExportFeedbackPDF
+  ExportFeedbackPDF,
+  GetDepartments,
+  CreateDepartment,
+  UpdateDepartment,
+  DeleteDepartment
 } from '../../wailsjs/go/main/App';
 import { main } from '../../wailsjs/go/models';
 
@@ -1677,12 +1682,464 @@ function Reports() {
   );
 }
 
+interface Department {
+  id: number;
+  department_code: string;
+  department_name: string;
+  description?: string;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+function DepartmentManagement() {
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [editingDepartment, setEditingDepartment] = useState<Department | null>(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [formData, setFormData] = useState({
+    departmentCode: '',
+    departmentName: '',
+    description: '',
+    isActive: true
+  });
+
+  useEffect(() => {
+    loadDepartments();
+  }, []);
+
+  const loadDepartments = async () => {
+    try {
+      const data = await GetDepartments();
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Failed to load departments:', error);
+      setDepartments([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const showNotification = (type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => {
+      setNotification(null);
+    }, 5000);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      if (!formData.departmentCode || !formData.departmentName) {
+        showNotification('error', 'Department Code and Name are required');
+        return;
+      }
+
+      if (editingDepartment) {
+        await UpdateDepartment(editingDepartment.id, formData.departmentCode, formData.departmentName, formData.description, formData.isActive);
+        showNotification('success', 'Department updated successfully!');
+      } else {
+        await CreateDepartment(formData.departmentCode, formData.departmentName, formData.description);
+        showNotification('success', 'Department added successfully!');
+      }
+      
+      setShowForm(false);
+      setEditingDepartment(null);
+      setFormData({ departmentCode: '', departmentName: '', description: '', isActive: true });
+      loadDepartments();
+    } catch (error) {
+      console.error('Failed to save department:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save department. Please try again.';
+      showNotification('error', errorMessage);
+    }
+  };
+
+  const handleEdit = (department: Department) => {
+    setEditingDepartment(department);
+    setFormData({
+      departmentCode: department.department_code,
+      departmentName: department.department_name,
+      description: department.description || '',
+      isActive: department.is_active
+    });
+    setShowForm(true);
+  };
+
+  const handleDelete = async (id: number) => {
+    if (confirm('Are you sure you want to delete this department?')) {
+      try {
+        await DeleteDepartment(id);
+        showNotification('success', 'Department deleted successfully!');
+        loadDepartments();
+      } catch (error) {
+        console.error('Failed to delete department:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Failed to delete department. Please try again.';
+        showNotification('error', errorMessage);
+      }
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  const filteredDepartments = departments.filter((dept) => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch = (
+      dept.department_code.toLowerCase().includes(searchLower) ||
+      dept.department_name.toLowerCase().includes(searchLower) ||
+      (dept.description && dept.description.toLowerCase().includes(searchLower))
+    );
+    
+    const matchesStatus = statusFilter === 'all' || 
+      (statusFilter === 'active' && dept.is_active) ||
+      (statusFilter === 'inactive' && !dept.is_active);
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  // Pagination
+  const total = filteredDepartments.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const startIndex = (currentPage - 1) * pageSize;
+  const endIndex = Math.min(startIndex + pageSize, total);
+  const pagedDepartments = filteredDepartments.slice(startIndex, endIndex);
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900">Department Management</h2>
+        </div>
+        <button
+          onClick={() => setShowForm(true)}
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+        >
+          <UserPlus className="h-4 w-4 mr-2" />
+          Add Department
+        </button>
+      </div>
+
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
+          notification.type === 'success' ? 'border-l-4 border-green-400' : 'border-l-4 border-red-400'
+        }`}>
+          <div className="p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <div className="ml-3 w-0 flex-1 pt-0.5">
+                <p className={`text-sm font-medium ${
+                  notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {notification.message}
+                </p>
+              </div>
+              <div className="ml-4 flex-shrink-0 flex">
+                <button
+                  className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onClick={() => setNotification(null)}
+                >
+                  <span className="sr-only">Close</span>
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Table Controls */}
+      <div className="bg-white shadow rounded-lg p-4 mb-4">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-700">Show</label>
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPageSize(Number(e.target.value));
+                setPage(1);
+              }}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <label className="text-sm text-gray-700">entries</label>
+          </div>
+          <div className="flex-1 max-w-xs relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => {
+                setSearchTerm(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Search"
+              className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            {searchTerm && (
+              <button
+                onClick={() => {
+                  setSearchTerm('');
+                  setPage(1);
+                }}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Department Form Modal */}
+      {showForm && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowForm(false);
+              setEditingDepartment(null);
+              setFormData({ departmentCode: '', departmentName: '', description: '', isActive: true });
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 relative max-h-[90vh] flex flex-col">
+            {/* Close Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setShowForm(false);
+                setEditingDepartment(null);
+                setFormData({ departmentCode: '', departmentName: '', description: '', isActive: true });
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+            >
+              ×
+            </button>
+            
+            {/* Header */}
+            <div className="text-center p-8 pb-4 flex-shrink-0">
+              <h3 className="text-2xl font-bold text-blue-600 mb-2">
+                {editingDepartment ? 'Edit Department' : 'Add Department'}
+              </h3>
+              <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
+            </div>
+            
+            <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto px-8 pb-8 flex-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Department Code *</label>
+                  <input
+                    type="text"
+                    value={formData.departmentCode}
+                    onChange={(e) => setFormData({ ...formData, departmentCode: e.target.value.toUpperCase() })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    disabled={!!editingDepartment}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Department Name *</label>
+                  <input
+                    type="text"
+                    value={formData.departmentName}
+                    onChange={(e) => setFormData({ ...formData, departmentName: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Description</label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  rows={3}
+                />
+              </div>
+              <div>
+                <label className="flex items-center">
+                  <input
+                    type="checkbox"
+                    checked={formData.isActive}
+                    onChange={(e) => setFormData({ ...formData, isActive: e.target.checked })}
+                    className="rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                  />
+                  <span className="ml-2 text-sm text-gray-700">Active</span>
+                </label>
+              </div>
+              {/* Submit Button */}
+              <div className="text-center">
+                <button
+                  type="submit"
+                  className="w-full max-w-xs mx-auto px-6 py-3 bg-red-600 text-white text-base font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
+                >
+                  {editingDepartment ? 'UPDATE' : 'SUBMIT'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Departments Table */}
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  #
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Name
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Action
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {pagedDepartments.map((dept, index) => (
+                <tr key={dept.id} className="hover:bg-gray-50">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {startIndex + index + 1}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {dept.department_code}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    {dept.description || dept.department_name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2.5 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                      dept.is_active 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : 'bg-red-100 text-red-800'
+                    }`}>
+                      {dept.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => handleEdit(dept)}
+                        className="text-blue-600 hover:text-blue-900 font-medium"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(dept.id)}
+                        className="text-red-600 hover:text-red-900 font-medium"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {pagedDepartments.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center">
+                    <div className="flex flex-col items-center justify-center text-gray-500">
+                      <Building2 className="w-12 h-12 mb-2 text-gray-400" />
+                      <p className="text-sm font-medium">No departments found</p>
+                      <p className="text-xs text-gray-400 mt-1">
+                        {searchTerm ? 'Try adjusting your search' : 'Add a department to get started'}
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="px-6 py-3 bg-gray-50 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div className="text-sm text-gray-600">
+            Showing <span className="font-medium">{total === 0 ? 0 : startIndex + 1}</span> to <span className="font-medium">{endIndex}</span> of <span className="font-medium">{total}</span> entries
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className={`px-3 py-1.5 border rounded-md text-sm ${
+                currentPage === 1
+                  ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50'
+                  : 'text-gray-700 border-gray-300 hover:bg-gray-50 bg-white'
+              }`}
+            >
+              Previous
+            </button>
+            {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
+              <button
+                key={pageNum}
+                onClick={() => setPage(pageNum)}
+                className={`px-3 py-1.5 border rounded-md text-sm ${
+                  currentPage === pageNum
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'text-gray-700 border-gray-300 hover:bg-gray-50 bg-white'
+                }`}
+              >
+                {pageNum}
+              </button>
+            ))}
+            <button
+              onClick={() => setPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className={`px-3 py-1.5 border rounded-md text-sm ${
+                currentPage === totalPages
+                  ? 'text-gray-400 border-gray-200 cursor-not-allowed bg-gray-50'
+                  : 'text-gray-700 border-gray-300 hover:bg-gray-50 bg-white'
+              }`}
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function AdminDashboard() {
   const location = useLocation();
   
   const navigationItems = [
     { name: 'Dashboard', href: '/admin', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/admin' },
     { name: 'Manage Users', href: '/admin/users', icon: <Users className="h-5 w-5" />, current: location.pathname === '/admin/users' },
+    { name: 'Departments', href: '/admin/departments', icon: <Building2 className="h-5 w-5" />, current: location.pathname === '/admin/departments' },
     { name: 'View Logs', href: '/admin/logs', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/admin/logs' },
     { name: 'Reports', href: '/admin/reports', icon: <FileText className="h-5 w-5" />, current: location.pathname === '/admin/reports' },
   ];
@@ -1692,6 +2149,7 @@ function AdminDashboard() {
       <Routes>
         <Route index element={<DashboardOverview />} />
         <Route path="users" element={<UserManagement />} />
+        <Route path="departments" element={<DepartmentManagement />} />
         <Route path="logs" element={<ViewLogs />} />
         <Route path="reports" element={<Reports />} />
       </Routes>
