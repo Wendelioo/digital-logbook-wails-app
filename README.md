@@ -13,4 +13,5 @@ A modern desktop application for monitoring and managing student computer labora
 - Export logs and reports to CSV and PDF
 - MySQL database integration
 
+Steps to install:
 
