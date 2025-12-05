@@ -8,7 +8,10 @@ import {
   Clock,
   CheckCircle,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  SlidersHorizontal,
+  X,
+  Search
 } from 'lucide-react';
 import { 
   GetStudentDashboard,
@@ -23,7 +26,17 @@ import { main } from '../../wailsjs/go/models';
 type Attendance = main.Attendance;
 type StudentDashboardData = main.StudentDashboard;
 type Feedback = main.Feedback;
-type LoginLog = main.LoginLog;
+
+// LoginLog interface matching the JSON structure from backend
+interface LoginLog {
+  id: number;
+  user_id: number;
+  user_name: string;
+  user_type: string;
+  pc_number?: string;
+  login_time: string;
+  logout_time?: string;
+}
 
 function DashboardOverview() {
   const { user } = useAuth();
@@ -198,21 +211,38 @@ function LoginHistory() {
   const [filteredLogs, setFilteredLogs] = useState<LoginLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
   useEffect(() => {
     const loadLoginLogs = async () => {
-      if (!user) return;
+      if (!user) {
+        setLoading(false);
+        return;
+      }
       
       try {
+        console.log('Loading login logs for user ID:', user.id);
         const data = await GetStudentLoginLogs(user.id);
-        setLoginLogs(data || []);
-        setFilteredLogs(data || []);
-        setError('');
+        console.log('Received login logs data:', data);
+        console.log('Number of logs:', data?.length || 0);
+        
+        if (data && Array.isArray(data)) {
+          setLoginLogs(data);
+          setFilteredLogs(data);
+          setError('');
+        } else {
+          setLoginLogs([]);
+          setFilteredLogs([]);
+          setError('');
+        }
       } catch (error) {
         console.error('Failed to load login logs:', error);
-        setError('Unable to load login history. Make sure you are connected to the database.');
+        setError(`Unable to load login history: ${error}`);
+        setLoginLogs([]);
+        setFilteredLogs([]);
       } finally {
         setLoading(false);
       }
@@ -221,33 +251,45 @@ function LoginHistory() {
     loadLoginLogs();
   }, [user]);
 
-  // Filter logs based on date range
+  // Filter logs based on date range and search
   useEffect(() => {
-    if (!startDate && !endDate) {
-      setFilteredLogs(loginLogs);
-      return;
+    let filtered = loginLogs;
+
+    // Apply date filters
+    if (startDate || endDate) {
+      filtered = filtered.filter(log => {
+        if (!log.login_time) return false;
+        
+        const logDate = new Date(log.login_time);
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        
+        if (start && logDate < start) return false;
+        if (end && logDate > end) return false;
+        
+        return true;
+      });
     }
 
-    const filtered = loginLogs.filter(log => {
-      if (!log.login_time) return false;
-      
-      const logDate = new Date(log.login_time);
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
-      
-      if (start && logDate < start) return false;
-      if (end && logDate > end) return false;
-      
-      return true;
-    });
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(log =>
+        (log.pc_number && log.pc_number.toLowerCase().includes(query)) ||
+        (log.login_time && new Date(log.login_time).toLocaleString().toLowerCase().includes(query))
+      );
+    }
     
     setFilteredLogs(filtered);
-  }, [loginLogs, startDate, endDate]);
+  }, [loginLogs, startDate, endDate, searchQuery]);
 
   const clearFilters = () => {
     setStartDate('');
     setEndDate('');
+    setSearchQuery('');
   };
+
+  const activeFilterCount = (startDate ? 1 : 0) + (endDate ? 1 : 0);
 
   if (loading) {
     return (
@@ -263,61 +305,108 @@ function LoginHistory() {
         <h2 className="text-2xl font-bold text-gray-900">Login History</h2>
       </div>
 
+      {/* Search and Filter Controls */}
+      <div className="mb-6 bg-white shadow rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 w-64">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
+                showFilters
+                  ? 'bg-primary-50 border-primary-500 text-primary-700'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <SlidersHorizontal className="h-5 w-5" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            
+            {/* Dropdown Filters Panel */}
+            {showFilters && (
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-gray-700">Filter by Date Range:</label>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    {(startDate || endDate) && (
+                      <button
+                        onClick={() => {
+                          setStartDate('');
+                          setEndDate('');
+                        }}
+                        className="w-full text-xs text-gray-600 hover:text-gray-900 underline text-left"
+                      >
+                        Clear Date Filters
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          {(searchQuery || startDate || endDate) && (
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+      </div>
+
       {error && (
         <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
           {error}
         </div>
       )}
 
-      {/* Date Filter */}
-      <div className="mb-6 bg-white shadow rounded-lg p-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Filter by Date</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              id="startDate"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              id="endDate"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={clearFilters}
-              className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-        {(startDate || endDate) && (
-          <div className="mt-3 text-sm text-gray-600">
-            Showing {filteredLogs.length} of {loginLogs.length} records
-          </div>
-        )}
-      </div>
-
       <div className="bg-white shadow overflow-hidden sm:rounded-lg">
         {filteredLogs.length === 0 ? (
           <div className="text-center py-12">
-            <ClipboardList className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Login History Yet</h3>
+            <p className="text-gray-500">No logs found</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -416,6 +505,8 @@ function FeedbackHistory() {
   const [filteredFeedback, setFilteredFeedback] = useState<Feedback[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
 
@@ -439,33 +530,46 @@ function FeedbackHistory() {
     loadFeedback();
   }, [user]);
 
-  // Filter feedback based on date range
+  // Filter feedback based on date range and search
   useEffect(() => {
-    if (!startDate && !endDate) {
-      setFilteredFeedback(feedbackList);
-      return;
+    let filtered = feedbackList;
+
+    // Apply date filters
+    if (startDate || endDate) {
+      filtered = filtered.filter(feedback => {
+        if (!feedback.date_submitted) return false;
+        
+        const feedbackDate = new Date(feedback.date_submitted);
+        const start = startDate ? new Date(startDate) : null;
+        const end = endDate ? new Date(endDate) : null;
+        
+        if (start && feedbackDate < start) return false;
+        if (end && feedbackDate > end) return false;
+        
+        return true;
+      });
     }
 
-    const filtered = feedbackList.filter(feedback => {
-      if (!feedback.date_submitted) return false;
-      
-      const feedbackDate = new Date(feedback.date_submitted);
-      const start = startDate ? new Date(startDate) : null;
-      const end = endDate ? new Date(endDate) : null;
-      
-      if (start && feedbackDate < start) return false;
-      if (end && feedbackDate > end) return false;
-      
-      return true;
-    });
+    // Apply search filter
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(feedback =>
+        (feedback.pc_number && feedback.pc_number.toLowerCase().includes(query)) ||
+        (feedback.comments && feedback.comments.toLowerCase().includes(query)) ||
+        (feedback.date_submitted && new Date(feedback.date_submitted).toLocaleString().toLowerCase().includes(query))
+      );
+    }
     
     setFilteredFeedback(filtered);
-  }, [feedbackList, startDate, endDate]);
+  }, [feedbackList, startDate, endDate, searchQuery]);
 
   const clearFilters = () => {
     setStartDate('');
     setEndDate('');
+    setSearchQuery('');
   };
+
+  const activeFilterCount = (startDate ? 1 : 0) + (endDate ? 1 : 0);
 
   if (loading) {
     return (
@@ -481,60 +585,107 @@ function FeedbackHistory() {
         <h2 className="text-2xl font-bold text-gray-900">Feedback History</h2>
       </div>
 
+      {/* Search and Filter Controls */}
+      <div className="mb-6 bg-white shadow rounded-lg p-4">
+        <div className="flex items-center gap-3">
+          <div className="relative flex-1 w-64">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
+                showFilters
+                  ? 'bg-primary-50 border-primary-500 text-primary-700'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <SlidersHorizontal className="h-5 w-5" />
+              Filters
+              {activeFilterCount > 0 && (
+                <span className="ml-1 px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
+            
+            {/* Dropdown Filters Panel */}
+            {showFilters && (
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-gray-700">Filter by Date Range:</label>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={endDate}
+                        onChange={(e) => setEndDate(e.target.value)}
+                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </div>
+                    {(startDate || endDate) && (
+                      <button
+                        onClick={() => {
+                          setStartDate('');
+                          setEndDate('');
+                        }}
+                        className="w-full text-xs text-gray-600 hover:text-gray-900 underline text-left"
+                      >
+                        Clear Date Filters
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+          {(searchQuery || startDate || endDate) && (
+            <button
+              onClick={clearFilters}
+              className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Clear All
+            </button>
+          )}
+        </div>
+      </div>
+
       {error && (
         <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
           {error}
         </div>
       )}
 
-      {/* Date Filter */}
-      <div className="mb-6 bg-white shadow rounded-lg p-4">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Filter by Date</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <label htmlFor="feedbackStartDate" className="block text-sm font-medium text-gray-700 mb-1">
-              Start Date
-            </label>
-            <input
-              type="date"
-              id="feedbackStartDate"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-          <div>
-            <label htmlFor="feedbackEndDate" className="block text-sm font-medium text-gray-700 mb-1">
-              End Date
-            </label>
-            <input
-              type="date"
-              id="feedbackEndDate"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-            />
-          </div>
-          <div className="flex items-end">
-            <button
-              onClick={clearFilters}
-              className="w-full px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-            >
-              Clear Filters
-            </button>
-          </div>
-        </div>
-        {(startDate || endDate) && (
-          <div className="mt-3 text-sm text-gray-600">
-            Showing {filteredFeedback.length} of {feedbackList.length} records
-          </div>
-        )}
-      </div>
-
       {filteredFeedback.length === 0 ? (
         <div className="bg-white shadow rounded-lg p-12 text-center">
-          <MessageSquare className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Feedback Yet</h3>
+          <p className="text-gray-500">No reports available</p>
         </div>
       ) : (
         <div className="bg-white shadow rounded-lg overflow-hidden">

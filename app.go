@@ -3,16 +3,19 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/base64"
 	"encoding/csv"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/jung-kurt/gofpdf"
+	docx "github.com/lukasjarosch/go-docx"
 )
 
 // App struct
@@ -33,12 +36,85 @@ func (a *App) startup(ctx context.Context) {
 	// Initialize database connection
 	db, err := InitDatabase()
 	if err != nil {
-		log.Printf("⚠ Database connection failed: %v", err)
-		log.Println("⚠ App will start but database features will be unavailable")
+		log.Printf("Database connection failed: %v", err)
+		log.Println("App will start but database features will be unavailable")
 	} else {
 		a.db = db
-		log.Println("✓ Database ready")
+		log.Println("Database ready")
+		// Run database migrations
+		if err := a.runMigrations(); err != nil {
+			log.Printf("Warning: Migration failed: %v", err)
+		}
 	}
+}
+
+// runMigrations runs database migrations to ensure schema is up to date
+func (a *App) runMigrations() error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	// Migration: Add forwarded_at column to feedback table if it doesn't exist
+	if err := a.migrateAddForwardedAtColumn(); err != nil {
+		return fmt.Errorf("failed to migrate forwarded_at column: %w", err)
+	}
+
+	return nil
+}
+
+// migrateAddForwardedAtColumn adds the forwarded_at column to feedback table if it doesn't exist
+func (a *App) migrateAddForwardedAtColumn() error {
+	// Check if column exists
+	var columnExists int
+	checkQuery := `
+		SELECT COUNT(*) 
+		FROM INFORMATION_SCHEMA.COLUMNS 
+		WHERE TABLE_SCHEMA = DATABASE() 
+		AND TABLE_NAME = 'feedback' 
+		AND COLUMN_NAME = 'forwarded_at'
+	`
+	err := a.db.QueryRow(checkQuery).Scan(&columnExists)
+	if err != nil {
+		return fmt.Errorf("failed to check if column exists: %w", err)
+	}
+
+	if columnExists > 0 {
+		log.Println("Migration: forwarded_at column already exists")
+		return nil
+	}
+
+	// Column doesn't exist, add it
+	log.Println("Migration: Adding forwarded_at column to feedback table...")
+	alterQuery := `ALTER TABLE feedback ADD COLUMN forwarded_at DATETIME NULL AFTER forwarded_by`
+	_, err = a.db.Exec(alterQuery)
+	if err != nil {
+		return fmt.Errorf("failed to add forwarded_at column: %w", err)
+	}
+
+	// Update existing forwarded records
+	updateQuery := `
+		UPDATE feedback 
+		SET forwarded_at = updated_at 
+		WHERE status = 'forwarded' 
+		AND forwarded_at IS NULL 
+		AND forwarded_by IS NOT NULL
+	`
+	_, err = a.db.Exec(updateQuery)
+	if err != nil {
+		log.Printf("Warning: Failed to update existing forwarded records: %v", err)
+		// Don't return error, column was added successfully
+	}
+
+	// Add index for better performance
+	indexQuery := `ALTER TABLE feedback ADD INDEX idx_forwarded_at (forwarded_at)`
+	_, err = a.db.Exec(indexQuery)
+	if err != nil {
+		// Index might already exist or fail, log but don't fail migration
+		log.Printf("Info: Index creation result (may already exist): %v", err)
+	}
+
+	log.Println("Migration: Successfully added forwarded_at column")
+	return nil
 }
 
 // ==============================================================================
@@ -73,19 +149,45 @@ func (a *App) Logout(userID int) error {
 	}
 
 	// Update the most recent login log for this user to set logout time
+	// Use a subquery to ensure we get the most recent login log
 	query := `UPDATE login_logs 
-			  SET logout_time = NOW(), 
-			      session_duration = TIMESTAMPDIFF(SECOND, login_time, NOW())
-			  WHERE user_id = ? AND logout_time IS NULL 
-			  ORDER BY login_time DESC LIMIT 1`
-	_, err := a.db.Exec(query, userID)
+			  SET logout_time = NOW()
+			  WHERE id = (
+				  SELECT id FROM (
+					  SELECT id FROM login_logs 
+					  WHERE user_id = ? AND logout_time IS NULL 
+					  ORDER BY login_time DESC 
+					  LIMIT 1
+				  ) AS subquery
+			  )`
+	result, err := a.db.Exec(query, userID)
 	if err != nil {
-		log.Printf("⚠ Failed to log logout for user %d: %v", userID, err)
+		log.Printf("Failed to log logout for user %d: %v", userID, err)
 		return err
 	}
 
-	log.Printf("✓ User logout successful: user_id=%d", userID)
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		log.Printf("Failed to get rows affected for logout: %v", err)
+	} else if rowsAffected == 0 {
+		log.Printf("No active login log found to update for user %d", userID)
+		// Don't return error - might be already logged out
+	} else {
+		log.Printf("User logout successful: user_id=%d (rows affected: %d)", userID, rowsAffected)
+	}
+
 	return nil
+}
+
+// RecordTimeoutLogout records logout time for timed-out sessions
+// This can be called automatically or manually to handle session timeouts
+func (a *App) RecordTimeoutLogout(userID int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	// Same logic as Logout - update the most recent login log
+	return a.Logout(userID)
 }
 
 // Login authenticates a user
@@ -121,13 +223,13 @@ func (a *App) Login(username, password string) (*User, error) {
 	case "teacher":
 		detailQuery = `SELECT first_name, middle_name, last_name, gender, teacher_id, email, contact_number, profile_photo FROM teachers WHERE user_id = ?`
 	case "student":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section, email, contact_number, profile_photo FROM students WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, email, contact_number, profile_photo FROM students WHERE user_id = ?`
 	case "working_student":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, year_level, section, email, contact_number, profile_photo FROM working_students WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, email, contact_number, profile_photo FROM working_students WHERE user_id = ?`
 	}
 
 	var firstName, middleName, lastName, gender sql.NullString
-	var employeeID, studentID, year, section, photoURL sql.NullString
+	var employeeID, studentID, photoURL sql.NullString
 	var email, contactNumber sql.NullString
 
 	switch user.Role {
@@ -185,7 +287,7 @@ func (a *App) Login(username, password string) (*User, error) {
 			}
 		}
 	case "student", "working_student":
-		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &studentID, &year, &section, &email, &contactNumber, &photoURL)
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &studentID, &email, &contactNumber, &photoURL)
 		if err == nil {
 			if firstName.Valid {
 				user.FirstName = &firstName.String
@@ -202,12 +304,6 @@ func (a *App) Login(username, password string) (*User, error) {
 			if studentID.Valid {
 				user.StudentID = &studentID.String
 			}
-			if year.Valid {
-				user.Year = &year.String
-			}
-			if section.Valid {
-				user.Section = &section.String
-			}
 			if email.Valid {
 				user.Email = &email.String
 			}
@@ -223,7 +319,7 @@ func (a *App) Login(username, password string) (*User, error) {
 	// Get the hostname (PC number) of this device
 	hostname, err := os.Hostname()
 	if err != nil {
-		log.Printf("⚠ Failed to get hostname: %v", err)
+		log.Printf("Failed to get hostname: %v", err)
 		hostname = "Unknown"
 	}
 
@@ -232,19 +328,244 @@ func (a *App) Login(username, password string) (*User, error) {
 				  VALUES (?, ?, ?, NOW(), 'success')`
 	result, err := a.db.Exec(insertLog, user.ID, user.Role, hostname)
 	if err != nil {
-		log.Printf("⚠ Failed to create login log: %v", err)
+		log.Printf("Failed to create login log: %v", err)
 		// Don't fail the login if logging fails
 	} else {
 		// Get the log ID for this session
 		logID, err := result.LastInsertId()
 		if err == nil {
 			user.LoginLogID = int(logID)
-			log.Printf("✓ Login logged with ID %d for PC: %s", logID, hostname)
+			log.Printf("Login logged with ID %d for PC: %s", logID, hostname)
 		}
 	}
 
-	log.Printf("✓ User login successful: %s (role: %s, pc: %s)", username, user.Role, hostname)
+	// Auto-record attendance for students if they log in during class time
+	if user.Role == "student" || user.Role == "working_student" {
+		go a.autoRecordAttendanceOnLogin(user.ID, hostname)
+	}
+
+	log.Printf("User login successful: %s (role: %s, pc: %s)", username, user.Role, hostname)
 	return &user, nil
+}
+
+// autoRecordAttendanceOnLogin automatically records attendance when a student logs in
+// if they are enrolled in classes with attendance initialized for today
+func (a *App) autoRecordAttendanceOnLogin(studentID int, pcNumber string) {
+	if a.db == nil {
+		return
+	}
+
+	today := time.Now().Format("2006-01-02")
+	currentTime := time.Now()
+
+	// Get all enrolled classes for this student with attendance initialized for today
+	query := `
+		SELECT 
+			cl.id as classlist_id,
+			cl.class_id,
+			c.schedule,
+			a.id as attendance_id,
+			c.school_year,
+			c.semester
+		FROM classlist cl
+		JOIN classes c ON cl.class_id = c.id
+		LEFT JOIN attendance a ON cl.id = a.classlist_id AND a.date = ?
+		WHERE cl.student_id = ? 
+			AND cl.status = 'active'
+			AND c.is_active = TRUE
+			AND a.id IS NOT NULL
+	`
+
+	rows, err := a.db.Query(query, today, studentID)
+	if err != nil {
+		log.Printf("Failed to query enrolled classes for auto-attendance: %v", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var classlistID, classID int
+		var schedule sql.NullString
+		var attendanceID sql.NullInt64
+		var schoolYear, semester sql.NullString
+
+		err := rows.Scan(&classlistID, &classID, &schedule, &attendanceID, &schoolYear, &semester)
+		if err != nil {
+			continue
+		}
+
+		// Check if current time matches class schedule
+		if schedule.Valid && a.isWithinClassSchedule(schedule.String, currentTime) {
+			// Update attendance to present with login time and PC number
+			updateQuery := `
+				UPDATE attendance 
+				SET time_in = CURTIME(),
+					pc_number = ?,
+					status = 'present',
+					updated_at = CURRENT_TIMESTAMP
+				WHERE classlist_id = ? AND date = ?
+			`
+			_, err := a.db.Exec(updateQuery, pcNumber, classlistID, today)
+			if err != nil {
+				log.Printf("Failed to auto-record attendance for student %d, class %d: %v", studentID, classID, err)
+			} else {
+				log.Printf("Auto-recorded attendance: student=%d, class=%d, pc=%s", studentID, classID, pcNumber)
+			}
+		}
+	}
+}
+
+// isWithinClassSchedule checks if the current time is within the class schedule time window
+// Schedule format examples: "MWF 1:00-2:00 PM", "TTh 10:00-11:30 AM", "1:00-2:00 PM"
+func (a *App) isWithinClassSchedule(schedule string, checkTime time.Time) bool {
+	if schedule == "" {
+		return false
+	}
+
+	// Check day of week if specified in schedule
+	weekday := int(checkTime.Weekday()) // 0=Sunday, 1=Monday, ..., 6=Saturday
+	scheduleUpper := strings.ToUpper(strings.TrimSpace(schedule))
+
+	// Check if schedule contains day abbreviations
+	hasDaySpec := false
+	matchesDay := false
+
+	// Check for common patterns first (longer patterns first to avoid partial matches)
+	if strings.Contains(scheduleUpper, "MTWTF") || strings.Contains(scheduleUpper, "MON-TUE-WED-THU-FRI") {
+		hasDaySpec = true
+		if weekday >= 1 && weekday <= 5 {
+			matchesDay = true
+		}
+	} else if strings.Contains(scheduleUpper, "TTH") || strings.Contains(scheduleUpper, "TTHU") || strings.Contains(scheduleUpper, "TU-TH") {
+		hasDaySpec = true
+		if weekday == 2 || weekday == 4 {
+			matchesDay = true
+		}
+	} else if strings.Contains(scheduleUpper, "MWF") || strings.Contains(scheduleUpper, "MON-WED-FRI") {
+		hasDaySpec = true
+		if weekday == 1 || weekday == 3 || weekday == 5 {
+			matchesDay = true
+		}
+	} else {
+		// Check individual day abbreviations (check longer ones first)
+		dayChecks := []struct {
+			pattern string
+			days    []int
+		}{
+			{"THU", []int{4}}, // Thursday
+			{"TUE", []int{2}}, // Tuesday
+			{"WED", []int{3}}, // Wednesday
+			{"FRI", []int{5}}, // Friday
+			{"MON", []int{1}}, // Monday
+			{"SAT", []int{6}}, // Saturday
+			{"SUN", []int{0}}, // Sunday
+			{"TH", []int{4}},  // Thursday (abbrev)
+			{"SU", []int{0}},  // Sunday (abbrev)
+		}
+
+		for _, check := range dayChecks {
+			if strings.Contains(scheduleUpper, check.pattern) {
+				hasDaySpec = true
+				for _, d := range check.days {
+					if weekday == d {
+						matchesDay = true
+						break
+					}
+				}
+				if matchesDay {
+					break
+				}
+			}
+		}
+
+		// Check single-letter day codes if no multi-letter match found
+		if !hasDaySpec {
+			if strings.Contains(scheduleUpper, " M ") || strings.HasPrefix(scheduleUpper, "M ") || scheduleUpper[0] == 'M' {
+				hasDaySpec = true
+				if weekday == 1 {
+					matchesDay = true
+				}
+			} else if strings.Contains(scheduleUpper, " T ") || strings.HasPrefix(scheduleUpper, "T ") {
+				hasDaySpec = true
+				if weekday == 2 {
+					matchesDay = true
+				}
+			} else if strings.Contains(scheduleUpper, " W ") || strings.HasPrefix(scheduleUpper, "W ") {
+				hasDaySpec = true
+				if weekday == 3 {
+					matchesDay = true
+				}
+			} else if strings.Contains(scheduleUpper, " F ") || strings.HasPrefix(scheduleUpper, "F ") {
+				hasDaySpec = true
+				if weekday == 5 {
+					matchesDay = true
+				}
+			}
+		}
+	}
+
+	// If day is specified but doesn't match, return false
+	if hasDaySpec && !matchesDay {
+		return false
+	}
+
+	// Extract time range from schedule (e.g., "1:00-2:00 PM" or "10:00-11:30 AM")
+	timePattern := regexp.MustCompile(`(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)`)
+	matches := timePattern.FindStringSubmatch(schedule)
+	if len(matches) != 6 {
+		// Try simpler pattern without AM/PM
+		timePattern2 := regexp.MustCompile(`(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})`)
+		matches = timePattern2.FindStringSubmatch(schedule)
+		if len(matches) != 5 {
+			return false // Cannot parse schedule
+		}
+		// Parse 24-hour format
+		startHour, _ := strconv.Atoi(matches[1])
+		startMin, _ := strconv.Atoi(matches[2])
+		endHour, _ := strconv.Atoi(matches[3])
+		endMin, _ := strconv.Atoi(matches[4])
+
+		currentHour := checkTime.Hour()
+		currentMin := checkTime.Minute()
+
+		currentMinutes := currentHour*60 + currentMin
+		startMinutes := startHour*60 + startMin
+		endMinutes := endHour*60 + endMin
+
+		// Allow 30 minutes before and after class time
+		return currentMinutes >= (startMinutes-30) && currentMinutes <= (endMinutes+30)
+	}
+
+	// Parse 12-hour format with AM/PM
+	startHour, _ := strconv.Atoi(matches[1])
+	startMin, _ := strconv.Atoi(matches[2])
+	endHour, _ := strconv.Atoi(matches[3])
+	endMin, _ := strconv.Atoi(matches[4])
+	period := matches[5]
+
+	// Convert to 24-hour format
+	if period == "PM" && startHour != 12 {
+		startHour += 12
+	}
+	if period == "PM" && endHour != 12 {
+		endHour += 12
+	}
+	if period == "AM" && startHour == 12 {
+		startHour = 0
+	}
+	if period == "AM" && endHour == 12 {
+		endHour = 0
+	}
+
+	currentHour := checkTime.Hour()
+	currentMin := checkTime.Minute()
+
+	currentMinutes := currentHour*60 + currentMin
+	startMinutes := startHour*60 + startMin
+	endMinutes := endHour*60 + endMin
+
+	// Allow 30 minutes before and after class time for flexibility
+	return currentMinutes >= (startMinutes-30) && currentMinutes <= (endMinutes+30)
 }
 
 // GetUsers returns all users with complete details
@@ -257,7 +578,7 @@ func (a *App) GetUsers() ([]User, error) {
 		SELECT 
 			id, username, user_type, created_at,
 			first_name, middle_name, last_name, gender,
-			employee_id, student_id_str, year_level, section,
+			employee_id, student_id_str,
 			email, contact_number
 		FROM v_users_complete
 		ORDER BY created_at DESC
@@ -273,12 +594,12 @@ func (a *App) GetUsers() ([]User, error) {
 		var user User
 		var createdAt time.Time
 		var firstName, middleName, lastName, gender sql.NullString
-		var employeeID, studentID, year, section sql.NullString
+		var employeeID, studentID sql.NullString
 		var email, contactNumber sql.NullString
 
 		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
 			&firstName, &middleName, &lastName, &gender,
-			&employeeID, &studentID, &year, &section,
+			&employeeID, &studentID,
 			&email, &contactNumber)
 		if err != nil {
 			continue
@@ -303,12 +624,6 @@ func (a *App) GetUsers() ([]User, error) {
 		}
 		if studentID.Valid {
 			user.StudentID = &studentID.String
-		}
-		if year.Valid {
-			user.Year = &year.String
-		}
-		if section.Valid {
-			user.Section = &section.String
 		}
 		if email.Valid {
 			user.Email = &email.String
@@ -333,7 +648,7 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 		SELECT 
 			id, username, user_type, created_at,
 			first_name, middle_name, last_name, gender,
-			employee_id, student_id_str, year_level, section,
+			employee_id, student_id_str,
 			email, contact_number
 		FROM v_users_complete
 		WHERE user_type = ?
@@ -350,12 +665,12 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 		var user User
 		var createdAt time.Time
 		var firstName, middleName, lastName, gender sql.NullString
-		var employeeID, studentID, year, section sql.NullString
+		var employeeID, studentID sql.NullString
 		var email, contactNumber sql.NullString
 
 		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
 			&firstName, &middleName, &lastName, &gender,
-			&employeeID, &studentID, &year, &section,
+			&employeeID, &studentID,
 			&email, &contactNumber)
 		if err != nil {
 			continue
@@ -380,12 +695,6 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 		}
 		if studentID.Valid {
 			user.StudentID = &studentID.String
-		}
-		if year.Valid {
-			user.Year = &year.String
-		}
-		if section.Valid {
-			user.Section = &section.String
 		}
 		if email.Valid {
 			user.Email = &email.String
@@ -410,7 +719,7 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 		SELECT 
 			id, username, user_type, created_at,
 			first_name, middle_name, last_name, gender,
-			employee_id, student_id_str, year_level, section,
+			employee_id, student_id_str,
 			email, contact_number
 		FROM v_users_complete
 		WHERE (
@@ -421,14 +730,12 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 			gender LIKE ? OR
 			employee_id LIKE ? OR
 			student_id_str LIKE ? OR
-			year_level LIKE ? OR
-			section LIKE ? OR
 			DATE_FORMAT(created_at, '%Y-%m-%d') LIKE ?
 		)
 	`
 	searchPattern := "%" + searchTerm + "%"
 	args := []interface{}{searchPattern, searchPattern, searchPattern, searchPattern, searchPattern,
-		searchPattern, searchPattern, searchPattern, searchPattern, searchPattern}
+		searchPattern, searchPattern, searchPattern}
 
 	if userType != "" {
 		query += ` AND user_type = ?`
@@ -448,12 +755,12 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 		var user User
 		var createdAt time.Time
 		var firstName, middleName, lastName, gender sql.NullString
-		var employeeID, studentID, year, section sql.NullString
+		var employeeID, studentID sql.NullString
 		var email, contactNumber sql.NullString
 
 		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
 			&firstName, &middleName, &lastName, &gender,
-			&employeeID, &studentID, &year, &section,
+			&employeeID, &studentID,
 			&email, &contactNumber)
 		if err != nil {
 			continue
@@ -479,12 +786,6 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 		if studentID.Valid {
 			user.StudentID = &studentID.String
 		}
-		if year.Valid {
-			user.Year = &year.String
-		}
-		if section.Valid {
-			user.Section = &section.String
-		}
 		if email.Valid {
 			user.Email = &email.String
 		}
@@ -499,13 +800,13 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 }
 
 // CreateUser creates a new user
-func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, section, email, contactNumber string) error {
+func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, section, email, contactNumber string, departmentID int) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
 	}
 
 	// Log the incoming data for debugging
-	log.Printf("🔍 CreateUser called - Role: %s, StudentID: %s, Year: %s, Section: %s, Gender: %s, Email: %s", role, studentID, year, section, gender, email)
+	log.Printf("CreateUser called - Role: %s, StudentID: %s, Year: %s, Section: %s, Gender: %s, Email: %s", role, studentID, year, section, gender, email)
 
 	// Determine username based on role
 	username := employeeID
@@ -524,24 +825,18 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 		if firstName == "" || lastName == "" {
 			return fmt.Errorf("first name and last name are required")
 		}
-		if year == "" {
-			return fmt.Errorf("year level is required for working student")
-		}
-		if section == "" {
-			return fmt.Errorf("section is required for working student")
-		}
 	}
 
 	// Insert into users table
 	query := `INSERT INTO users (username, password, user_type) VALUES (?, ?, ?)`
 	result, err := a.db.Exec(query, username, password, role)
 	if err != nil {
-		log.Printf("❌ Failed to insert into users table: %v", err)
+		log.Printf("Failed to insert into users table: %v", err)
 		return fmt.Errorf("failed to create user account: %w", err)
 	}
 
 	userID, _ := result.LastInsertId()
-	log.Printf("✅ Created user account with ID: %d", userID)
+	log.Printf("Created user account with ID: %d", userID)
 
 	// Insert into respective table based on role
 	switch role {
@@ -549,29 +844,580 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 		query = `INSERT INTO admins (user_id, admin_id, first_name, middle_name, last_name, gender, email) VALUES (?, ?, ?, ?, ?, ?, ?)`
 		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email))
 	case "teacher":
-		query = `INSERT INTO teachers (user_id, teacher_id, first_name, middle_name, last_name, gender, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber))
+		query = `INSERT INTO teachers (user_id, teacher_id, first_name, middle_name, last_name, gender, email, contact_number, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber), nullInt(departmentID))
 	case "student":
-		query = `INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, year_level, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber), nullString(year), nullString(section))
+		query = `INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber))
 	case "working_student":
-		query = `INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, year_level, section) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-		log.Printf("📝 Inserting working student - user_id: %d, student_id: %s, name: %s %s, gender: %s, email: %s, year: %s, section: %s",
-			userID, studentID, firstName, lastName, gender, email, year, section)
-		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber), nullString(year), nullString(section))
+		query = `INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		log.Printf("📝 Inserting working student - user_id: %d, student_id: %s, name: %s %s, gender: %s, email: %s",
+			userID, studentID, firstName, lastName, gender, email)
+		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber))
 	}
 
 	if err != nil {
-		log.Printf("❌ Failed to insert into %s table: %v", role, err)
+		log.Printf("Failed to insert into %s table: %v", role, err)
 		return fmt.Errorf("failed to create %s profile: %w", role, err)
 	}
 
-	log.Printf("✅ Successfully created %s: %s %s (ID: %d)", role, firstName, lastName, userID)
+	log.Printf("Successfully created %s: %s %s (ID: %d)", role, firstName, lastName, userID)
 	return nil
 }
 
+// BulkStudentData represents a single student entry for bulk registration
+type BulkStudentData struct {
+	StudentCode   string `json:"student_code"`
+	FirstName     string `json:"first_name"`
+	MiddleName    string `json:"middle_name"`
+	LastName      string `json:"last_name"`
+	Gender        string `json:"gender"`
+	ContactNumber string `json:"contact_number"`
+}
+
+// extractStudentDataFromText extracts student information from text content
+// Looks for patterns like: Student Code, Name (First, Middle, Last), Gender, Contact
+func extractStudentDataFromText(text string) [][]string {
+	var records [][]string
+
+	// Split text into lines
+	lines := strings.Split(text, "\n")
+
+	// Pattern to match student data - looking for student codes and names
+	// Common patterns:
+	// - Student Code: alphanumeric codes
+	// - Names: typically in format "Last, First Middle" or "First Middle Last"
+	studentCodePattern := regexp.MustCompile(`(?i)(?:student\s*(?:code|id|number)[:\s]*)?([A-Z0-9\-]{3,})`)
+	namePattern := regexp.MustCompile(`([A-Z][a-z]+(?:\s+[A-Z][a-z]+)*)`)
+
+	var currentRecord []string
+	var foundCode bool
+
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+
+		// Try to find student code
+		codeMatches := studentCodePattern.FindStringSubmatch(line)
+		if len(codeMatches) > 1 && !foundCode {
+			if len(currentRecord) > 0 {
+				// Save previous record if it has data
+				if len(currentRecord) >= 2 {
+					records = append(records, currentRecord)
+				}
+			}
+			currentRecord = []string{codeMatches[1]}
+			foundCode = true
+			continue
+		}
+
+		// Try to find names
+		if foundCode {
+			nameMatches := namePattern.FindAllString(line, -1)
+			if len(nameMatches) >= 2 {
+				// Assume first is first name, last is last name
+				currentRecord = append(currentRecord, nameMatches[0])
+				if len(nameMatches) >= 3 {
+					currentRecord = append(currentRecord, nameMatches[len(nameMatches)-1]) // Last name
+					currentRecord = append(currentRecord, nameMatches[1])                  // Middle name if exists
+				} else {
+					currentRecord = append(currentRecord, nameMatches[len(nameMatches)-1]) // Last name
+					currentRecord = append(currentRecord, "")                              // No middle name
+				}
+				foundCode = false
+				if len(currentRecord) >= 3 {
+					records = append(records, currentRecord)
+					currentRecord = []string{}
+				}
+			}
+		}
+	}
+
+	// Add last record if exists
+	if len(currentRecord) >= 3 {
+		records = append(records, currentRecord)
+	}
+
+	// If no structured data found, try CSV-like parsing
+	if len(records) == 0 {
+		reader := csv.NewReader(strings.NewReader(text))
+		csvRecords, err := reader.ReadAll()
+		if err == nil && len(csvRecords) > 0 {
+			return csvRecords
+		}
+
+		// Try tab-separated
+		for _, line := range lines {
+			if strings.Contains(line, "\t") {
+				fields := strings.Split(line, "\t")
+				if len(fields) >= 3 {
+					records = append(records, fields)
+				}
+			} else if strings.Contains(line, ",") {
+				// Simple comma-separated (not proper CSV)
+				fields := strings.Split(line, ",")
+				cleanedFields := make([]string, len(fields))
+				for i, f := range fields {
+					cleanedFields[i] = strings.TrimSpace(f)
+				}
+				if len(cleanedFields) >= 3 {
+					records = append(records, cleanedFields)
+				}
+			}
+		}
+	}
+
+	return records
+}
+
+// parsePDF extracts text from PDF file
+// Note: PDF parsing is currently disabled due to DLL dependency requirements
+// Users should convert PDF files to CSV or TXT format for bulk upload
+func parsePDF(fileData []byte) (string, error) {
+	_ = fileData // Parameter intentionally unused - PDF parsing is disabled
+	// PDF parsing requires libmupdf.dll which may not be available
+	// For now, return an error suggesting CSV/TXT conversion
+	return "", fmt.Errorf("PDF parsing is not available. Please convert your PDF to CSV or TXT format, or use DOCX format")
+}
+
+// parseDOCX extracts text from DOCX file
+// DOCX files are ZIP archives containing XML files
+func parseDOCX(fileData []byte) (string, error) {
+	// For now, we'll extract text by parsing the document.xml from the ZIP
+	// This is a simplified approach - for production, consider using a more robust library
+	// like github.com/unidoc/unioffice or github.com/nguyenthenguyen/docx
+
+	// Try to use the docx library to get runs
+	tmpFile, err := os.CreateTemp("", "docx_*.docx")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temp file: %w", err)
+	}
+	defer os.Remove(tmpFile.Name())
+
+	// Write file data
+	if _, err := tmpFile.Write(fileData); err != nil {
+		tmpFile.Close()
+		return "", fmt.Errorf("failed to write temp file: %w", err)
+	}
+	tmpFile.Close()
+
+	// Read DOCX using the library
+	doc, err := docx.Open(tmpFile.Name())
+	if err != nil {
+		return "", fmt.Errorf("failed to open DOCX: %w", err)
+	}
+	defer doc.Close()
+
+	// Extract text from document runs
+	var text strings.Builder
+
+	// Get document.xml content
+	docXML := doc.GetFile("word/document.xml")
+	if len(docXML) == 0 {
+		return "", fmt.Errorf("could not read document.xml from DOCX file")
+	}
+
+	// Use RunParser to extract text from the XML
+	runParser := docx.NewRunParser(docXML)
+	if err := runParser.Execute(); err != nil {
+		return "", fmt.Errorf("failed to parse DOCX runs: %w", err)
+	}
+
+	runs := runParser.Runs()
+	for _, run := range runs {
+		if run != nil && run.HasText {
+			runText := run.GetText(docXML)
+			if runText != "" {
+				text.WriteString(runText)
+				text.WriteString(" ")
+			}
+		}
+	}
+
+	result := text.String()
+	if result == "" {
+		return "", fmt.Errorf("could not extract text from DOCX. Please ensure the document contains text, or convert to CSV or PDF format")
+	}
+
+	return result, nil
+}
+
+// CreateUsersBulkFromFile creates multiple students from uploaded file (PDF, DOCX, CSV, TXT)
+// fileData: base64 encoded file content
+// fileName: original file name to detect file type
+func (a *App) CreateUsersBulkFromFile(fileDataBase64 string, fileName string) (map[string]interface{}, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	// Decode base64 file data
+	fileData, err := base64.StdEncoding.DecodeString(fileDataBase64)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decode file data: %w", err)
+	}
+
+	if len(fileData) == 0 {
+		return nil, fmt.Errorf("file is empty")
+	}
+
+	// Detect file type from extension
+	ext := strings.ToLower(filepath.Ext(fileName))
+	var textContent string
+
+	switch ext {
+	case ".pdf":
+		textContent, err = parsePDF(fileData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse PDF: %w", err)
+		}
+	case ".docx", ".doc":
+		textContent, err = parseDOCX(fileData)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse DOCX: %w", err)
+		}
+	case ".csv", ".txt":
+		textContent = string(fileData)
+	default:
+		// Try to parse as text/CSV
+		textContent = string(fileData)
+	}
+
+	// Extract student data from text
+	records := extractStudentDataFromText(textContent)
+
+	if len(records) == 0 {
+		return nil, fmt.Errorf("no student data found in file. Please ensure the file contains student codes and names")
+	}
+
+	// Detect header row and create column mapping
+	startIndex := 0
+	columnMap := make(map[string]int) // Maps field names to column indices
+
+	if len(records) > 0 {
+		firstRow := records[0]
+		firstRowLower := strings.ToLower(strings.Join(firstRow, " "))
+
+		// Check if first row looks like headers
+		isHeader := strings.Contains(firstRowLower, "student") ||
+			strings.Contains(firstRowLower, "code") ||
+			strings.Contains(firstRowLower, "id") ||
+			strings.Contains(firstRowLower, "name") ||
+			strings.Contains(firstRowLower, "gender") ||
+			strings.Contains(firstRowLower, "email") ||
+			strings.Contains(firstRowLower, "contact") ||
+			strings.Contains(firstRowLower, "phone")
+
+		if isHeader {
+			startIndex = 1
+			// Map columns based on header names
+			for colIdx, header := range firstRow {
+				headerLower := strings.ToLower(strings.TrimSpace(header))
+
+				// Student Code/ID detection
+				if _, exists := columnMap["student_code"]; !exists && (strings.Contains(headerLower, "student") && (strings.Contains(headerLower, "code") || strings.Contains(headerLower, "id")) ||
+					strings.Contains(headerLower, "student_id") ||
+					strings.Contains(headerLower, "student code") ||
+					(strings.Contains(headerLower, "id") && !strings.Contains(headerLower, "email") && !strings.Contains(headerLower, "contact"))) {
+					columnMap["student_code"] = colIdx
+				}
+
+				// First Name detection
+				if _, exists := columnMap["first_name"]; !exists && (strings.Contains(headerLower, "first") && strings.Contains(headerLower, "name") ||
+					strings.Contains(headerLower, "firstname") ||
+					strings.Contains(headerLower, "fname") ||
+					headerLower == "first") {
+					columnMap["first_name"] = colIdx
+				}
+
+				// Last Name detection
+				if _, exists := columnMap["last_name"]; !exists && (strings.Contains(headerLower, "last") && strings.Contains(headerLower, "name") ||
+					strings.Contains(headerLower, "lastname") ||
+					strings.Contains(headerLower, "lname") ||
+					headerLower == "last" ||
+					strings.Contains(headerLower, "surname")) {
+					columnMap["last_name"] = colIdx
+				}
+
+				// Middle Name detection
+				if _, exists := columnMap["middle_name"]; !exists && (strings.Contains(headerLower, "middle") && strings.Contains(headerLower, "name") ||
+					strings.Contains(headerLower, "middlename") ||
+					strings.Contains(headerLower, "mname") ||
+					headerLower == "middle" ||
+					strings.Contains(headerLower, "mi")) {
+					columnMap["middle_name"] = colIdx
+				}
+
+				// Email detection
+				if _, exists := columnMap["email"]; !exists && (strings.Contains(headerLower, "email") ||
+					strings.Contains(headerLower, "e-mail") ||
+					strings.Contains(headerLower, "mail")) {
+					columnMap["email"] = colIdx
+				}
+
+				// Contact Number detection
+				if _, exists := columnMap["contact"]; !exists && (strings.Contains(headerLower, "contact") ||
+					strings.Contains(headerLower, "phone") ||
+					strings.Contains(headerLower, "mobile") ||
+					strings.Contains(headerLower, "cell") ||
+					(strings.Contains(headerLower, "number") && !strings.Contains(headerLower, "student") && !strings.Contains(headerLower, "id"))) {
+					columnMap["contact"] = colIdx
+				}
+
+				// Gender detection
+				if _, exists := columnMap["gender"]; !exists && (strings.Contains(headerLower, "gender") ||
+					strings.Contains(headerLower, "sex")) {
+					columnMap["gender"] = colIdx
+				}
+			}
+		}
+	}
+
+	// If no header mapping found, use default positions (backward compatibility)
+	if len(columnMap) == 0 {
+		columnMap["student_code"] = 0
+		columnMap["first_name"] = 1
+		columnMap["last_name"] = 2
+		if len(records) > 0 && len(records[0]) > 3 {
+			columnMap["middle_name"] = 3
+		}
+		if len(records) > 0 && len(records[0]) > 4 {
+			columnMap["gender"] = 4
+		}
+		if len(records) > 0 && len(records[0]) > 5 {
+			columnMap["contact"] = 5
+		}
+	}
+
+	var successCount int
+	var errorCount int
+	var errors []string
+
+	// Helper function to get column value safely
+	getColumnValue := func(record []string, colIdx int, found bool) string {
+		if found && colIdx >= 0 && colIdx < len(record) {
+			return strings.TrimSpace(record[colIdx])
+		}
+		return ""
+	}
+
+	// Process each record
+	for i, record := range records[startIndex:] {
+		rowNum := i + startIndex + 1
+
+		// Ensure we have at least 3 fields
+		for len(record) < 3 {
+			record = append(record, "")
+		}
+
+		// Extract values using column mapping
+		studentCodeIdx, hasStudentCode := columnMap["student_code"]
+		firstNameIdx, hasFirstName := columnMap["first_name"]
+		lastNameIdx, hasLastName := columnMap["last_name"]
+		middleNameIdx, hasMiddleName := columnMap["middle_name"]
+		genderIdx, hasGender := columnMap["gender"]
+		contactIdx, hasContact := columnMap["contact"]
+		emailIdx, hasEmail := columnMap["email"]
+
+		studentCode := getColumnValue(record, studentCodeIdx, hasStudentCode)
+		firstName := getColumnValue(record, firstNameIdx, hasFirstName)
+		lastName := getColumnValue(record, lastNameIdx, hasLastName)
+		middleName := getColumnValue(record, middleNameIdx, hasMiddleName)
+		gender := getColumnValue(record, genderIdx, hasGender)
+		contactNumber := getColumnValue(record, contactIdx, hasContact)
+		email := getColumnValue(record, emailIdx, hasEmail)
+
+		// Validate required fields
+		if studentCode == "" {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d: Student Code is required", rowNum))
+			continue
+		}
+		if firstName == "" {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d: First Name is required", rowNum))
+			continue
+		}
+		if lastName == "" {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d: Last Name is required", rowNum))
+			continue
+		}
+
+		// Create the student using existing CreateUser function
+		fullName := fmt.Sprintf("%s, %s", lastName, firstName)
+		if middleName != "" {
+			fullName = fmt.Sprintf("%s, %s %s", lastName, firstName, middleName)
+		}
+
+		// Use student code as password (default password)
+		err := a.CreateUser(
+			studentCode, // password
+			fullName,    // name
+			firstName,
+			middleName,
+			lastName,
+			gender,
+			"student",
+			"",          // employeeID
+			studentCode, // studentID
+			"",          // year level
+			"",          // section
+			email,       // email (now detected from headers)
+			contactNumber,
+			0, // departmentID
+		)
+
+		if err != nil {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d (%s): %v", rowNum, studentCode, err))
+			log.Printf("❌ Failed to create student at row %d: %v", rowNum, err)
+		} else {
+			successCount++
+			log.Printf("✅ Created student: %s %s (Code: %s)", firstName, lastName, studentCode)
+		}
+	}
+
+	result := map[string]interface{}{
+		"success_count": successCount,
+		"error_count":   errorCount,
+		"total_count":   len(records) - startIndex,
+		"errors":        errors,
+	}
+
+	return result, nil
+}
+
+// CreateUsersBulk creates multiple students from CSV data (kept for backward compatibility)
+// CSV format: Student Code, First Name, Middle Name (optional), Last Name, Gender, Contact Number (optional)
+func (a *App) CreateUsersBulk(csvData string) (map[string]interface{}, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	// Parse CSV data
+	reader := csv.NewReader(strings.NewReader(csvData))
+	records, err := reader.ReadAll()
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse CSV: %w", err)
+	}
+
+	if len(records) == 0 {
+		return nil, fmt.Errorf("CSV file is empty")
+	}
+
+	// Skip header row if present
+	startIndex := 0
+	if len(records) > 0 {
+		// Check if first row looks like a header (contains "student" or "code" etc.)
+		firstRow := strings.ToLower(strings.Join(records[0], " "))
+		if strings.Contains(firstRow, "student") || strings.Contains(firstRow, "code") ||
+			strings.Contains(firstRow, "name") || strings.Contains(firstRow, "gender") {
+			startIndex = 1
+		}
+	}
+
+	var successCount int
+	var errorCount int
+	var errors []string
+
+	// Process each record
+	for i, record := range records[startIndex:] {
+		rowNum := i + startIndex + 1
+
+		// Validate minimum required fields (at least Student Code, First Name, Last Name)
+		if len(record) < 3 {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d: Insufficient columns (need at least Student Code, First Name, Last Name)", rowNum))
+			continue
+		}
+
+		studentCode := strings.TrimSpace(record[0])
+		firstName := strings.TrimSpace(record[1])
+		middleName := ""
+		lastName := ""
+		gender := ""
+		contactNumber := ""
+		email := "" // Email not supported in legacy CreateUsersBulk function
+
+		// Parse based on number of columns
+		if len(record) >= 3 {
+			lastName = strings.TrimSpace(record[2])
+		}
+		if len(record) >= 4 {
+			middleName = strings.TrimSpace(record[3])
+		}
+		if len(record) >= 5 {
+			gender = strings.TrimSpace(record[4])
+		}
+		if len(record) >= 6 {
+			contactNumber = strings.TrimSpace(record[5])
+		}
+
+		// Validate required fields
+		if studentCode == "" {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d: Student Code is required", rowNum))
+			continue
+		}
+		if firstName == "" {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d: First Name is required", rowNum))
+			continue
+		}
+		if lastName == "" {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d: Last Name is required", rowNum))
+			continue
+		}
+
+		// Create the student using existing CreateUser function
+		fullName := fmt.Sprintf("%s, %s", lastName, firstName)
+		if middleName != "" {
+			fullName = fmt.Sprintf("%s, %s %s", lastName, firstName, middleName)
+		}
+
+		// Use student code as password (default password)
+		err := a.CreateUser(
+			studentCode, // password
+			fullName,    // name
+			firstName,
+			middleName,
+			lastName,
+			gender,
+			"student",
+			"",          // employeeID
+			studentCode, // studentID
+			"",          // year level
+			"",          // section
+			email,       // email
+			contactNumber,
+			0, // departmentID
+		)
+
+		if err != nil {
+			errorCount++
+			errors = append(errors, fmt.Sprintf("Row %d (%s): %v", rowNum, studentCode, err))
+			log.Printf("❌ Failed to create student at row %d: %v", rowNum, err)
+		} else {
+			successCount++
+			log.Printf("✅ Created student: %s %s (Code: %s)", firstName, lastName, studentCode)
+		}
+	}
+
+	result := map[string]interface{}{
+		"success_count": successCount,
+		"error_count":   errorCount,
+		"total_count":   len(records) - startIndex,
+		"errors":        errors,
+	}
+
+	return result, nil
+}
+
 // UpdateUser updates an existing user
-func (a *App) UpdateUser(id int, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, section, email, contactNumber string) error {
+func (a *App) UpdateUser(id int, name, firstName, middleName, lastName, gender, role, employeeID, studentID, year, section, email, contactNumber string, departmentID int) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
 	}
@@ -584,14 +1430,14 @@ func (a *App) UpdateUser(id int, name, firstName, middleName, lastName, gender, 
 		query = `UPDATE admins SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, admin_id = ?, email = ? WHERE user_id = ?`
 		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(employeeID), nullString(email), id)
 	case "teacher":
-		query = `UPDATE teachers SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, teacher_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(employeeID), nullString(email), nullString(contactNumber), id)
+		query = `UPDATE teachers SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, teacher_id = ?, email = ?, contact_number = ?, department_id = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(employeeID), nullString(email), nullString(contactNumber), nullInt(departmentID), id)
 	case "student":
-		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, email = ?, contact_number = ?, year_level = ?, section = ? WHERE user_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(email), nullString(contactNumber), nullString(year), nullString(section), id)
+		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(email), nullString(contactNumber), id)
 	case "working_student":
-		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, email = ?, contact_number = ?, year_level = ?, section = ? WHERE user_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(email), nullString(contactNumber), nullString(year), nullString(section), id)
+		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(email), nullString(contactNumber), id)
 	}
 
 	return err
@@ -657,6 +1503,120 @@ func (a *App) GetAdminDashboard() (AdminDashboard, error) {
 	}
 
 	return dashboard, nil
+}
+
+// ==============================================================================
+// DEPARTMENT MANAGEMENT
+// ==============================================================================
+
+// Department represents a department
+type Department struct {
+	ID             int     `json:"id"`
+	DepartmentCode string  `json:"department_code"`
+	DepartmentName string  `json:"department_name"`
+	Description    *string `json:"description,omitempty"`
+	IsActive       bool    `json:"is_active"`
+	CreatedAt      string  `json:"created_at"`
+	UpdatedAt      string  `json:"updated_at"`
+}
+
+// GetDepartments returns all departments
+func (a *App) GetDepartments() ([]Department, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT id, department_code, department_name, description, is_active, created_at, updated_at
+		FROM departments
+		ORDER BY department_code
+	`
+	rows, err := a.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var departments []Department
+	for rows.Next() {
+		var dept Department
+		var description sql.NullString
+		var createdAt, updatedAt time.Time
+
+		err := rows.Scan(&dept.ID, &dept.DepartmentCode, &dept.DepartmentName, &description, &dept.IsActive, &createdAt, &updatedAt)
+		if err != nil {
+			continue
+		}
+
+		if description.Valid {
+			dept.Description = &description.String
+		}
+		dept.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		dept.UpdatedAt = updatedAt.Format("2006-01-02 15:04:05")
+
+		departments = append(departments, dept)
+	}
+
+	return departments, nil
+}
+
+// CreateDepartment creates a new department
+func (a *App) CreateDepartment(departmentCode, departmentName, description string) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	if departmentCode == "" || departmentName == "" {
+		return fmt.Errorf("department code and name are required")
+	}
+
+	query := `INSERT INTO departments (department_code, department_name, description) VALUES (?, ?, ?)`
+	_, err := a.db.Exec(query, departmentCode, departmentName, nullString(description))
+	if err != nil {
+		log.Printf("⚠ Failed to create department: %v", err)
+		return err
+	}
+
+	log.Printf("✓ Department created: %s - %s", departmentCode, departmentName)
+	return nil
+}
+
+// UpdateDepartment updates an existing department
+func (a *App) UpdateDepartment(id int, departmentCode, departmentName, description string, isActive bool) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	if departmentCode == "" || departmentName == "" {
+		return fmt.Errorf("department code and name are required")
+	}
+
+	query := `UPDATE departments SET department_code = ?, department_name = ?, description = ?, is_active = ? WHERE id = ?`
+	_, err := a.db.Exec(query, departmentCode, departmentName, nullString(description), isActive, id)
+	if err != nil {
+		log.Printf("⚠ Failed to update department: %v", err)
+		return err
+	}
+
+	log.Printf("✓ Department updated: ID=%d", id)
+	return nil
+}
+
+// DeleteDepartment deletes a department
+func (a *App) DeleteDepartment(id int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	query := `DELETE FROM departments WHERE id = ?`
+	_, err := a.db.Exec(query, id)
+	if err != nil {
+		log.Printf("⚠ Failed to delete department: %v", err)
+		return err
+	}
+
+	log.Printf("✓ Department deleted: ID=%d", id)
+	return nil
 }
 
 // ==============================================================================
@@ -727,45 +1687,71 @@ func (a *App) GetStudentLoginLogs(userID int) ([]LoginLog, error) {
 		return nil, fmt.Errorf("database not connected")
 	}
 
+	log.Printf("GetStudentLoginLogs called for userID: %d", userID)
+
+	// Query the login_logs table directly and join with users to get the name
 	query := `
 		SELECT 
-			id, user_id, user_type, pc_number, 
-			login_time, logout_time, full_name
-		FROM v_login_logs_complete 
-		WHERE user_id = ?
-		ORDER BY login_time DESC 
+			ll.id, 
+			ll.user_id, 
+			COALESCE(u.user_type, 'unknown') as user_type, 
+			ll.pc_number, 
+			ll.login_time, 
+			ll.logout_time,
+			COALESCE(
+				CONCAT(ws.last_name, ', ', ws.first_name, 
+					CASE WHEN ws.middle_name IS NOT NULL THEN CONCAT(' ', ws.middle_name) ELSE '' END),
+				CONCAT(s.last_name, ', ', s.first_name,
+					CASE WHEN s.middle_name IS NOT NULL THEN CONCAT(' ', s.middle_name) ELSE '' END),
+				CONCAT(t.last_name, ', ', t.first_name,
+					CASE WHEN t.middle_name IS NOT NULL THEN CONCAT(' ', t.middle_name) ELSE '' END),
+				CONCAT(a.last_name, ', ', a.first_name,
+					CASE WHEN a.middle_name IS NOT NULL THEN CONCAT(' ', a.middle_name) ELSE '' END),
+				u.username
+			) as full_name
+		FROM login_logs ll
+		JOIN users u ON ll.user_id = u.id
+		LEFT JOIN students s ON u.id = s.user_id
+		LEFT JOIN working_students ws ON u.id = ws.user_id
+		LEFT JOIN teachers t ON u.id = t.user_id
+		LEFT JOIN admins a ON u.id = a.user_id
+		WHERE ll.user_id = ?
+		ORDER BY ll.login_time DESC 
 		LIMIT 100
 	`
 	rows, err := a.db.Query(query, userID)
 	if err != nil {
-		return nil, err
+		log.Printf("Error querying login logs: %v", err)
+		return nil, fmt.Errorf("failed to query login logs: %w", err)
 	}
 	defer rows.Close()
 
 	var logs []LoginLog
 	for rows.Next() {
-		var log LoginLog
+		var logEntry LoginLog
 		var pcNumber sql.NullString
 		var loginTime time.Time
 		var logoutTime sql.NullTime
 
-		err := rows.Scan(&log.ID, &log.UserID, &log.UserType, &pcNumber, &loginTime, &logoutTime, &log.UserName)
+		err := rows.Scan(&logEntry.ID, &logEntry.UserID, &logEntry.UserType, &pcNumber, &loginTime, &logoutTime, &logEntry.UserName)
 		if err != nil {
+			log.Printf("Error scanning login log row: %v", err)
 			continue
 		}
 
-		log.LoginTime = loginTime.Format("2006-01-02 15:04:05")
+		logEntry.LoginTime = loginTime.Format("2006-01-02 15:04:05")
 		if pcNumber.Valid {
-			log.PCNumber = &pcNumber.String
+			logEntry.PCNumber = &pcNumber.String
 		}
 		if logoutTime.Valid {
 			formattedLogoutTime := logoutTime.Time.Format("2006-01-02 15:04:05")
-			log.LogoutTime = &formattedLogoutTime
+			logEntry.LogoutTime = &formattedLogoutTime
 		}
 
-		logs = append(logs, log)
+		logs = append(logs, logEntry)
 	}
 
+	log.Printf("GetStudentLoginLogs returning %d logs for userID: %d", len(logs), userID)
 	return logs, nil
 }
 
@@ -807,9 +1793,9 @@ func (a *App) GetFeedback() ([]Feedback, error) {
 			f.id, 
 			f.student_id, 
 			COALESCE(s.student_id, ws.student_id, 'N/A') as student_id_str,
-			f.first_name, 
-			f.middle_name, 
-			f.last_name, 
+			COALESCE(s.first_name, ws.first_name, '') as first_name, 
+			COALESCE(s.middle_name, ws.middle_name) as middle_name, 
+			COALESCE(s.last_name, ws.last_name, '') as last_name, 
 			f.pc_number, 
 			f.equipment_condition, 
 			f.monitor_condition, 
@@ -906,9 +1892,9 @@ func (a *App) GetStudentFeedback(studentID int) ([]Feedback, error) {
 			f.id, 
 			f.student_id, 
 			COALESCE(s.student_id, ws.student_id, 'N/A') as student_id_str,
-			f.first_name, 
-			f.middle_name, 
-			f.last_name, 
+			COALESCE(s.first_name, ws.first_name, '') as first_name,
+			COALESCE(s.middle_name, ws.middle_name) as middle_name,
+			COALESCE(s.last_name, ws.last_name, '') as last_name,
 			f.pc_number, 
 			f.equipment_condition, 
 			f.monitor_condition, 
@@ -978,38 +1964,6 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 	}
 	pcNumber := hostname
 
-	// Parse user name to get first, middle, and last name
-	// Assuming format: "LastName, FirstName MiddleName" or "LastName, FirstName"
-	var firstName, middleName, lastName string
-	// For now, use the userName as-is and split it
-	// In production, you might want to get this from the user record
-	lastName = userName // Simplified - you may want to parse this properly
-	firstName = ""
-
-	// Get user details from database
-	var userRole string
-	err = a.db.QueryRow("SELECT user_type FROM users WHERE id = ?", userID).Scan(&userRole)
-	if err == nil {
-		// Get name details based on role
-		var query string
-		switch userRole {
-		case "student":
-			query = "SELECT first_name, middle_name, last_name FROM students WHERE user_id = ?"
-		case "working_student":
-			query = "SELECT first_name, middle_name, last_name FROM working_students WHERE user_id = ?"
-		default:
-			query = ""
-		}
-
-		if query != "" {
-			var middleNameNull sql.NullString
-			err = a.db.QueryRow(query, userID).Scan(&firstName, &middleNameNull, &lastName)
-			if err == nil && middleNameNull.Valid {
-				middleName = middleNameNull.String
-			}
-		}
-	}
-
 	// Determine equipment conditions based on status
 	// ENUM values: 'Good', 'Minor Issue', 'Not Working'
 	equipmentCondition := "Good"
@@ -1059,12 +2013,12 @@ func (a *App) SaveEquipmentFeedback(userID int, userName, computerStatus, comput
 	}
 
 	// Insert feedback into database
-	query := `INSERT INTO feedback (student_id, first_name, middle_name, last_name, pc_number, 
+	query := `INSERT INTO feedback (student_id, pc_number, 
 			  equipment_condition, monitor_condition, keyboard_condition, mouse_condition, 
 			  comments, date_submitted) 
-			  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())`
+			  VALUES (?, ?, ?, ?, ?, ?, ?, NOW())`
 
-	_, err = a.db.Exec(query, userID, firstName, nullString(middleName), lastName, pcNumber,
+	_, err = a.db.Exec(query, userID, pcNumber,
 		equipmentCondition, monitorCondition, keyboardCondition, mouseCondition, nullString(combinedComments))
 
 	if err != nil {
@@ -1087,9 +2041,9 @@ func (a *App) GetPendingFeedback() ([]Feedback, error) {
 			f.id, 
 			f.student_id, 
 			COALESCE(s.student_id, ws.student_id, 'N/A') as student_id_str,
-			f.first_name, 
-			f.middle_name, 
-			f.last_name, 
+			COALESCE(s.first_name, ws.first_name, '') as first_name, 
+			COALESCE(s.middle_name, ws.middle_name) as middle_name, 
+			COALESCE(s.last_name, ws.last_name, '') as last_name, 
 			f.pc_number, 
 			f.equipment_condition, 
 			f.monitor_condition, 
@@ -1394,6 +2348,7 @@ type CourseClass struct {
 	SubjectID     int     `json:"subject_id"`
 	SubjectCode   string  `json:"subject_code"`
 	SubjectName   string  `json:"subject_name"`
+	OfferingCode  *string `json:"offering_code,omitempty"`
 	TeacherID     int     `json:"teacher_id"`
 	TeacherCode   *string `json:"teacher_code,omitempty"`
 	TeacherName   string  `json:"teacher_name"`
@@ -1418,23 +2373,26 @@ type ClasslistEntry struct {
 	FirstName      string  `json:"first_name"`
 	MiddleName     *string `json:"middle_name,omitempty"`
 	LastName       string  `json:"last_name"`
-	YearLevel      *string `json:"year_level,omitempty"`
-	Section        *string `json:"section,omitempty"`
 	EnrollmentDate string  `json:"enrollment_date"`
 	Status         string  `json:"status"`
+	Email          *string `json:"email,omitempty"`
+	ContactNumber  *string `json:"contact_number,omitempty"`
+	Course         *string `json:"course,omitempty"`
 }
 
 // ClassStudent represents a student (used for enrollment operations)
 type ClassStudent struct {
-	ID         int     `json:"id"`
-	StudentID  string  `json:"student_id"`
-	FirstName  string  `json:"first_name"`
-	MiddleName *string `json:"middle_name"`
-	LastName   string  `json:"last_name"`
-	YearLevel  *string `json:"year_level"`
-	Section    *string `json:"section"`
-	ClassID    *int    `json:"class_id,omitempty"`
-	IsEnrolled bool    `json:"is_enrolled"`
+	ID            int     `json:"id"`
+	StudentID     string  `json:"student_id"`
+	FirstName     string  `json:"first_name"`
+	MiddleName    *string `json:"middle_name"`
+	LastName      string  `json:"last_name"`
+	Gender        *string `json:"gender"`
+	Email         *string `json:"email"`
+	ContactNumber *string `json:"contact_number"`
+	ProfilePhoto  *string `json:"profile_photo"`
+	ClassID       *int    `json:"class_id,omitempty"`
+	IsEnrolled    bool    `json:"is_enrolled"`
 }
 
 // Attendance represents an attendance record
@@ -1598,7 +2556,7 @@ func (a *App) GetTeacherClasses(teacherID int) ([]CourseClass, error) {
 
 	query := `
 		SELECT 
-			c.id, c.subject_id, s.subject_code, s.subject_name,
+			c.id, c.subject_id, s.subject_code, s.subject_name, c.offering_code,
 			c.teacher_id, CONCAT(t.last_name, ', ', t.first_name) as teacher_name,
 			c.schedule, c.room, c.year_level, c.section, c.semester, c.school_year,
 			COALESCE(enrollment_count.count, 0) as enrolled_count,
@@ -1623,15 +2581,19 @@ func (a *App) GetTeacherClasses(teacherID int) ([]CourseClass, error) {
 	var classes []CourseClass
 	for rows.Next() {
 		var class CourseClass
-		var schedule, room, yearLevel, section, semester, schoolYear sql.NullString
+		var offeringCode, schedule, room, yearLevel, section, semester, schoolYear sql.NullString
+		var createdBy sql.NullInt64
 		err := rows.Scan(
-			&class.ID, &class.SubjectID, &class.SubjectCode, &class.SubjectName,
+			&class.ID, &class.SubjectID, &class.SubjectCode, &class.SubjectName, &offeringCode,
 			&class.TeacherID, &class.TeacherName,
 			&schedule, &room, &yearLevel, &section, &semester, &schoolYear,
-			&class.EnrolledCount, &class.IsActive,
+			&class.EnrolledCount, &class.IsActive, &createdBy,
 		)
 		if err != nil {
 			continue
+		}
+		if offeringCode.Valid {
+			class.OfferingCode = &offeringCode.String
 		}
 		if schedule.Valid {
 			class.Schedule = &schedule.String
@@ -1651,6 +2613,94 @@ func (a *App) GetTeacherClasses(teacherID int) ([]CourseClass, error) {
 		if schoolYear.Valid {
 			class.SchoolYear = &schoolYear.String
 		}
+		if createdBy.Valid {
+			createdByInt := int(createdBy.Int64)
+			class.CreatedBy = &createdByInt
+		}
+		classes = append(classes, class)
+	}
+
+	return classes, nil
+}
+
+// GetTeacherClassesCreatedByWorkingStudents returns classes assigned to a teacher that were created by working students
+func (a *App) GetTeacherClassesCreatedByWorkingStudents(teacherUserID int) ([]CourseClass, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	// First get the teacher ID from the user ID
+	teacherID, err := a.GetTeacherID(teacherUserID)
+	if err != nil {
+		return nil, fmt.Errorf("teacher not found for user ID %d: %v", teacherUserID, err)
+	}
+
+	query := `
+		SELECT 
+			c.id, c.subject_id, s.subject_code, s.subject_name, c.offering_code,
+			c.teacher_id, CONCAT(t.last_name, ', ', t.first_name) as teacher_name,
+			c.schedule, c.room, c.year_level, c.section, c.semester, c.school_year,
+			COALESCE(enrollment_count.count, 0) as enrolled_count,
+			c.is_active, c.created_by, c.created_at
+		FROM classes c
+		LEFT JOIN subjects s ON c.subject_id = s.id
+		LEFT JOIN teachers t ON c.teacher_id = t.id
+		LEFT JOIN (
+			SELECT class_id, COUNT(*) as count 
+			FROM classlist 
+			WHERE status = 'active'
+			GROUP BY class_id
+		) enrollment_count ON c.id = enrollment_count.class_id
+		WHERE c.teacher_id = ? AND c.is_active = TRUE AND c.created_by IS NOT NULL
+		ORDER BY c.created_at DESC, s.subject_code, c.year_level, c.section
+	`
+	rows, err := a.db.Query(query, teacherID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var classes []CourseClass
+	for rows.Next() {
+		var class CourseClass
+		var offeringCode, schedule, room, yearLevel, section, semester, schoolYear sql.NullString
+		var createdBy sql.NullInt64
+		var createdAt time.Time
+		err := rows.Scan(
+			&class.ID, &class.SubjectID, &class.SubjectCode, &class.SubjectName, &offeringCode,
+			&class.TeacherID, &class.TeacherName,
+			&schedule, &room, &yearLevel, &section, &semester, &schoolYear,
+			&class.EnrolledCount, &class.IsActive, &createdBy, &createdAt,
+		)
+		if err != nil {
+			continue
+		}
+		if offeringCode.Valid {
+			class.OfferingCode = &offeringCode.String
+		}
+		if schedule.Valid {
+			class.Schedule = &schedule.String
+		}
+		if room.Valid {
+			class.Room = &room.String
+		}
+		if yearLevel.Valid {
+			class.YearLevel = &yearLevel.String
+		}
+		if section.Valid {
+			class.Section = &section.String
+		}
+		if semester.Valid {
+			class.Semester = &semester.String
+		}
+		if schoolYear.Valid {
+			class.SchoolYear = &schoolYear.String
+		}
+		if createdBy.Valid {
+			createdByInt := int(createdBy.Int64)
+			class.CreatedBy = &createdByInt
+		}
+		class.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
 		classes = append(classes, class)
 	}
 
@@ -1667,7 +2717,7 @@ func (a *App) GetAllClasses() ([]CourseClass, error) {
 
 	query := `
 		SELECT 
-			c.id, c.subject_id, s.subject_code, s.subject_name,
+			c.id, c.subject_id, s.subject_code, s.subject_name, c.offering_code,
 			c.teacher_id, CONCAT(t.last_name, ', ', t.first_name) as teacher_name,
 			c.schedule, c.room, c.year_level, c.section, c.semester, c.school_year,
 			COALESCE(enrollment_count.count, 0) as enrolled_count,
@@ -1694,16 +2744,19 @@ func (a *App) GetAllClasses() ([]CourseClass, error) {
 	var classes []CourseClass
 	for rows.Next() {
 		var class CourseClass
-		var schedule, room, yearLevel, section, semester, schoolYear sql.NullString
+		var offeringCode, schedule, room, yearLevel, section, semester, schoolYear sql.NullString
 		var createdBy sql.NullInt64
 		err := rows.Scan(
-			&class.ID, &class.SubjectID, &class.SubjectCode, &class.SubjectName,
+			&class.ID, &class.SubjectID, &class.SubjectCode, &class.SubjectName, &offeringCode,
 			&class.TeacherID, &class.TeacherName,
 			&schedule, &room, &yearLevel, &section, &semester, &schoolYear,
 			&class.EnrolledCount, &class.IsActive, &createdBy,
 		)
 		if err != nil {
 			continue
+		}
+		if offeringCode.Valid {
+			class.OfferingCode = &offeringCode.String
 		}
 		if schedule.Valid {
 			class.Schedule = &schedule.String
@@ -1846,10 +2899,23 @@ func (a *App) GetClassStudents(classID int) ([]ClasslistEntry, error) {
 		SELECT 
 			vcl.classlist_id, vcl.class_id, vcl.student_id, vcl.student_code,
 			vcl.first_name, vcl.middle_name, vcl.last_name,
-			vcl.year_level, vcl.section, vcl.enrollment_status,
-			cl.enrollment_date
+			vcl.enrollment_status,
+			cl.enrollment_date,
+			CASE 
+				WHEN vcl.user_type = 'student' THEN st.email
+				WHEN vcl.user_type = 'working_student' THEN ws.email
+			END as email,
+			CASE 
+				WHEN vcl.user_type = 'student' THEN st.contact_number
+				WHEN vcl.user_type = 'working_student' THEN ws.contact_number
+			END as contact_number,
+			s.subject_name as course
 		FROM v_classlist_complete vcl
 		JOIN classlist cl ON vcl.classlist_id = cl.id
+		JOIN classes c ON cl.class_id = c.id
+		JOIN subjects s ON c.subject_id = s.id
+		LEFT JOIN students st ON vcl.student_id = st.user_id AND vcl.user_type = 'student'
+		LEFT JOIN working_students ws ON vcl.student_id = ws.user_id AND vcl.user_type = 'working_student'
 		WHERE vcl.class_id = ? AND vcl.enrollment_status = 'active'
 		ORDER BY vcl.last_name, vcl.first_name
 	`
@@ -1863,13 +2929,13 @@ func (a *App) GetClassStudents(classID int) ([]ClasslistEntry, error) {
 	var students []ClasslistEntry
 	for rows.Next() {
 		var student ClasslistEntry
-		var middleName, yearLevel, section sql.NullString
+		var middleName, email, contactNumber, course sql.NullString
 		var enrollmentDate time.Time
 		err := rows.Scan(
 			&student.ID, &student.ClassID, &student.StudentID, &student.StudentCode,
 			&student.FirstName, &middleName, &student.LastName,
-			&yearLevel, &section, &student.Status,
-			&enrollmentDate,
+			&student.Status,
+			&enrollmentDate, &email, &contactNumber, &course,
 		)
 		if err != nil {
 			continue
@@ -1877,11 +2943,14 @@ func (a *App) GetClassStudents(classID int) ([]ClasslistEntry, error) {
 		if middleName.Valid {
 			student.MiddleName = &middleName.String
 		}
-		if yearLevel.Valid {
-			student.YearLevel = &yearLevel.String
+		if email.Valid {
+			student.Email = &email.String
 		}
-		if section.Valid {
-			student.Section = &section.String
+		if contactNumber.Valid {
+			student.ContactNumber = &contactNumber.String
+		}
+		if course.Valid {
+			student.Course = &course.String
 		}
 		student.EnrollmentDate = enrollmentDate.Format("2006-01-02")
 		students = append(students, student)
@@ -1922,7 +2991,7 @@ func (a *App) CreateSubject(code, name string, teacherUserID int, description st
 }
 
 // CreateClass creates a new class instance (by working student)
-func (a *App) CreateClass(subjectID, teacherUserID int, schedule, room, yearLevel, section, semester, schoolYear string, createdBy int) (int, error) {
+func (a *App) CreateClass(subjectID, teacherUserID int, offeringCode, schedule, room, yearLevel, section, semester, schoolYear string, createdBy int) (int, error) {
 	if a.db == nil {
 		return 0, fmt.Errorf("database not connected")
 	}
@@ -1935,8 +3004,8 @@ func (a *App) CreateClass(subjectID, teacherUserID int, schedule, room, yearLeve
 	}
 
 	query := `
-		INSERT INTO classes (subject_id, teacher_id, schedule, room, year_level, section, semester, school_year, created_by, is_active)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
+		INSERT INTO classes (subject_id, teacher_id, offering_code, schedule, room, year_level, section, semester, school_year, created_by, is_active)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, TRUE)
 	`
 	// Handle created_by: convert user ID to working student ID
 	var createdByValue interface{}
@@ -1956,6 +3025,7 @@ func (a *App) CreateClass(subjectID, teacherUserID int, schedule, room, yearLeve
 	result, err := a.db.Exec(
 		query,
 		subjectID, teacherID,
+		nullString(offeringCode),
 		nullString(schedule), nullString(room),
 		nullString(yearLevel), nullString(section),
 		nullString(semester), nullString(schoolYear),
@@ -2025,27 +3095,12 @@ func (a *App) EnrollStudentInClass(studentID int, classID int, enrolledBy int) e
 		return fmt.Errorf("database not connected")
 	}
 
-	// Handle enrolled_by: convert user ID to working student ID if needed
-	var enrolledByValue interface{}
-	if enrolledBy == 0 {
-		enrolledByValue = nil
-	} else {
-		// Get the working student ID for this user
-		workingStudentID, err := a.GetWorkingStudentID(enrolledBy)
-		if err != nil {
-			log.Printf("⚠ Warning: Could not get working student ID for user %d: %v", enrolledBy, err)
-			enrolledByValue = nil
-		} else {
-			enrolledByValue = workingStudentID
-		}
-	}
-
 	query := `
-		INSERT INTO classlist (class_id, student_id, enrolled_by, status)
-		VALUES (?, ?, ?, 'active')
+		INSERT INTO classlist (class_id, student_id, status)
+		VALUES (?, ?, 'active')
 		ON DUPLICATE KEY UPDATE status = 'active', updated_at = CURRENT_TIMESTAMP
 	`
-	_, err := a.db.Exec(query, classID, studentID, enrolledByValue)
+	_, err := a.db.Exec(query, classID, studentID)
 	if err != nil {
 		log.Printf("⚠ Failed to enroll student %d in class %d: %v", studentID, classID, err)
 		return err
@@ -2068,8 +3123,8 @@ func (a *App) EnrollMultipleStudents(studentIDs []int, classID int, enrolledBy i
 	defer tx.Rollback()
 
 	stmt, err := tx.Prepare(`
-		INSERT INTO classlist (class_id, student_id, enrolled_by, status)
-		VALUES (?, ?, ?, 'active')
+		INSERT INTO classlist (class_id, student_id, status)
+		VALUES (?, ?, 'active')
 		ON DUPLICATE KEY UPDATE status = 'active', updated_at = CURRENT_TIMESTAMP
 	`)
 	if err != nil {
@@ -2077,24 +3132,8 @@ func (a *App) EnrollMultipleStudents(studentIDs []int, classID int, enrolledBy i
 	}
 	defer stmt.Close()
 
-	// Handle enrolled_by: convert user ID to working student ID if needed
-	var enrolledByValue interface{}
-	if enrolledBy == 0 {
-		enrolledByValue = nil
-	} else {
-		// Get the working student ID for this user
-		workingStudentID, err := a.GetWorkingStudentID(enrolledBy)
-		if err != nil {
-			log.Printf("⚠ Warning: Could not get working student ID for user %d: %v", enrolledBy, err)
-			enrolledByValue = nil
-		} else {
-			enrolledByValue = workingStudentID
-		}
-	}
-
 	for _, studentID := range studentIDs {
-
-		_, err = stmt.Exec(classID, studentID, enrolledByValue)
+		_, err = stmt.Exec(classID, studentID)
 		if err != nil {
 			log.Printf("⚠ Failed to enroll student %d: %v", studentID, err)
 			return err
@@ -2151,7 +3190,7 @@ func (a *App) GetAvailableStudents(classID int) ([]ClassStudent, error) {
 
 	query := `
 		SELECT 
-			s.user_id as id, s.student_id, s.first_name, s.middle_name, s.last_name, s.year_level, s.section,
+			s.user_id as id, s.student_id, s.first_name, s.middle_name, s.last_name,
 			EXISTS(
 				SELECT 1 FROM classlist cl 
 				WHERE cl.student_id = s.user_id AND cl.class_id = ? AND cl.status = 'active'
@@ -2165,7 +3204,7 @@ func (a *App) GetAvailableStudents(classID int) ([]ClassStudent, error) {
 		UNION ALL
 		
 		SELECT 
-			ws.user_id as id, ws.student_id, ws.first_name, ws.middle_name, ws.last_name, ws.year_level, ws.section,
+			ws.user_id as id, ws.student_id, ws.first_name, ws.middle_name, ws.last_name,
 			EXISTS(
 				SELECT 1 FROM classlist cl 
 				WHERE cl.student_id = ws.user_id AND cl.class_id = ? AND cl.status = 'active'
@@ -2188,19 +3227,13 @@ func (a *App) GetAvailableStudents(classID int) ([]ClassStudent, error) {
 	var students []ClassStudent
 	for rows.Next() {
 		var student ClassStudent
-		var middleName, yearLevel, section sql.NullString
-		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName, &student.LastName, &yearLevel, &section, &student.IsEnrolled)
+		var middleName sql.NullString
+		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName, &student.LastName, &student.IsEnrolled)
 		if err != nil {
 			continue
 		}
 		if middleName.Valid {
 			student.MiddleName = &middleName.String
-		}
-		if yearLevel.Valid {
-			student.YearLevel = &yearLevel.String
-		}
-		if section.Valid {
-			student.Section = &section.String
 		}
 		students = append(students, student)
 	}
@@ -2216,8 +3249,7 @@ func (a *App) GetAllStudentsForEnrollment(classID int) ([]ClassStudent, error) {
 
 	query := `
 		SELECT 
-			s.user_id as id, s.student_id, s.first_name, s.middle_name, s.last_name, 
-			s.year_level, s.section,
+			s.user_id as id, s.student_id, s.first_name, s.middle_name, s.last_name,
 			EXISTS(
 				SELECT 1 FROM classlist cl 
 				WHERE cl.student_id = s.user_id AND cl.class_id = ? AND cl.status = 'active'
@@ -2228,7 +3260,6 @@ func (a *App) GetAllStudentsForEnrollment(classID int) ([]ClassStudent, error) {
 		
 		SELECT 
 			ws.user_id as id, ws.student_id, ws.first_name, ws.middle_name, ws.last_name,
-			ws.year_level, ws.section,
 			EXISTS(
 				SELECT 1 FROM classlist cl 
 				WHERE cl.student_id = ws.user_id AND cl.class_id = ? AND cl.status = 'active'
@@ -2247,20 +3278,14 @@ func (a *App) GetAllStudentsForEnrollment(classID int) ([]ClassStudent, error) {
 	var students []ClassStudent
 	for rows.Next() {
 		var student ClassStudent
-		var middleName, yearLevel, section sql.NullString
+		var middleName sql.NullString
 		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName,
-			&student.LastName, &yearLevel, &section, &student.IsEnrolled)
+			&student.LastName, &student.IsEnrolled)
 		if err != nil {
 			continue
 		}
 		if middleName.Valid {
 			student.MiddleName = &middleName.String
-		}
-		if yearLevel.Valid {
-			student.YearLevel = &yearLevel.String
-		}
-		if section.Valid {
-			student.Section = &section.String
 		}
 		students = append(students, student)
 	}
@@ -2319,42 +3344,15 @@ func (a *App) GetAllRegisteredStudents(yearLevelFilter, sectionFilter string) ([
 	}
 
 	// Base query that gets all students
-	baseQuery := `
+	query := `
 		SELECT 
 			s.user_id as id, s.student_id, s.first_name, s.middle_name, s.last_name, 
-			s.year_level, s.section
+			s.gender, s.email, s.contact_number, s.profile_photo
 		FROM students s
+		ORDER BY s.last_name, s.first_name
 	`
 
-	// Build WHERE clause based on filters
-	var whereConditions []string
-	var args []interface{}
-
-	if yearLevelFilter != "" && yearLevelFilter != "All" {
-		whereConditions = append(whereConditions, "s.year_level = ?")
-		args = append(args, yearLevelFilter)
-	}
-
-	if sectionFilter != "" && sectionFilter != "All" {
-		whereConditions = append(whereConditions, "s.section = ?")
-		args = append(args, sectionFilter)
-	}
-
-	whereClause := ""
-	if len(whereConditions) > 0 {
-		whereClause = " WHERE " + strings.Join(whereConditions, " AND ")
-	}
-
-	query := baseQuery + whereClause + " ORDER BY s.year_level, s.section, s.last_name, s.first_name"
-
-	var rows *sql.Rows
-	var err error
-
-	if len(args) > 0 {
-		rows, err = a.db.Query(query, args...)
-	} else {
-		rows, err = a.db.Query(query)
-	}
+	rows, err := a.db.Query(query)
 
 	if err != nil {
 		return nil, err
@@ -2364,20 +3362,26 @@ func (a *App) GetAllRegisteredStudents(yearLevelFilter, sectionFilter string) ([
 	var students []ClassStudent
 	for rows.Next() {
 		var student ClassStudent
-		var middleName, yearLevel, section sql.NullString
+		var middleName, gender, email, contactNumber, profilePhoto sql.NullString
 		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName,
-			&student.LastName, &yearLevel, &section)
+			&student.LastName, &gender, &email, &contactNumber, &profilePhoto)
 		if err != nil {
 			continue
 		}
 		if middleName.Valid {
 			student.MiddleName = &middleName.String
 		}
-		if yearLevel.Valid {
-			student.YearLevel = &yearLevel.String
+		if gender.Valid {
+			student.Gender = &gender.String
 		}
-		if section.Valid {
-			student.Section = &section.String
+		if email.Valid {
+			student.Email = &email.String
+		}
+		if contactNumber.Valid {
+			student.ContactNumber = &contactNumber.String
+		}
+		if profilePhoto.Valid {
+			student.ProfilePhoto = &profilePhoto.String
 		}
 		students = append(students, student)
 	}
@@ -2386,38 +3390,9 @@ func (a *App) GetAllRegisteredStudents(yearLevelFilter, sectionFilter string) ([
 }
 
 // GetAvailableSections returns all unique sections from students and working_students tables
+// Note: section column no longer exists in the schema, returning empty array
 func (a *App) GetAvailableSections() ([]string, error) {
-	if a.db == nil {
-		return nil, fmt.Errorf("database not connected")
-	}
-
-	query := `
-		SELECT DISTINCT section 
-		FROM (
-			SELECT section FROM students WHERE section IS NOT NULL AND section != ''
-			UNION
-			SELECT section FROM working_students WHERE section IS NOT NULL AND section != ''
-		) as all_sections
-		ORDER BY section
-	`
-
-	rows, err := a.db.Query(query)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var sections []string
-	for rows.Next() {
-		var section string
-		err := rows.Scan(&section)
-		if err != nil {
-			continue
-		}
-		sections = append(sections, section)
-	}
-
-	return sections, nil
+	return []string{}, nil
 }
 
 // RecordAttendance records attendance for a student in a class
@@ -2493,30 +3468,28 @@ func (a *App) GetClassAttendance(classID int, date string) ([]Attendance, error)
 			COALESCE(a.id, 0) as attendance_id,
 			cl.id as classlist_id,
 			cl.class_id,
-			ROW_NUMBER() OVER (ORDER BY u.last_name, u.first_name) as ctrl_no,
+			ROW_NUMBER() OVER (ORDER BY vcl.last_name, vcl.first_name) as ctrl_no,
 			COALESCE(a.date, ?) as date,
-			u.id as student_id,
-			COALESCE(st.student_id, ws.student_id, '') as student_code,
-			u.first_name,
-			u.middle_name,
-			u.last_name,
-			c.subject_code,
-			c.subject_name,
+			vcl.student_id,
+			vcl.student_code,
+			vcl.first_name,
+			vcl.middle_name,
+			vcl.last_name,
+			s.subject_code,
+			s.subject_name,
 			a.time_in,
 			a.time_out,
 			a.pc_number,
-			COALESCE(a.status, 'absent') as status,
+			a.status,
 			a.remarks,
 			a.recorded_by
 		FROM classlist cl
-		JOIN users u ON cl.student_id = u.id
-		LEFT JOIN students st ON u.id = st.user_id AND u.user_type = 'student'
-		LEFT JOIN working_students ws ON u.id = ws.user_id AND u.user_type = 'working_student'
+		JOIN v_classlist_complete vcl ON cl.id = vcl.classlist_id
 		JOIN classes c ON cl.class_id = c.id
 		JOIN subjects s ON c.subject_id = s.id
 		LEFT JOIN attendance a ON cl.id = a.classlist_id AND a.date = ?
 		WHERE cl.class_id = ? AND cl.status = 'active'
-		ORDER BY u.last_name, u.first_name
+		ORDER BY vcl.last_name, vcl.first_name
 	`
 
 	rows, err := a.db.Query(query, date, date, classID)
@@ -2529,14 +3502,14 @@ func (a *App) GetClassAttendance(classID int, date string) ([]Attendance, error)
 	var attendances []Attendance
 	for rows.Next() {
 		var att Attendance
-		var middleName, timeIn, timeOut, pcNumber, remarks sql.NullString
+		var middleName, timeIn, timeOut, pcNumber, remarks, status sql.NullString
 		var recordedBy sql.NullInt64
 
 		err := rows.Scan(
 			&att.ID, &att.ClasslistID, &att.ClassID, &att.CtrlNo, &att.Date,
 			&att.StudentID, &att.StudentCode, &att.FirstName, &middleName, &att.LastName,
 			&att.SubjectCode, &att.SubjectName,
-			&timeIn, &timeOut, &pcNumber, &att.Status, &remarks, &recordedBy,
+			&timeIn, &timeOut, &pcNumber, &status, &remarks, &recordedBy,
 		)
 		if err != nil {
 			log.Printf("⚠ Failed to scan attendance row: %v", err)
@@ -2558,6 +3531,11 @@ func (a *App) GetClassAttendance(classID int, date string) ([]Attendance, error)
 		if remarks.Valid {
 			att.Remarks = &remarks.String
 		}
+		if status.Valid {
+			att.Status = status.String
+		} else {
+			att.Status = "" // Empty string when no status is set yet
+		}
 		if recordedBy.Valid {
 			recordedByInt := int(recordedBy.Int64)
 			att.RecordedBy = &recordedByInt
@@ -2570,7 +3548,7 @@ func (a *App) GetClassAttendance(classID int, date string) ([]Attendance, error)
 }
 
 // InitializeAttendanceForClass creates attendance records for all students in a class for a date
-// All students are initially marked as absent
+// Status is initially NULL (no remarks yet)
 func (a *App) InitializeAttendanceForClass(classID int, date string, recordedBy int) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
@@ -2581,7 +3559,7 @@ func (a *App) InitializeAttendanceForClass(classID int, date string, recordedBy 
 		SELECT 
 			cl.id,
 			?,
-			'absent',
+			NULL,
 			?,
 			CURRENT_TIMESTAMP
 		FROM classlist cl
@@ -2787,8 +3765,21 @@ func (a *App) GetStudentDashboard(userID int) (StudentDashboard, error) {
 	}
 
 	// Get all attendance for this student
-	query := `SELECT id, class_id, date, student_id, time_in, time_out, status 
-			  FROM attendance WHERE student_id = ? ORDER BY date DESC LIMIT 100`
+	// Join with classlist to get class_id and student_id
+	query := `
+		SELECT 
+			a.id, 
+			cl.class_id, 
+			a.date, 
+			cl.student_id, 
+			a.time_in, 
+			a.time_out, 
+			a.status 
+		FROM attendance a
+		JOIN classlist cl ON a.classlist_id = cl.id
+		WHERE cl.student_id = ? 
+		ORDER BY a.date DESC 
+		LIMIT 100`
 	rows, err := a.db.Query(query, userID)
 	if err != nil {
 		return dashboard, err

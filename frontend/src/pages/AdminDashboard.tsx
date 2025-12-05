@@ -12,10 +12,18 @@ import {
   Download,
   Search,
   Filter,
+  SlidersHorizontal,
   X,
   Eye,
   EyeOff,
-  Building2
+  Building2,
+  Plus,
+  Calendar,
+  Upload,
+  FolderOpen,
+  GraduationCap,
+  BarChart3,
+  AlertCircle
 } from 'lucide-react';
 import { 
   GetAdminDashboard, 
@@ -58,6 +66,8 @@ interface User {
   year?: string;
   section?: string;
   photo_url?: string;
+  email?: string;
+  contact_number?: string;
   created: string;
 }
 
@@ -198,27 +208,37 @@ function DashboardOverview() {
 function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
   const [showForm, setShowForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
   const [userTypeFilter, setUserTypeFilter] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
   const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [formData, setFormData] = useState({
     password: '',
+    confirmPassword: '',
     name: '',
     firstName: '',
     middleName: '',
     lastName: '',
     gender: '',
+    birthdate: '',
+    address: '',
     role: 'teacher',
     employeeId: '',
     studentId: '',
     year: '',
     section: '',
     email: '',
-    contactNumber: ''
+    contactNumber: '',
+    departmentId: 0
   });
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
 
   // Excel-like table state: sorting, filtering, selection, pagination
   type SortKey = 'name' | 'role' | 'year' | 'created';
@@ -231,8 +251,9 @@ function UserManagement() {
     created: ''
   });
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  // Pagination state
+  const [entriesPerPage, setEntriesPerPage] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   const toggleSort = (key: SortKey) => {
     setSortKey((prevKey) => {
@@ -247,12 +268,12 @@ function UserManagement() {
 
   const onFilterChange = (key: SortKey, value: string) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
-    setPage(1);
+    setCurrentPage(1);
   };
 
   const clearFilters = () => {
     setFilters({ name: '', role: '', year: '', created: '' });
-    setPage(1);
+    setCurrentPage(1);
   };
 
   const toggleSelectRow = (id: number) => {
@@ -273,12 +294,13 @@ function UserManagement() {
 
   const copySelected = async (rows: User[]) => {
     try {
-      const header = ['Name', 'ID', 'Role', 'Year', 'Created'];
+      const header = ['User ID', 'Full Name', 'User Type'];
       const lines = rows.map((u) => {
         const fullName = u.first_name && u.last_name 
           ? `${u.last_name}, ${u.first_name}${u.middle_name ? ' ' + u.middle_name : ''}`
           : u.name;
-        return [fullName, u.employee_id || u.student_id || '-', u.role.replace('_', ' '), u.year || '', u.created].join('\t');
+        const loginId = u.employee_id || u.student_id || u.name || '-';
+        return [loginId, fullName, u.role.replace('_', ' ')].join('\t');
       });
       const text = [header.join('\t'), ...lines].join('\n');
       await navigator.clipboard.writeText(text);
@@ -306,7 +328,22 @@ function UserManagement() {
 
   useEffect(() => {
     loadUsers();
+    loadDepartments();
   }, [userTypeFilter, searchTerm]); // Reload when filters change
+
+  useEffect(() => {
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [userTypeFilter, searchTerm, entriesPerPage]);
+
+  const loadDepartments = async () => {
+    try {
+      const data = await GetDepartments();
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Failed to load departments:', error);
+      setDepartments([]);
+    }
+  };
 
   const loadUsers = async () => {
     try {
@@ -329,8 +366,10 @@ function UserManagement() {
       
       // Ensure data is always an array, even if API returns null/undefined
       setUsers(data || []);
+      setError('');
     } catch (error) {
       console.error('Failed to load users:', error);
+      setError('Unable to load users from server.');
       // Set empty array on error to prevent blank screen
       setUsers([]);
     } finally {
@@ -350,14 +389,6 @@ function UserManagement() {
       if (formData.role === 'working_student') {
         if (!formData.studentId) {
           showNotification('error', 'Student ID is required for Working Students');
-          return;
-        }
-        if (!formData.year) {
-          showNotification('error', 'Year Level is required for Working Students');
-          return;
-        }
-        if (!formData.section) {
-          showNotification('error', 'Section is required for Working Students');
           return;
         }
         if (!formData.gender) {
@@ -384,6 +415,12 @@ function UserManagement() {
         return;
       }
 
+      // Validate password confirmation for new users
+      if (!editingUser && formData.password !== formData.confirmPassword) {
+        showNotification('error', 'Passwords do not match');
+        return;
+      }
+
       console.log('Submitting user with data:', {
         role: formData.role,
         firstName: formData.firstName,
@@ -396,11 +433,13 @@ function UserManagement() {
         section: formData.section
       });
 
+      const departmentId = formData.role === 'teacher' ? formData.departmentId : 0;
+      
       if (editingUser) {
-        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year, formData.section, formData.email, formData.contactNumber);
+        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
         showNotification('success', 'User updated successfully!');
       } else {
-        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, formData.year, formData.section, formData.email, formData.contactNumber);
+        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
         
         // Show specific notification based on user role
         const roleMessages = {
@@ -415,7 +454,9 @@ function UserManagement() {
       
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '' });
+      setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+      setAvatarFile(null);
+      setAvatarPreview(null);
       loadUsers();
     } catch (error) {
       console.error('Failed to save user:', error);
@@ -428,20 +469,38 @@ function UserManagement() {
     setEditingUser(user);
     setFormData({
       password: '',
+      confirmPassword: '',
       name: user.name,
       firstName: user.first_name || '',
       middleName: user.middle_name || '',
       lastName: user.last_name || '',
       gender: user.gender || '',
+      birthdate: '',
+      address: '',
       role: user.role,
       employeeId: user.employee_id || '',
       studentId: user.student_id || '',
       year: user.year || '',
       section: user.section || '',
       email: '',
-      contactNumber: ''
+      contactNumber: '',
+      departmentId: 0
     });
+    setAvatarFile(null);
+    setAvatarPreview(null);
     setShowForm(true);
+  };
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleDelete = async (id: number) => {
@@ -470,7 +529,7 @@ function UserManagement() {
   // Note: userTypeFilter and searchTerm are now handled server-side
   // Only column-specific filters are applied here
   const filteredUsers = users.filter((u) => {
-    // Column-specific filters (for Excel-like filtering)
+    // Column-specific filters
     const inName = u.name.toLowerCase().includes(filters.name.toLowerCase());
     const inRole = u.role.toLowerCase().includes(filters.role.toLowerCase());
     const inYear = (u.year || '').toLowerCase().includes(filters.year.toLowerCase());
@@ -508,62 +567,25 @@ function UserManagement() {
     return 0;
   });
 
-  const total = sortedUsers.length;
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
-  const currentPage = Math.min(page, totalPages);
-  const startIndex = (currentPage - 1) * pageSize;
-  const endIndex = Math.min(startIndex + pageSize, total);
-  const pagedUsers = sortedUsers.slice(startIndex, endIndex);
-
-  const allSelectedOnPage = pagedUsers.length > 0 && pagedUsers.every((u) => selectedIds.has(u.id));
-  const selectedRows = sortedUsers.filter((u) => selectedIds.has(u.id));
-  const sortIndicator = (key: SortKey) => (sortKey === key ? (sortDir === 'asc' ? '▲' : '▼') : '');
+  // Recalculate pagination with simplified approach
+  const totalPages = Math.ceil(sortedUsers.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const endIndex = startIndex + entriesPerPage;
+  const currentUsers = sortedUsers.slice(startIndex, endIndex);
+  const startEntry = sortedUsers.length > 0 ? startIndex + 1 : 0;
+  const endEntry = Math.min(endIndex, sortedUsers.length);
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
-        </div>
+    <div className="p-6">
+      <div className="mb-6 flex items-center justify-between">
+        <h2 className="text-2xl font-bold text-gray-900">User Management</h2>
         <button
           onClick={() => setShowForm(true)}
-          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+          className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
         >
-          <UserPlus className="h-4 w-4 mr-2" />
-          Add User
+          <Plus className="h-4 w-4 mr-2" />
+          ADD NEW
         </button>
-      </div>
-
-      {/* Filters Section */}
-      <div className="bg-white shadow rounded-lg p-4 mb-4">
-        <div className="flex flex-col sm:flex-row gap-4 items-end">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Filter by User Type
-            </label>
-            <select
-              value={userTypeFilter}
-              onChange={(e) => setUserTypeFilter(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              <option value="">All</option>
-              <option value="teacher">Teacher</option>
-              <option value="student">Student</option>
-              <option value="working_student">Working Student</option>
-            </select>
-          </div>
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Search (Name, Student ID, Employee ID, Gender, Date)
-            </label>
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
-            />
-          </div>
-        </div>
       </div>
 
       {/* Notification */}
@@ -615,7 +637,9 @@ function UserManagement() {
             if (e.target === e.currentTarget) {
               setShowForm(false);
               setEditingUser(null);
-              setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '' });
+              setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+              setAvatarFile(null);
+              setAvatarPreview(null);
             }
           }}
         >
@@ -626,7 +650,9 @@ function UserManagement() {
               onClick={() => {
                 setShowForm(false);
                 setEditingUser(null);
-                setFormData({ password: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '' });
+                setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+                setAvatarFile(null);
+                setAvatarPreview(null);
               }}
               className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
             >
@@ -634,418 +660,545 @@ function UserManagement() {
             </button>
             
             {/* Header */}
-            <div className="text-center p-8 pb-4 flex-shrink-0">
-              <h3 className="text-2xl font-bold text-blue-600 mb-2">
-                {editingUser ? 'Edit User' : 'Add User'}
+            <div className="p-4 pb-3 flex-shrink-0 border-b border-gray-200">
+              <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Plus className="h-5 w-5" />
+                {editingUser ? `Edit ${formData.role === 'teacher' ? 'Teacher' : 'Working Student'}` : `Add ${formData.role === 'teacher' ? 'Teacher' : 'Working Student'}`}
               </h3>
-              <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
             </div>
             
-            <form onSubmit={handleSubmit} className="space-y-6 overflow-y-auto px-8 pb-8 flex-1">
-                {/* Role Selection */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Role</label>
+            <form onSubmit={handleSubmit} className="overflow-y-auto flex-1">
+              <div className="p-4">
+                {/* Role Selection - Hidden if editing */}
+                {!editingUser && (
+                  <div className="mb-4">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">Role</label>
                     <select
                       value={formData.role}
                       onChange={(e) => {
                         const newRole = e.target.value;
                         setFormData({ 
                           ...formData, 
-                          role: newRole,
-                          year: '',
-                          section: ''
+                          role: newRole
                         });
                       }}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      disabled={!!editingUser}
+                      className="w-full max-w-xs px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="teacher">Teacher</option>
                       <option value="working_student">Working Student</option>
                     </select>
                   </div>
-                  <div></div>
-                </div>
+                )}
 
-                {/* Role-specific fields */}
-                {formData.role === 'working_student' ? (
-                  // Working Student Form: Student ID, Password, First/Middle/Last Name, Gender
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Two Column Layout */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Left Column - Personal Information */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold text-gray-700 mb-3">Personal Information</h4>
+                    
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Student ID</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">First Name</label>
                       <input
                         type="text"
-                        value={formData.studentId}
-                        onChange={(e) => setFormData({ ...formData, studentId: e.target.value, password: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        value={formData.firstName}
+                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Last Name</label>
+                      <input
+                        type="text"
+                        value={formData.lastName}
+                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
+                      <select
+                        value={formData.gender}
+                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                      >
+                        <option value="">Please Select Here</option>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Birthdate</label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={formData.birthdate}
+                          onChange={(e) => setFormData({ ...formData, birthdate: e.target.value })}
+                          className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        />
+                        <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Contact</label>
+                      <input
+                        type="tel"
+                        value={formData.contactNumber}
+                        onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        placeholder="09789436123"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
+                      <textarea
+                        value={formData.address}
+                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        rows={2}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Column - Account Information and Avatar */}
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-semibold text-gray-700 mb-3">Account Information</h4>
+                    
+                    {formData.role === 'teacher' ? (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
+                        <select
+                          value={formData.departmentId}
+                          onChange={(e) => setFormData({ ...formData, departmentId: Number(e.target.value) })}
+                          className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        >
+                          <option value={0}>Please Select Here</option>
+                          {departments.filter(dept => dept.is_active).map((dept) => (
+                            <option key={dept.id} value={dept.id}>
+                              {dept.department_code} - {dept.department_name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : null}
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Email</label>
+                      <input
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Username</label>
+                      <input
+                        type="text"
+                        value={formData.role === 'teacher' ? formData.employeeId : formData.studentId}
+                        onChange={(e) => {
+                          if (formData.role === 'teacher') {
+                            setFormData({ ...formData, employeeId: e.target.value, password: e.target.value });
+                          } else {
+                            setFormData({ ...formData, studentId: e.target.value, password: e.target.value });
+                          }
+                        }}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                        required
+                        placeholder={formData.role === 'teacher' ? 'Teacher ID' : 'Student ID'}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Password</label>
                       <div className="relative">
                         <input
                           type={showPassword ? "text" : "password"}
                           value={formData.password}
                           onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          className="w-full px-2.5 py-1.5 pr-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           required={!editingUser}
                         />
                         <button
                           type="button"
                           onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                         >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
+
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                      <input
-                        type="text"
-                        value={formData.lastName}
-                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                      <input
-                        type="text"
-                        value={formData.firstName}
-                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
-                      <input
-                        type="text"
-                        value={formData.middleName}
-                        onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
-                      <select
-                        value={formData.gender}
-                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Select Gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Contact Number</label>
-                      <input
-                        type="tel"
-                        value={formData.contactNumber}
-                        onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="09XX-XXX-XXXX"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
-                      <select
-                        value={formData.year}
-                        onChange={(e) => setFormData({ ...formData, year: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Select Year Level</option>
-                        <option value="1st Year">1st Year</option>
-                        <option value="2nd Year">2nd Year</option>
-                        <option value="3rd Year">3rd Year</option>
-                        <option value="4th Year">4th Year</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
-                      <input
-                        type="text"
-                        value={formData.section}
-                        onChange={(e) => setFormData({ ...formData, section: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                  </div>
-                ) : formData.role === 'teacher' ? (
-                  // Teacher Form: Teacher ID, Password, First/Middle/Last Name, Gender
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Teacher ID</label>
-                      <input
-                        type="text"
-                        value={formData.employeeId}
-                        onChange={(e) => setFormData({ ...formData, employeeId: e.target.value, password: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Confirm Password</label>
                       <div className="relative">
                         <input
-                          type={showPassword ? "text" : "password"}
-                          value={formData.password}
-                          onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                          className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          type={showConfirmPassword ? "text" : "password"}
+                          value={formData.confirmPassword}
+                          onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                          className="w-full px-2.5 py-1.5 pr-8 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                           required={!editingUser}
                         />
                         <button
                           type="button"
-                          onClick={() => setShowPassword(!showPassword)}
-                          className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
                         >
-                          {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                         </button>
                       </div>
                     </div>
+
+                    {/* User Avatar */}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                      <input
-                        type="text"
-                        value={formData.lastName}
-                        onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                      <input
-                        type="text"
-                        value={formData.firstName}
-                        onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
-                      <input
-                        type="text"
-                        value={formData.middleName}
-                        onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Gender</label>
-                      <select
-                        value={formData.gender}
-                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Select Gender</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Email Address</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">Contact Number</label>
-                      <input
-                        type="tel"
-                        value={formData.contactNumber}
-                        onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        placeholder="09XX-XXX-XXXX"
-                      />
+                      <label className="block text-xs font-medium text-gray-700 mb-1">User Avatar</label>
+                      <div className="space-y-1.5">
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            id="avatar-upload"
+                            accept="image/*"
+                            onChange={handleAvatarChange}
+                            className="hidden"
+                          />
+                          <label
+                            htmlFor="avatar-upload"
+                            className="px-3 py-1.5 bg-gray-100 border border-gray-300 rounded-md text-xs font-medium text-gray-700 cursor-pointer hover:bg-gray-200"
+                          >
+                            Choose File
+                          </label>
+                          <span className="text-xs text-gray-500">
+                            {avatarFile ? avatarFile.name : 'No file chosen'}
+                          </span>
+                        </div>
+                        <div className="w-full h-32 bg-gray-200 rounded-md flex items-center justify-center overflow-hidden">
+                          {avatarPreview ? (
+                            <img src={avatarPreview} alt="Avatar preview" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="text-gray-400 text-xs">No image selected</div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                ) : null}
-                {/* Submit Button */}
-                <div className="text-center">
-                  <button
-                    type="submit"
-                    className="w-full max-w-xs mx-auto px-6 py-3 bg-red-600 text-white text-base font-semibold rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 transition-colors"
-                  >
-                    {editingUser ? 'UPDATE' : 'SUBMIT'}
-                  </button>
                 </div>
-              </form>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="border-t border-gray-200 p-4 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingUser(null);
+                    setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+                    setAvatarFile(null);
+                    setAvatarPreview(null);
+                  }}
+                  className="px-4 py-1.5 text-sm bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                >
+                  CANCEL
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  SAVE
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
 
-      {/* Users Table - Excel-like features: sorting, filters, selection, pagination */}
+      {error && (
+        <div className="mb-4 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* View User Details Modal */}
+      <ViewUserDetailsModal
+        user={viewingUser}
+        isOpen={!!viewingUser}
+        onClose={() => setViewingUser(null)}
+        departmentName={undefined}
+      />
+
       <div className="bg-white shadow rounded-lg">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            Show <select 
+              value={entriesPerPage}
+              onChange={(e) => {
+                setEntriesPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="border border-gray-300 rounded px-2 py-1 mx-1"
+            >
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select> entries
+          </div>
+          <div className="flex items-center gap-4">
+            <select
+              value={userTypeFilter}
+              onChange={(e) => setUserTypeFilter(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+            >
+              <option value="">All Users</option>
+              <option value="teacher">Teacher</option>
+              <option value="student">Student</option>
+              <option value="working_student">Working Student</option>
+            </select>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto">
-          <div className="max-h-[70vh] overflow-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0 z-10">
-                <tr>
-                  <th className="px-3 py-2 w-10">
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Name
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('role')}>
-                    Role <span className="ml-1">{sortIndicator('role')}</span>
-                  </th>
-                  {(userTypeFilter === 'student' || userTypeFilter === 'working_student') && (
-                    <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('year')}>
-                      Year <span className="ml-1">{sortIndicator('year')}</span>
+          <div className="max-h-[60vh] overflow-y-auto">
+            {currentUsers.length > 0 ? (
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-blue-600 sticky top-0 z-10">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      User ID
                     </th>
-                  )}
-                  <th className="px-3 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer select-none" onClick={() => toggleSort('created')}>
-                    Created <span className="ml-1">{sortIndicator('created')}</span>
-                  </th>
-                  <th className="px-3 py-2 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {pagedUsers.map((user) => (
-                  <tr key={user.id} className={selectedIds.has(user.id) ? 'bg-primary-50' : ''}>
-                  <td className="px-3 py-2">
-                    <input
-                      type="checkbox"
-                      checked={selectedIds.has(user.id)}
-                      onChange={() => toggleSelectRow(user.id)}
-                    />
-                  </td>
-                  <td className="px-3 py-2 text-sm text-gray-900">
-                    {user.first_name && user.last_name 
-                      ? `${user.last_name}, ${user.first_name}${user.middle_name ? ' ' + user.middle_name : ''}`
-                      : user.name}
-                  </td>
-                  <td className="px-3 py-2 text-sm text-gray-900">{user.employee_id || user.student_id || '-'}</td>
-                    <td className="px-3 py-2 text-sm text-gray-900">{user.role.replace('_', ' ')}</td>
-                    {(userTypeFilter === 'student' || userTypeFilter === 'working_student') && (
-                      <td className="px-3 py-2 text-sm text-gray-900">{user.year || ''}</td>
-                    )}
-                    <td className="px-3 py-2 text-sm text-gray-900">{user.created}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex items-center space-x-2 justify-end">
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      Full Name
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      User Type
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                      Action
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                {currentUsers.map((user, index) => (
+                  <tr key={user.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {user.employee_id || user.student_id || user.name || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {user.first_name && user.last_name 
+                        ? `${user.last_name}, ${user.first_name}${user.middle_name ? ' ' + user.middle_name : ''}`
+                        : user.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {user.role.replace('_', ' ')}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setViewingUser(user)}
+                          className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          title="View"
+                        >
+                          <Eye className="h-3 w-3" />
+                        </button>
                         <button
                           onClick={() => handleEdit(user)}
-                          className="text-primary-600 hover:text-primary-900"
+                          className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                           title="Edit"
                         >
-                          <Edit className="h-4 w-4" />
+                          <Edit className="h-3 w-3" />
                         </button>
                         <button
                           onClick={() => handleDelete(user.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
                           title="Delete"
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <Trash2 className="h-3 w-3" />
                         </button>
                       </div>
                     </td>
                   </tr>
                 ))}
-                {pagedUsers.length === 0 && (
-                  <tr>
-                    <td colSpan={(userTypeFilter === 'student' || userTypeFilter === 'working_student') ? 7 : 6} className="px-3 py-6 text-center text-gray-500">
-                      No users found
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                </tbody>
+              </table>
+            ) : (
+              <div className="px-6 py-12 text-center">
+                <p className="text-gray-500">No data available.</p>
+              </div>
+            )}
           </div>
         </div>
-        <div className="p-3 border-t border-gray-200 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div className="text-sm text-gray-600">
-            {selectedRows.length} selected • Showing {total === 0 ? 0 : startIndex + 1}-{endIndex} of {total}
+        {currentUsers.length > 0 && (
+          <div className="px-6 py-4 border-t border-gray-200 flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Showing {startEntry} to {endEntry} of {sortedUsers.length} entries
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <button
+                className="px-3 py-1 text-sm font-medium text-white bg-blue-600 border border-blue-600 rounded-md hover:bg-blue-700"
+              >
+                {currentPage}
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => copySelected(selectedRows)}
-              disabled={selectedRows.length === 0}
-              className={`inline-flex items-center px-3 py-1.5 border rounded-md text-sm ${
-                selectedRows.length === 0
-                  ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-                  : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-              title="Copy selected to clipboard"
-            >
-              <ClipboardList className="h-4 w-4 mr-1.5" /> Copy
-            </button>
-            <button
-              onClick={() => deleteSelected(selectedRows.map((u) => u.id))}
-              disabled={selectedRows.length === 0}
-              className={`inline-flex items-center px-3 py-1.5 border rounded-md text-sm ${
-                selectedRows.length === 0
-                  ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-                  : 'text-red-700 border-red-300 hover:bg-red-50'
-              }`}
-              title="Delete selected"
-            >
-              <Trash2 className="h-4 w-4 mr-1.5" /> Delete Selected
-            </button>
-            <div className="hidden sm:block w-px h-6 bg-gray-200 mx-2" />
-            <label className="text-sm text-gray-600">Rows per page:</label>
-            <select
-              value={pageSize}
-              onChange={(e) => {
-                const v = parseInt(e.target.value, 10);
-                setPageSize(v);
-                setPage(1);
-              }}
-              className="border border-gray-300 rounded px-2 py-1 text-sm"
-            >
-              <option value={10}>10</option>
-              <option value={25}>25</option>
-              <option value={50}>50</option>
-              <option value={100}>100</option>
-            </select>
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className={`px-3 py-1.5 border rounded-md text-sm ${
-                currentPage === 1
-                  ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-                  : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              Prev
-            </button>
-            <span className="text-sm text-gray-600">Page {currentPage} of {totalPages}</span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className={`px-3 py-1.5 border rounded-md text-sm ${
-                currentPage === totalPages
-                  ? 'text-gray-400 border-gray-200 cursor-not-allowed'
-                  : 'text-gray-700 border-gray-300 hover:bg-gray-50'
-              }`}
-            >
-              Next
-            </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+interface ViewUserDetailsModalProps {
+  user: User | null;
+  isOpen: boolean;
+  onClose: () => void;
+  departmentName?: string;
+}
+
+function ViewUserDetailsModal({ user, isOpen, onClose, departmentName }: ViewUserDetailsModalProps) {
+  if (!isOpen || !user) return null;
+
+  const getFullName = () => {
+    if (user.first_name && user.last_name) {
+      return `${user.first_name}${user.middle_name ? ' ' + user.middle_name : ''} ${user.last_name}`;
+    }
+    return user.name;
+  };
+
+  const getTitle = () => {
+    const role = user.role.replace('_', ' ');
+    return role.charAt(0).toUpperCase() + role.slice(1) + ' Details';
+  };
+
+  const getUsername = () => {
+    return user.employee_id || user.student_id || user.name;
+  };
+
+  const getDepartment = () => {
+    if (user.role === 'teacher' && departmentName) {
+      return departmentName;
+    }
+    if (user.role === 'student' || user.role === 'working_student') {
+      return user.year && user.section ? `${user.year} - ${user.section}` : user.year || user.section || 'N/A';
+    }
+    return 'N/A';
+  };
+
+  return (
+    <div 
+      className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) {
+          onClose();
+        }
+      }}
+    >
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4 relative">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center gap-2">
+          <Eye className="h-5 w-5 text-gray-700" />
+          <h3 className="text-lg font-semibold text-gray-900">{getTitle()}</h3>
+        </div>
+
+        {/* Content */}
+        <div className="p-6">
+          <div className="flex gap-6">
+            {/* Left Section - Profile Picture */}
+            <div className="flex-shrink-0">
+              <div className="w-32 h-32 border-2 border-black rounded overflow-hidden bg-gray-100 flex items-center justify-center">
+                {user.photo_url ? (
+                  <img 
+                    src={user.photo_url} 
+                    alt={getFullName()} 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                    <Users className="h-12 w-12 text-gray-400" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right Section - Details */}
+            <div className="flex-1 space-y-3">
+              <div>
+                <span className="text-sm font-semibold text-gray-700">Fullname:</span>
+                <span className="text-sm text-gray-900 ml-2">{getFullName()}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold text-gray-700">Gender:</span>
+                <span className="text-sm text-gray-900 ml-2">{user.gender || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold text-gray-700">Birthday:</span>
+                <span className="text-sm text-gray-900 ml-2">N/A</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold text-gray-700">Contact:</span>
+                <span className="text-sm text-gray-900 ml-2">{user.contact_number || 'N/A'}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold text-gray-700">Email:</span>
+                <span className="text-sm text-gray-900 ml-2">{user.email || ''}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold text-gray-700">Address:</span>
+                <span className="text-sm text-gray-900 ml-2">N/A</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold text-gray-700">
+                  {user.role === 'teacher' ? 'Department:' : 'Year & Section:'}
+                </span>
+                <span className="text-sm text-gray-900 ml-2">{getDepartment()}</span>
+              </div>
+              <div>
+                <span className="text-sm font-semibold text-gray-700">Username:</span>
+                <span className="text-sm text-gray-900 ml-2">{getUsername()}</span>
+              </div>
+            </div>
           </div>
+        </div>
+
+        {/* Footer - Close Button */}
+        <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+          <button
+            onClick={onClose}
+            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-md transition-colors"
+          >
+            <X className="h-4 w-4" />
+            CLOSE
+          </button>
         </div>
       </div>
     </div>
@@ -1168,7 +1321,7 @@ function ViewLogs() {
 
         {/* Search Bar and Filter Button */}
         <div className="flex gap-3">
-          <div className="flex-1 relative">
+          <div className="w-64 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
@@ -1185,22 +1338,49 @@ function ViewLogs() {
               </button>
             )}
           </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
-              showFilters
-                ? 'bg-primary-50 border-primary-500 text-primary-700'
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <Filter className="h-5 w-5" />
-            Filters
-            {dateFilter && (
-              <span className="ml-1 px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">
-                1
-              </span>
+          <div className="relative">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
+                showFilters
+                  ? 'bg-primary-50 border-primary-500 text-primary-700'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <SlidersHorizontal className="h-5 w-5" />
+              Filters
+              {dateFilter && (
+                <span className="ml-1 px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">
+                  1
+                </span>
+              )}
+            </button>
+            
+            {/* Dropdown Filters Panel */}
+            {showFilters && (
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
+                    {dateFilter && (
+                      <button
+                        onClick={() => setDateFilter('')}
+                        className="text-xs text-gray-600 hover:text-gray-900 underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
             )}
-          </button>
+          </div>
           {(searchQuery || dateFilter) && (
             <button
               onClick={clearFilters}
@@ -1210,29 +1390,6 @@ function ViewLogs() {
             </button>
           )}
         </div>
-
-        {/* Advanced Filters Panel */}
-        {showFilters && (
-          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              {dateFilter && (
-                <button
-                  onClick={() => setDateFilter('')}
-                  className="text-sm text-gray-600 hover:text-gray-900 underline"
-                >
-                  Clear date filter
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Error Message */}
@@ -1325,13 +1482,7 @@ function ViewLogs() {
                 ) : (
                   <tr>
                     <td colSpan={6} className="px-6 py-12 text-center">
-                      <div className="flex flex-col items-center justify-center text-gray-500">
-                        <svg className="w-12 h-12 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                        </svg>
-                        <p className="text-sm font-medium">No logs found</p>
-                        <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
-                      </div>
+                      <p className="text-gray-500 font-medium">No logs found</p>
                     </td>
                   </tr>
                 )}
@@ -1366,6 +1517,10 @@ function Reports() {
   
   // Date filter only
   const [dateFilter, setDateFilter] = useState('');
+  
+  // Modal state
+  const [selectedReport, setSelectedReport] = useState<Feedback | null>(null);
+  const [showReportModal, setShowReportModal] = useState(false);
 
   useEffect(() => {
     loadReports();
@@ -1445,22 +1600,30 @@ function Reports() {
 
   return (
     <div>
+      {/* Header Section */}
       <div className="mb-6">
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-start mb-6">
           <div>
-            <h2 className="text-2xl font-bold text-gray-900">Equipment Reports</h2>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-blue-100 rounded-lg">
+                <BarChart3 className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Equipment Reports</h2>
+              </div>
+            </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             <button
               onClick={handleExportReports}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2.5 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             >
               <Download className="h-4 w-4 mr-2" />
               Export CSV
             </button>
             <button
               onClick={handleExportReportsPDF}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700"
+              className="inline-flex items-center px-4 py-2.5 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
             >
               <Download className="h-4 w-4 mr-2" />
               Export PDF
@@ -1470,7 +1633,7 @@ function Reports() {
 
         {/* Search Bar and Filter Button */}
         <div className="flex gap-3">
-          <div className="flex-1 relative">
+          <div className="w-64 relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
@@ -1487,22 +1650,49 @@ function Reports() {
               </button>
             )}
           </div>
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
-              showFilters
-                ? 'bg-primary-50 border-primary-500 text-primary-700'
-                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            <Filter className="h-5 w-5" />
-            Filters
-            {dateFilter && (
-              <span className="ml-1 px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">
-                1
-              </span>
+          <div className="relative">
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
+                showFilters
+                  ? 'bg-primary-50 border-primary-500 text-primary-700'
+                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <SlidersHorizontal className="h-5 w-5" />
+              Filters
+              {dateFilter && (
+                <span className="ml-1 px-2 py-0.5 bg-primary-500 text-white rounded-full text-xs">
+                  1
+                </span>
+              )}
+            </button>
+            
+            {/* Dropdown Filters Panel */}
+            {showFilters && (
+              <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
+                    {dateFilter && (
+                      <button
+                        onClick={() => setDateFilter('')}
+                        className="text-xs text-gray-600 hover:text-gray-900 underline"
+                      >
+                        Clear
+                      </button>
+                    )}
+                  </div>
+                  <input
+                    type="date"
+                    value={dateFilter}
+                    onChange={(e) => setDateFilter(e.target.value)}
+                    className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  />
+                </div>
+              </div>
             )}
-          </button>
+          </div>
           {(searchQuery || dateFilter) && (
             <button
               onClick={clearFilters}
@@ -1512,172 +1702,307 @@ function Reports() {
             </button>
           )}
         </div>
-
-        {/* Advanced Filters Panel */}
-        {showFilters && (
-          <div className="mt-4 p-4 bg-gray-50 border border-gray-200 rounded-lg">
-            <div className="flex items-center gap-4">
-              <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-              />
-              {dateFilter && (
-                <button
-                  onClick={() => setDateFilter('')}
-                  className="text-sm text-gray-600 hover:text-gray-900 underline"
-                >
-                  Clear date filter
-                </button>
-              )}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Error Message */}
       {error && (
-        <div className="mb-4 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+        <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 rounded-r-lg p-4 shadow-sm">
           <div className="flex">
             <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
+              <AlertCircle className="h-5 w-5 text-yellow-400" />
             </div>
             <div className="ml-3">
-              <p className="text-sm text-yellow-700">{error}</p>
+              <p className="text-sm font-medium text-yellow-800">{error}</p>
             </div>
           </div>
         </div>
       )}
 
       {/* Reports Table */}
-      <div className="bg-white shadow rounded-lg overflow-x-auto">
-        <div className="max-h-[70vh] overflow-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50 sticky top-0 z-10">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Student ID
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  PC Number
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Equipment
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Monitor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Keyboard
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Mouse
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Comments
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  WS Notes
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Forwarded By
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Date
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredReports.map((report) => (
-                <tr key={report.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.student_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.student_id_str}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.pc_number}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                      report.equipment_condition === 'Good' 
-                        ? 'bg-green-100 text-green-800' 
-                        : report.equipment_condition === 'Minor Issue' 
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {report.equipment_condition}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.monitor_condition}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.keyboard_condition}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.mouse_condition}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
-                    {report.comments || '-'}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs">
-                    {report.working_student_notes ? (
-                      <span className="text-gray-700 italic">{report.working_student_notes}</span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex flex-col">
-                      <span className="font-medium">{report.forwarded_by_name || 'Unknown'}</span>
-                      {report.forwarded_at && (
-                        <span className="text-xs text-gray-500">
-                          {new Date(report.forwarded_at).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {report.date_submitted ? new Date(report.date_submitted).toLocaleDateString() : '-'}
-                  </td>
-                </tr>
-              ))}
-              {filteredReports.length === 0 && (
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <div className="max-h-[70vh] overflow-y-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 sticky top-0 z-10">
                 <tr>
-                  <td colSpan={11} className="px-6 py-4 text-center text-gray-500">
-                    No reports found
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Student ID
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Full Name
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    PC Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Forwarded By
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredReports.map((report) => (
+                  <tr key={report.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-700">
+                        {report.student_id_str}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {report.student_name}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2.5 py-1 bg-blue-100 text-blue-800 rounded-full text-xs font-medium">
+                        {report.pc_number}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span className="text-sm font-medium text-gray-900">{report.forwarded_by_name || 'Unknown'}</span>
+                        {report.forwarded_at && (
+                          <span className="text-xs text-gray-500">
+                            {new Date(report.forwarded_at).toLocaleString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-700">
+                        {report.date_submitted ? new Date(report.date_submitted).toLocaleDateString('en-US', {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric'
+                        }) : '-'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => {
+                          setSelectedReport(report);
+                          setShowReportModal(true);
+                        }}
+                        className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                      >
+                        <Eye className="h-4 w-4 mr-1.5" />
+                        View Details
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+                {filteredReports.length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="px-6 py-12 text-center">
+                      <p className="text-gray-500 font-medium">No reports available</p>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-        <div className="p-3 border-t border-gray-200 flex justify-between items-center">
+        <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
           <div className="text-sm text-gray-600">
-            Showing <span className="font-medium">{filteredReports.length}</span> of <span className="font-medium">{reports.length}</span> reports
+            Showing <span className="font-semibold text-gray-900">{filteredReports.length}</span> of <span className="font-semibold text-gray-900">{reports.length}</span> report{reports.length !== 1 ? 's' : ''}
           </div>
           {(searchQuery || dateFilter) && (
-            <div className="text-sm text-gray-500 flex items-center gap-1">
-              <Search className="h-4 w-4" />
-              <span>Search/Filters active</span>
+            <div className="text-sm text-gray-500 flex items-center gap-2">
+              <Filter className="h-4 w-4" />
+              <span>Filters active</span>
             </div>
           )}
         </div>
       </div>
+
+      {/* Report Details Modal */}
+      {showReportModal && selectedReport && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowReportModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl mx-4 relative max-h-[90vh] overflow-y-auto">
+            <button
+              type="button"
+              onClick={() => setShowReportModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+            >
+              ×
+            </button>
+            
+            <div className="p-8">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <FileText className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-bold text-gray-900">
+                    Equipment Report Details
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">Full report submitted by student</p>
+                </div>
+              </div>
+
+              {/* Report Information */}
+              <div className="space-y-6">
+                {/* Student Information */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Student Information</h4>
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-600">Name:</span>
+                      <p className="font-medium text-gray-900">{selectedReport.student_name}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Student ID:</span>
+                      <p className="font-medium text-gray-900">{selectedReport.student_id_str}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">PC Number:</span>
+                      <p className="font-medium text-gray-900">{selectedReport.pc_number}</p>
+                    </div>
+                    <div>
+                      <span className="text-gray-600">Date Submitted:</span>
+                      <p className="font-medium text-gray-900">
+                        {selectedReport.date_submitted ? new Date(selectedReport.date_submitted).toLocaleString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        }) : '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Equipment Conditions */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <h4 className="text-sm font-semibold text-gray-700 mb-3">Equipment Conditions</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div>
+                      <span className="text-xs text-gray-600 block mb-2">Equipment</span>
+                      <span className={`px-3 py-1.5 inline-flex text-sm font-semibold rounded-full ${
+                        selectedReport.equipment_condition === 'Good' 
+                          ? 'bg-green-100 text-green-800' 
+                          : selectedReport.equipment_condition === 'Minor Issue' 
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedReport.equipment_condition}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-600 block mb-2">Monitor</span>
+                      <span className={`px-3 py-1.5 inline-flex text-sm font-semibold rounded-full ${
+                        selectedReport.monitor_condition === 'Good' 
+                          ? 'bg-green-100 text-green-800' 
+                          : selectedReport.monitor_condition === 'Minor Issue' 
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedReport.monitor_condition}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-600 block mb-2">Keyboard</span>
+                      <span className={`px-3 py-1.5 inline-flex text-sm font-semibold rounded-full ${
+                        selectedReport.keyboard_condition === 'Good' 
+                          ? 'bg-green-100 text-green-800' 
+                          : selectedReport.keyboard_condition === 'Minor Issue' 
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedReport.keyboard_condition}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs text-gray-600 block mb-2">Mouse</span>
+                      <span className={`px-3 py-1.5 inline-flex text-sm font-semibold rounded-full ${
+                        selectedReport.mouse_condition === 'Good' 
+                          ? 'bg-green-100 text-green-800' 
+                          : selectedReport.mouse_condition === 'Minor Issue' 
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {selectedReport.mouse_condition}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Student Comments */}
+                {selectedReport.comments && (
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Student Comments</h4>
+                    <p className="text-sm text-gray-900 whitespace-pre-wrap">{selectedReport.comments}</p>
+                  </div>
+                )}
+
+                {/* Working Student Notes */}
+                {selectedReport.working_student_notes && (
+                  <div className="bg-yellow-50 rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-2">Working Student Notes</h4>
+                    <p className="text-sm text-gray-900 whitespace-pre-wrap italic">{selectedReport.working_student_notes}</p>
+                  </div>
+                )}
+
+                {/* Forwarding Information */}
+                {selectedReport.forwarded_by_name && (
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <h4 className="text-sm font-semibold text-gray-700 mb-3">Forwarding Information</h4>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-gray-600">Forwarded By:</span>
+                        <p className="font-medium text-gray-900">{selectedReport.forwarded_by_name}</p>
+                      </div>
+                      {selectedReport.forwarded_at && (
+                        <div>
+                          <span className="text-gray-600">Forwarded At:</span>
+                          <p className="font-medium text-gray-900">
+                            {new Date(selectedReport.forwarded_at).toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Close Button */}
+              <div className="mt-6 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowReportModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2073,13 +2398,7 @@ function DepartmentManagement() {
               {pagedDepartments.length === 0 && (
                 <tr>
                   <td colSpan={5} className="px-6 py-12 text-center">
-                    <div className="flex flex-col items-center justify-center text-gray-500">
-                      <Building2 className="w-12 h-12 mb-2 text-gray-400" />
-                      <p className="text-sm font-medium">No departments found</p>
-                      <p className="text-xs text-gray-400 mt-1">
-                        {searchTerm ? 'Try adjusting your search' : 'Add a department to get started'}
-                      </p>
-                    </div>
+                    <p className="text-gray-500 font-medium">No departments found</p>
                   </td>
                 </tr>
               )}
@@ -2139,9 +2458,9 @@ function AdminDashboard() {
   const navigationItems = [
     { name: 'Dashboard', href: '/admin', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/admin' },
     { name: 'Manage Users', href: '/admin/users', icon: <Users className="h-5 w-5" />, current: location.pathname === '/admin/users' },
-    { name: 'Departments', href: '/admin/departments', icon: <Building2 className="h-5 w-5" />, current: location.pathname === '/admin/departments' },
-    { name: 'View Logs', href: '/admin/logs', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/admin/logs' },
-    { name: 'Reports', href: '/admin/reports', icon: <FileText className="h-5 w-5" />, current: location.pathname === '/admin/reports' },
+    { name: 'Departments', href: '/admin/departments', icon: <GraduationCap className="h-5 w-5" />, current: location.pathname === '/admin/departments' },
+    { name: 'View Logs', href: '/admin/logs', icon: <FolderOpen className="h-5 w-5" />, current: location.pathname === '/admin/logs' },
+    { name: 'Reports', href: '/admin/reports', icon: <BarChart3 className="h-5 w-5" />, current: location.pathname === '/admin/reports' },
   ];
 
   return (

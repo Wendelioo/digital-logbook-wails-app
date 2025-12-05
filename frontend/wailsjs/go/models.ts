@@ -70,8 +70,10 @@ export namespace main {
 	    first_name: string;
 	    middle_name?: string;
 	    last_name: string;
-	    year_level?: string;
-	    section?: string;
+	    gender?: string;
+	    email?: string;
+	    contact_number?: string;
+	    profile_photo?: string;
 	    class_id?: number;
 	    is_enrolled: boolean;
 	
@@ -86,8 +88,10 @@ export namespace main {
 	        this.first_name = source["first_name"];
 	        this.middle_name = source["middle_name"];
 	        this.last_name = source["last_name"];
-	        this.year_level = source["year_level"];
-	        this.section = source["section"];
+	        this.gender = source["gender"];
+	        this.email = source["email"];
+	        this.contact_number = source["contact_number"];
+	        this.profile_photo = source["profile_photo"];
 	        this.class_id = source["class_id"];
 	        this.is_enrolled = source["is_enrolled"];
 	    }
@@ -100,10 +104,11 @@ export namespace main {
 	    first_name: string;
 	    middle_name?: string;
 	    last_name: string;
-	    year_level?: string;
-	    section?: string;
 	    enrollment_date: string;
 	    status: string;
+	    email?: string;
+	    contact_number?: string;
+	    course?: string;
 	
 	    static createFrom(source: any = {}) {
 	        return new ClasslistEntry(source);
@@ -118,10 +123,11 @@ export namespace main {
 	        this.first_name = source["first_name"];
 	        this.middle_name = source["middle_name"];
 	        this.last_name = source["last_name"];
-	        this.year_level = source["year_level"];
-	        this.section = source["section"];
 	        this.enrollment_date = source["enrollment_date"];
 	        this.status = source["status"];
+	        this.email = source["email"];
+	        this.contact_number = source["contact_number"];
+	        this.course = source["course"];
 	    }
 	}
 	export class CourseClass {
@@ -129,6 +135,7 @@ export namespace main {
 	    subject_id: number;
 	    subject_code: string;
 	    subject_name: string;
+	    offering_code?: string;
 	    teacher_id: number;
 	    teacher_code?: string;
 	    teacher_name: string;
@@ -153,6 +160,7 @@ export namespace main {
 	        this.subject_id = source["subject_id"];
 	        this.subject_code = source["subject_code"];
 	        this.subject_name = source["subject_name"];
+	        this.offering_code = source["offering_code"];
 	        this.teacher_id = source["teacher_id"];
 	        this.teacher_code = source["teacher_code"];
 	        this.teacher_name = source["teacher_name"];
@@ -166,6 +174,30 @@ export namespace main {
 	        this.is_active = source["is_active"];
 	        this.created_by = source["created_by"];
 	        this.created_at = source["created_at"];
+	    }
+	}
+	export class Department {
+	    id: number;
+	    department_code: string;
+	    department_name: string;
+	    description?: string;
+	    is_active: boolean;
+	    created_at: string;
+	    updated_at: string;
+	
+	    static createFrom(source: any = {}) {
+	        return new Department(source);
+	    }
+	
+	    constructor(source: any = {}) {
+	        if ('string' === typeof source) source = JSON.parse(source);
+	        this.id = source["id"];
+	        this.department_code = source["department_code"];
+	        this.department_name = source["department_name"];
+	        this.description = source["description"];
+	        this.is_active = source["is_active"];
+	        this.created_at = source["created_at"];
+	        this.updated_at = source["updated_at"];
 	    }
 	}
 	export class Feedback {

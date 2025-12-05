@@ -60,6 +60,6 @@ func InitDatabase() (*sql.DB, error) {
 		return nil, fmt.Errorf("failed to connect to database: %w", err)
 	}
 
-	log.Println("✓ Database connection established successfully")
+	log.Println("Database connection established successfully")
 	return db, nil
 }

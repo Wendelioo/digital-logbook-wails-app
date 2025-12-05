@@ -58,6 +58,88 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // Handle automatic logout on window/app close, timeout, or inactivity
+  useEffect(() => {
+    if (!user) return;
+
+    let inactivityTimer: ReturnType<typeof setTimeout> | null = null;
+    const INACTIVITY_TIMEOUT = 30 * 60 * 1000; // 30 minutes of inactivity
+
+    // Function to reset inactivity timer
+    const resetInactivityTimer = () => {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      inactivityTimer = setTimeout(async () => {
+        // Auto logout after inactivity
+        try {
+          if (window.go && window.go.main && window.go.main.App) {
+            await Logout(user.id);
+          }
+        } catch (error) {
+          console.error('Auto logout on inactivity failed:', error);
+        } finally {
+          setUser(null);
+          setIsAuthenticated(false);
+          localStorage.removeItem('user');
+        }
+      }, INACTIVITY_TIMEOUT);
+    };
+
+    // Reset timer on user activity
+    const activityEvents = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click'];
+    activityEvents.forEach(event => {
+      document.addEventListener(event, resetInactivityTimer, true);
+    });
+
+    // Start inactivity timer
+    resetInactivityTimer();
+
+    // Handle window/app close - use synchronous approach
+    const handleBeforeUnload = () => {
+      // Use sendBeacon or synchronous XMLHttpRequest for reliable logout on close
+      if (window.go && window.go.main && window.go.main.App && user) {
+        // Try to call logout - use fire-and-forget approach
+        // Note: We can't await in beforeunload, so we'll try our best
+        const logoutPromise = Logout(user.id);
+        // Store in a way that might complete
+        (window as any).__pendingLogout = logoutPromise;
+      }
+    };
+
+    // Handle component unmount (app closing)
+    const handleUnload = async () => {
+      if (window.go && window.go.main && window.go.main.App && user) {
+        try {
+          await Logout(user.id);
+        } catch (error) {
+          console.error('Logout on unload failed:', error);
+        }
+      }
+    };
+
+    // Add event listeners
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    window.addEventListener('unload', handleUnload);
+
+    // Cleanup
+    return () => {
+      if (inactivityTimer) {
+        clearTimeout(inactivityTimer);
+      }
+      activityEvents.forEach(event => {
+        document.removeEventListener(event, resetInactivityTimer, true);
+      });
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      window.removeEventListener('unload', handleUnload);
+      
+      // Also try to logout on cleanup (component unmount)
+      if (window.go && window.go.main && window.go.main.App && user) {
+        Logout(user.id).catch(err => console.error('Logout on cleanup failed:', err));
+      }
+    };
+  }, [user]);
+
   const login = async (username: string, password: string): Promise<User> => {
     try {
       // Clear any existing user data first

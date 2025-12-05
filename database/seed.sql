@@ -91,6 +91,123 @@ INSERT INTO admins (user_id, admin_id, first_name, middle_name, last_name, gende
 */
 
 -- ============================================================================
+-- INSERT STUDENT ACCOUNTS (10 Students)
+-- ============================================================================
+
+-- Student 1
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(2, '2000001', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(2, '2000001', 'John', 'Michael', 'Doe', 'Male', 'john.doe@student.edu', '09123456789', CURRENT_TIMESTAMP);
+
+-- Student 2
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(3, '2000002', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(3, '2000002', 'Jane', 'Marie', 'Smith', 'Female', 'jane.smith@student.edu', '09123456790', CURRENT_TIMESTAMP);
+
+-- Student 3
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(4, '2000003', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(4, '2000003', 'Robert', 'James', 'Johnson', 'Male', 'robert.johnson@student.edu', '09123456791', CURRENT_TIMESTAMP);
+
+-- Student 4
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(5, '2000004', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(5, '2000004', 'Maria', 'Grace', 'Williams', 'Female', 'maria.williams@student.edu', '09123456792', CURRENT_TIMESTAMP);
+
+-- Student 5
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(6, '2000005', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(6, '2000005', 'David', 'Paul', 'Brown', 'Male', 'david.brown@student.edu', '09123456793', CURRENT_TIMESTAMP);
+
+-- Student 6
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(7, '2000006', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(7, '2000006', 'Sarah', 'Ann', 'Jones', 'Female', 'sarah.jones@student.edu', '09123456794', CURRENT_TIMESTAMP);
+
+-- Student 7
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(8, '2000007', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(8, '2000007', 'Michael', 'Thomas', 'Garcia', 'Male', 'michael.garcia@student.edu', '09123456795', CURRENT_TIMESTAMP);
+
+-- Student 8
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(9, '2000008', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(9, '2000008', 'Emily', 'Rose', 'Miller', 'Female', 'emily.miller@student.edu', '09123456796', CURRENT_TIMESTAMP);
+
+-- Student 9
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(10, '2000009', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(10, '2000009', 'Christopher', 'Lee', 'Davis', 'Male', 'christopher.davis@student.edu', '09123456797', CURRENT_TIMESTAMP);
+
+-- Student 10
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(11, '2000010', 'student123', 'student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(11, '2000010', 'Jessica', 'Lynn', 'Rodriguez', 'Female', 'jessica.rodriguez@student.edu', '09123456798', CURRENT_TIMESTAMP);
+
+-- ============================================================================
+-- INSERT WORKING STUDENT ACCOUNTS (2 Working Students)
+-- ============================================================================
+
+-- Working Student 1
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(12, '3000001', 'working123', 'working_student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(12, '3000001', 'Daniel', 'Mark', 'Martinez', 'Male', 'daniel.martinez@student.edu', '09123456799', CURRENT_TIMESTAMP);
+
+-- Working Student 2
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(13, '3000002', 'working123', 'working_student', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(13, '3000002', 'Amanda', 'Nicole', 'Anderson', 'Female', 'amanda.anderson@student.edu', '09123456800', CURRENT_TIMESTAMP);
+
+-- ============================================================================
+-- INSERT TEACHER ACCOUNTS (2 Teachers)
+-- ============================================================================
+
+-- Teacher 1
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(14, '4000001', 'teacher123', 'teacher', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO teachers (user_id, teacher_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(14, '4000001', 'Dr. Patricia', 'Anne', 'Wilson', 'Female', 'patricia.wilson@teacher.edu', '09123456801', CURRENT_TIMESTAMP);
+
+-- Teacher 2
+INSERT INTO users (id, username, password, user_type, is_active, created_at) VALUES 
+(15, '4000002', 'teacher123', 'teacher', TRUE, CURRENT_TIMESTAMP);
+
+INSERT INTO teachers (user_id, teacher_id, first_name, middle_name, last_name, gender, email, contact_number, created_at) VALUES 
+(15, '4000002', 'Prof. Richard', 'John', 'Taylor', 'Male', 'richard.taylor@teacher.edu', '09123456802', CURRENT_TIMESTAMP);
+
+-- ============================================================================
+-- VERIFICATION QUERIES (Optional - Run to verify seed data)
+-- ============================================================================
+-- SELECT * FROM v_users_complete WHERE user_type = 'student';
+-- SELECT * FROM v_users_complete WHERE user_type = 'working_student';
+-- SELECT * FROM v_users_complete WHERE user_type = 'teacher';
+
+-- ============================================================================
 -- END OF SEED DATA
 -- ============================================================================
 

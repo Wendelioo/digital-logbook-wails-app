@@ -4,13 +4,21 @@ import {main} from '../models';
 
 export function ChangePassword(arg1:string,arg2:string,arg3:string):Promise<void>;
 
-export function CreateClass(arg1:number,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:number):Promise<number>;
+export function CreateClass(arg1:number,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:number):Promise<number>;
+
+export function CreateDepartment(arg1:string,arg2:string,arg3:string):Promise<void>;
 
 export function CreateSubject(arg1:string,arg2:string,arg3:number,arg4:string):Promise<void>;
 
-export function CreateUser(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string):Promise<void>;
+export function CreateUser(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string,arg14:number):Promise<void>;
+
+export function CreateUsersBulk(arg1:string):Promise<Record<string, any>>;
+
+export function CreateUsersBulkFromFile(arg1:string,arg2:string):Promise<Record<string, any>>;
 
 export function DeleteClass(arg1:number):Promise<void>;
+
+export function DeleteDepartment(arg1:number):Promise<void>;
 
 export function DeleteUser(arg1:number):Promise<void>;
 
@@ -52,6 +60,8 @@ export function GetClassStudents(arg1:number):Promise<Array<main.ClasslistEntry>
 
 export function GetClassesByCreator(arg1:number):Promise<Array<main.CourseClass>>;
 
+export function GetDepartments():Promise<Array<main.Department>>;
+
 export function GetFeedback():Promise<Array<main.Feedback>>;
 
 export function GetPendingFeedback():Promise<Array<main.Feedback>>;
@@ -67,6 +77,8 @@ export function GetSubjects():Promise<Array<main.Subject>>;
 export function GetTeacherClasses(arg1:number):Promise<Array<main.CourseClass>>;
 
 export function GetTeacherClassesByUserID(arg1:number):Promise<Array<main.CourseClass>>;
+
+export function GetTeacherClassesCreatedByWorkingStudents(arg1:number):Promise<Array<main.CourseClass>>;
 
 export function GetTeacherDashboard(arg1:number):Promise<main.TeacherDashboard>;
 
@@ -90,6 +102,8 @@ export function RecordAttendance(arg1:number,arg2:number,arg3:string,arg4:string
 
 export function RecordStudentLogin(arg1:number,arg2:number,arg3:string):Promise<void>;
 
+export function RecordTimeoutLogout(arg1:number):Promise<void>;
+
 export function SaveEquipmentFeedback(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string):Promise<void>;
 
 export function SearchUsers(arg1:string,arg2:string):Promise<Array<main.User>>;
@@ -104,6 +118,8 @@ export function UpdateAttendanceTime(arg1:number,arg2:string,arg3:string):Promis
 
 export function UpdateClass(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:boolean):Promise<void>;
 
-export function UpdateUser(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string):Promise<void>;
+export function UpdateDepartment(arg1:number,arg2:string,arg3:string,arg4:string,arg5:boolean):Promise<void>;
+
+export function UpdateUser(arg1:number,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:string,arg9:string,arg10:string,arg11:string,arg12:string,arg13:string,arg14:number):Promise<void>;
 
 export function UpdateUserPhoto(arg1:number,arg2:string,arg3:string):Promise<void>;

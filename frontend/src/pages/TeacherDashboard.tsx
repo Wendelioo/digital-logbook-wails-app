@@ -12,7 +12,17 @@ import {
   Clock,
   ArrowLeft,
   Calendar,
-  MapPin
+  MapPin,
+  Calculator,
+  Globe,
+  FlaskConical,
+  GraduationCap,
+  Eye,
+  Edit,
+  Trash2,
+  Plus,
+  Library,
+  CalendarPlus
 } from 'lucide-react';
 import { 
   GetTeacherClassesByUserID,
@@ -21,7 +31,14 @@ import {
   InitializeAttendanceForClass,
   UpdateAttendanceRecord,
   RecordAttendance,
-  ExportAttendanceCSV
+  ExportAttendanceCSV,
+  GetTeacherClassesCreatedByWorkingStudents,
+  UpdateClass,
+  DeleteClass,
+  GetAllStudentsForEnrollment,
+  EnrollMultipleStudents,
+  UnenrollStudentFromClassByIDs,
+  GetAllClasses
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
 import { main } from '../../wailsjs/go/models';
@@ -30,9 +47,52 @@ import { main } from '../../wailsjs/go/models';
 type Class = main.CourseClass;
 type ClasslistEntry = main.ClasslistEntry;
 type Attendance = main.Attendance;
+type ClassStudent = main.ClassStudent;
+
+// Helper function to get subject icon and color
+function getSubjectIconAndColor(subjectCode: string, subjectName: string) {
+  const code = subjectCode.toLowerCase();
+  const name = subjectName.toLowerCase();
+  
+  if (code.includes('math') || name.includes('math')) {
+    return {
+      icon: <Calculator className="h-6 w-6" />,
+      headerColor: 'bg-blue-600',
+      iconColor: 'text-blue-200'
+    };
+  }
+  if (code.includes('hist') || name.includes('history') || name.includes('civics')) {
+    return {
+      icon: <Globe className="h-6 w-6" />,
+      headerColor: 'bg-green-600',
+      iconColor: 'text-green-200'
+    };
+  }
+  if (code.includes('sci') || name.includes('science') || name.includes('lab')) {
+    return {
+      icon: <FlaskConical className="h-6 w-6" />,
+      headerColor: 'bg-green-600',
+      iconColor: 'text-green-200'
+    };
+  }
+  if (code.includes('eng') || name.includes('english') || name.includes('literature')) {
+    return {
+      icon: <BookOpen className="h-6 w-6" />,
+      headerColor: 'bg-purple-600',
+      iconColor: 'text-purple-200'
+    };
+  }
+  // Default
+  return {
+    icon: <GraduationCap className="h-6 w-6" />,
+    headerColor: 'bg-indigo-600',
+    iconColor: 'text-indigo-200'
+  };
+}
 
 function DashboardOverview() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [classes, setClasses] = useState<Class[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
@@ -92,12 +152,12 @@ function DashboardOverview() {
       )}
 
       {/* Quick Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
         <div className="bg-white overflow-hidden shadow rounded-lg">
           <div className="p-5">
             <div className="flex items-center">
               <div className="flex-shrink-0">
-                <BookOpen className="h-8 w-8 text-blue-600" />
+                <Library className="h-8 w-8 text-blue-600" />
               </div>
               <div className="ml-5 w-0 flex-1">
                 <dl>
@@ -132,84 +192,82 @@ function DashboardOverview() {
             </div>
           </div>
         </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <ClipboardList className="h-8 w-8 text-green-600" />
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Subjects
-                  </dt>
-                  <dd className="text-3xl font-bold text-gray-900">
-                    {new Set(classes.map(c => c.subject_id)).size}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
 
-      {/* Classes List */}
+      {/* Classes List - Card Grid */}
       {!loading && classes.length > 0 && (
-        <div className="bg-white shadow rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Your Classes</h3>
-          </div>
-          <div className="divide-y divide-gray-200">
-            {classes.map((cls) => (
-              <div key={cls.id} className="px-6 py-4 hover:bg-gray-50">
-                <div className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center">
-                      <h4 className="text-lg font-semibold text-gray-900">
-                        {cls.subject_code} - {cls.subject_name}
-                      </h4>
-                      {cls.section && (
-                        <span className="ml-3 px-2 py-1 text-xs font-medium bg-blue-100 text-blue-800 rounded">
-                          Section {cls.section}
-                        </span>
-                      )}
+        <div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {classes.map((cls) => {
+              const { icon, headerColor, iconColor } = getSubjectIconAndColor(cls.subject_code, cls.subject_name);
+              return (
+                <div 
+                  key={cls.id} 
+                  className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/teacher/class-management/${cls.id}`)}
+                >
+                  {/* Card Header */}
+                  <div className={`${headerColor} px-4 py-3 flex items-center justify-between`}>
+                    <div className="flex-1">
+                      <h3 className="text-white font-semibold text-lg">{cls.subject_name}</h3>
+                      <p className="text-white text-sm opacity-90">{cls.subject_code}</p>
                     </div>
-                    <div className="mt-1 flex items-center gap-4 text-sm text-gray-500">
-                      {cls.schedule && (
-                        <div className="flex items-center">
-                          <Clock className="h-4 w-4 mr-1" />
-                          {cls.schedule}
-                        </div>
-                      )}
-                      {cls.room && (
-                        <div className="flex items-center">
-                          <MapPin className="h-4 w-4 mr-1" />
-                          {cls.room}
-                        </div>
-                      )}
-                      <div className="flex items-center">
-                        <Users className="h-4 w-4 mr-1" />
-                        {cls.enrolled_count} students
-                      </div>
+                    <div className={iconColor}>
+                      {icon}
                     </div>
                   </div>
+                  
+                  {/* Card Body */}
+                  <div className="px-4 py-4 bg-white">
+                    <div className="flex items-center mb-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center mr-3">
+                        <Users className="h-5 w-5 text-gray-600" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">{cls.teacher_name}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center text-sm text-gray-600">
+                      <Users className="h-4 w-4 mr-2" />
+                      <span>{cls.enrolled_count} students</span>
+                    </div>
+                    {cls.schedule && (
+                      <div className="flex items-center text-sm text-gray-600 mt-2">
+                        <Clock className="h-4 w-4 mr-2" />
+                        <span>{cls.schedule}</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
+        </div>
+      )}
+      
+      {!loading && classes.length === 0 && (
+        <div className="bg-white shadow rounded-lg p-12 text-center">
+          <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
+          <h3 className="mt-4 text-lg font-medium text-gray-900">No classes found</h3>
+          <p className="mt-2 text-sm text-gray-500">
+            You don't have any assigned classes yet.
+          </p>
         </div>
       )}
     </div>
   );
 }
 
-function Classlists() {
+function ClassManagement() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [classes, setClasses] = useState<Class[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [filteredClasses, setFilteredClasses] = useState<Class[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [entriesPerPage, setEntriesPerPage] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -217,8 +275,9 @@ function Classlists() {
 
       setLoading(true);
       try {
-        const data = await GetTeacherClassesByUserID(user.id);
+        const data = await GetTeacherClassesCreatedByWorkingStudents(user.id);
         setClasses(data || []);
+        setFilteredClasses(data || []);
         setError('');
       } catch (error) {
         console.error('Failed to load classes:', error);
@@ -231,131 +290,455 @@ function Classlists() {
     loadClasses();
   }, [user?.id]);
 
+  useEffect(() => {
+    let filtered = classes;
+
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(cls =>
+        cls.subject_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cls.subject_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (cls.school_year && cls.school_year.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (cls.year_level && cls.year_level.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (cls.section && cls.section.toLowerCase().includes(searchTerm.toLowerCase()))
+      );
+    }
+
+    setFilteredClasses(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [searchTerm, classes]);
+
   const handleViewClassList = (classId: number) => {
-    navigate(`/teacher/classlists/${classId}`);
+    navigate(`/teacher/class-management/${classId}`);
   };
 
-  return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-gray-900">Class Lists</h2>
-      </div>
-
-      {error && (
-        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
-          {error}
-        </div>
-      )}
-
-      {loading ? (
+  if (loading) {
+    return (
+      <div className="p-6">
         <div className="flex items-center justify-center h-64">
           <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
         </div>
-      ) : classes.length > 0 ? (
-        <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Subject
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Section
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Schedule
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Room
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Students
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {classes.map((cls) => (
-                <tr key={cls.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{cls.subject_code}</div>
-                    <div className="text-sm text-gray-500">{cls.subject_name}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {cls.section || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {cls.schedule || 'TBA'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {cls.room || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {cls.enrolled_count}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <button 
-                      onClick={() => handleViewClassList(cls.id)}
-                      className="text-primary-600 hover:text-primary-900 font-medium hover:underline transition-colors"
-                    >
-                      View Roster
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      </div>
+    );
+  }
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredClasses.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const endIndex = startIndex + entriesPerPage;
+  const currentClasses = filteredClasses.slice(startIndex, endIndex);
+  const startEntry = filteredClasses.length > 0 ? startIndex + 1 : 0;
+  const endEntry = Math.min(endIndex, filteredClasses.length);
+
+  return (
+    <div className="flex flex-col">
+      {/* Header Section */}
+      <div className="flex-shrink-0 mb-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">Class Management</h2>
         </div>
-      ) : (
-        <div className="bg-white shadow sm:rounded-lg p-6">
-          <div className="text-center py-8">
-            <h3 className="text-sm font-medium text-gray-900">No classes found</h3>
+      </div>
+
+      {error && (
+        <div className="flex-shrink-0 mb-4 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* Controls Section */}
+      <div className="flex-shrink-0 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">Show</span>
+            <select
+              value={entriesPerPage}
+              onChange={(e) => {
+                setEntriesPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span className="text-sm text-gray-700">entries</span>
           </div>
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-gray-700">Search</span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder=""
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Table Section */}
+      <div className="flex-1 bg-white shadow rounded-lg overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-blue-600">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                #
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                School Year
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Semester
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Offering Code
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Subject Name
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Schedule
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Room
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Teacher
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Students
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Action
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {currentClasses.map((cls, index) => (
+              <tr key={cls.id} className="hover:bg-gray-50">
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {startIndex + index + 1}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.school_year || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.semester || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.offering_code || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.subject_name || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.schedule || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.room || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.teacher_name || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.enrolled_count}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleViewClassList(cls.id)}
+                      className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      title="View"
+                    >
+                      <Eye className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={() => navigate(`/teacher/class-management/${cls.id}`)}
+                      className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      title="Edit"
+                    >
+                      <Edit className="h-3 w-3" />
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('Are you sure you want to delete this class?')) {
+                          try {
+                            await DeleteClass(cls.id);
+                            // Reload classes
+                            const data = await GetTeacherClassesCreatedByWorkingStudents(user?.id || 0);
+                            setClasses(data || []);
+                            setFilteredClasses(data || []);
+                            alert('Class deleted successfully!');
+                          } catch (error) {
+                            console.error('Failed to delete class:', error);
+                            alert('Failed to delete class. Please try again.');
+                          }
+                        }
+                      }}
+                      className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                      title="Delete"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination Section */}
+      {filteredClasses.length > 0 && (
+        <div className="flex-shrink-0 mt-4 flex items-center justify-between">
+          <div className="text-sm text-gray-700">
+            Showing {startEntry} to {endEntry} of {filteredClasses.length} entries
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              className="px-3 py-1 text-sm font-medium text-white bg-blue-600 border border-blue-600 rounded-md hover:bg-blue-700"
+            >
+              {currentPage}
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 text-sm text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {filteredClasses.length === 0 && !error && (
+        <div className="text-center py-12">
+          {searchTerm ? (
+            <>
+              <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No matching classes found</h3>
+              <div className="mt-6">
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Clear Search
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
+                <BookOpen className="h-8 w-8 text-gray-400" />
+              </div>
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No classes found</h3>
+              <p className="mt-1 text-sm text-gray-500">
+                No class lists have been created by working students and assigned to you yet.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function ViewClassList() {
+function ClassManagementDetail() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { user } = useAuth();
   const [classInfo, setClassInfo] = useState<Class | null>(null);
   const [students, setStudents] = useState<ClasslistEntry[]>([]);
+  const [availableStudents, setAvailableStudents] = useState<ClassStudent[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string>('');
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedStudents, setSelectedStudents] = useState<Set<number>>(new Set());
+  const [searchTerm, setSearchTerm] = useState('');
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [enrolling, setEnrolling] = useState(false);
+  const [editFormData, setEditFormData] = useState({
+    schedule: '',
+    room: '',
+    yearLevel: '',
+    section: '',
+    semester: '',
+    schoolYear: ''
+  });
+  const [saving, setSaving] = useState(false);
+
+  const loadClassDetails = async () => {
+    if (!id) return;
+    
+    setLoading(true);
+    try {
+      const classes = await GetTeacherClassesCreatedByWorkingStudents(user?.id || 0);
+      const selectedClass = classes.find(c => c.id === parseInt(id));
+      
+      if (selectedClass) {
+        setClassInfo(selectedClass);
+        setEditFormData({
+          schedule: selectedClass.schedule || '',
+          room: selectedClass.room || '',
+          yearLevel: selectedClass.year_level || '',
+          section: selectedClass.section || '',
+          semester: selectedClass.semester || '',
+          schoolYear: selectedClass.school_year || ''
+        });
+      }
+
+      const studentsData = await GetClassStudents(parseInt(id));
+      setStudents(studentsData || []);
+      
+      setError('');
+    } catch (error) {
+      console.error('Failed to load class details:', error);
+      setError('Unable to load class details from server.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    const loadClassDetails = async () => {
-      if (!id || !user?.id) return;
-      
-      setLoading(true);
-      try {
-        // Get all teacher's classes and find the selected one
-        const classes = await GetTeacherClassesByUserID(user.id);
-        const selectedClass = classes.find(c => c.id === parseInt(id));
-        
-        if (selectedClass) {
-          setClassInfo(selectedClass);
-        }
-
-        // Get enrolled students in this class
-        const studentsData = await GetClassStudents(parseInt(id));
-        setStudents(studentsData || []);
-        setError('');
-      } catch (error) {
-        console.error('Failed to load class details:', error);
-        setError('Unable to load class details from server.');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     loadClassDetails();
   }, [id, user?.id]);
+
+  const handleRemoveStudent = async (studentId: number, classId: number) => {
+    if (!confirm('Are you sure you want to remove this student from the class?')) {
+      return;
+    }
+
+    try {
+      await UnenrollStudentFromClassByIDs(studentId, classId);
+      await loadClassDetails();
+      alert('Student removed successfully!');
+    } catch (error) {
+      console.error('Failed to remove student:', error);
+      alert('Failed to remove student. Please try again.');
+    }
+  };
+
+  const handleAddStudent = async () => {
+    if (!id) return;
+    
+    try {
+      const available = await GetAllStudentsForEnrollment(parseInt(id));
+      setAvailableStudents(available || []);
+      setShowAddModal(true);
+      setSelectedStudents(new Set());
+      setSearchTerm('');
+    } catch (error) {
+      console.error('Failed to load available students:', error);
+      alert('Failed to load students. Please try again.');
+    }
+  };
+
+  const handleEnrollStudents = async () => {
+    if (!id || selectedStudents.size === 0) return;
+
+    setEnrolling(true);
+    try {
+      const studentIds = Array.from(selectedStudents);
+      await EnrollMultipleStudents(studentIds, parseInt(id), user?.id || 0);
+      
+      setShowAddModal(false);
+      await loadClassDetails();
+      alert(`Successfully enrolled ${selectedStudents.size} student(s)!`);
+    } catch (error) {
+      console.error('Failed to enroll students:', error);
+      alert('Failed to enroll some students. Please try again.');
+    } finally {
+      setEnrolling(false);
+    }
+  };
+
+  const handleEditClass = () => {
+    if (!classInfo) return;
+    setShowEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!id || !classInfo) return;
+
+    setSaving(true);
+    try {
+      await UpdateClass(
+        parseInt(id),
+        editFormData.schedule,
+        editFormData.room,
+        editFormData.yearLevel,
+        editFormData.section,
+        editFormData.semester,
+        editFormData.schoolYear,
+        classInfo.is_active
+      );
+      setShowEditModal(false);
+      await loadClassDetails();
+      alert('Class updated successfully!');
+    } catch (error) {
+      console.error('Failed to update class:', error);
+      alert('Failed to update class. Please try again.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteClass = async () => {
+    if (!id) return;
+    if (!confirm('Are you sure you want to delete this class? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      await DeleteClass(parseInt(id));
+      alert('Class deleted successfully!');
+      navigate('/teacher/class-management');
+    } catch (error) {
+      console.error('Failed to delete class:', error);
+      alert('Failed to delete class. Please try again.');
+    }
+  };
+
+  const toggleStudentSelection = (studentId: number) => {
+    const newSelection = new Set(selectedStudents);
+    if (newSelection.has(studentId)) {
+      newSelection.delete(studentId);
+    } else {
+      newSelection.add(studentId);
+    }
+    setSelectedStudents(newSelection);
+  };
+
+  const filteredAvailableStudents = availableStudents.filter(student =>
+    !student.is_enrolled && (
+      student.student_id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      student.last_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (student.middle_name && student.middle_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+  );
+
+  const filteredStudents = students.filter(student => {
+    const searchLower = studentSearchTerm.toLowerCase();
+    return (
+      student.student_code.toLowerCase().includes(searchLower) ||
+      student.first_name.toLowerCase().includes(searchLower) ||
+      student.last_name.toLowerCase().includes(searchLower) ||
+      (student.middle_name && student.middle_name.toLowerCase().includes(searchLower))
+    );
+  });
 
   if (loading) {
     return (
@@ -373,10 +756,10 @@ function ViewClassList() {
         <div className="text-center py-8">
           <p className="text-gray-500">Class not found</p>
           <button
-            onClick={() => navigate('/teacher/classlists')}
+            onClick={() => navigate('/teacher/class-management')}
             className="mt-4 text-primary-600 hover:text-primary-900"
           >
-            Back to Class Lists
+            Back to Class Management
           </button>
         </div>
       </div>
@@ -385,17 +768,74 @@ function ViewClassList() {
 
   return (
     <div className="p-6">
-      {/* Header with Back Button */}
-      <div className="mb-6 flex items-center">
-        <button
-          onClick={() => navigate('/teacher/classlists')}
-          className="mr-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
-        >
-          <ArrowLeft className="h-5 w-5 text-gray-600" />
-        </button>
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Class Roster</h2>
-          <p className="text-gray-600">View students enrolled in this class</p>
+      <div className="bg-white shadow rounded-lg mb-6">
+        <div className="px-6 py-6">
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center">
+              <button
+                onClick={() => navigate('/teacher/class-management')}
+                className="mr-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <ArrowLeft className="h-5 w-5 text-gray-600" />
+              </button>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900">Class Information</h2>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={handleDeleteClass}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
+              >
+                <Trash2 className="h-4 w-4 inline mr-2" />
+                DELETE CLASS
+              </button>
+              <button
+                onClick={handleEditClass}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                <Edit className="h-4 w-4 inline mr-2" />
+                EDIT CLASS
+              </button>
+              <button
+                onClick={handleAddStudent}
+                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                ADD STUDENT
+              </button>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-200 pt-6">
+            <h3 className="text-lg font-semibold text-gray-700 mb-4">Class Details</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">School Year:</span>
+                <span className="text-gray-900">{classInfo.school_year || 'N/A'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Semester:</span>
+                <span className="text-gray-900">{classInfo.semester || 'N/A'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Subject Name:</span>
+                <span className="text-gray-900">{classInfo.subject_name || 'N/A'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Schedule:</span>
+                <span className="text-gray-900">{classInfo.schedule || 'N/A'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Room:</span>
+                <span className="text-gray-900">{classInfo.room || 'N/A'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Teacher:</span>
+                <span className="text-gray-900">{classInfo.teacher_name || 'N/A'}</span>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -405,137 +845,344 @@ function ViewClassList() {
         </div>
       )}
 
-      {/* Class Information Header */}
-      <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b pb-2">Class Information</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex">
-            <span className="font-medium text-gray-700 w-32">Subject Code:</span>
-            <span className="text-gray-900">{classInfo.subject_code}</span>
+      <div className="bg-white shadow rounded-lg">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-semibold text-gray-700">Class Student List</h3>
+        </div>
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <div className="text-sm text-gray-600">
+            Show <select className="border border-gray-300 rounded px-2 py-1 mx-1">
+              <option value="10">10</option>
+              <option value="25">25</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+            </select> entries
           </div>
-          <div className="flex">
-            <span className="font-medium text-gray-700 w-32">Section:</span>
-            <span className="text-gray-900">{classInfo.section || 'N/A'}</span>
-          </div>
-          <div className="flex">
-            <span className="font-medium text-gray-700 w-32">Subject Name:</span>
-            <span className="text-gray-900">{classInfo.subject_name}</span>
-          </div>
-          <div className="flex">
-            <span className="font-medium text-gray-700 w-32">Schedule:</span>
-            <span className="text-gray-900">{classInfo.schedule || 'TBA'}</span>
-          </div>
-          <div className="flex">
-            <span className="font-medium text-gray-700 w-32">Room:</span>
-            <span className="text-gray-900">{classInfo.room || 'N/A'}</span>
-          </div>
-          <div className="flex">
-            <span className="font-medium text-gray-700 w-32">Year Level:</span>
-            <span className="text-gray-900">{classInfo.year_level || 'N/A'}</span>
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search"
+              value={studentSearchTerm}
+              onChange={(e) => setStudentSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
           </div>
         </div>
-      </div>
-
-      {/* Student Count */}
-      <div className="mb-4">
-        <div className="text-sm text-gray-600">
-          Total Students: <span className="font-semibold">{students.length}</span>
-        </div>
-      </div>
-
-      {/* Student List Table */}
-      <div className="bg-white shadow overflow-hidden sm:rounded-lg">
-        {students.length > 0 ? (
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Student ID
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Last Name
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  First Name
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Middle Name
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Year/Section
-                </th>
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {students.map((student) => (
-                <tr key={student.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {student.student_code}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {student.last_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    {student.first_name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {student.middle_name || '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {student.year_level || '-'} {student.section ? `/ ${student.section}` : ''}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      student.status === 'active' ? 'bg-green-100 text-green-800' :
-                      student.status === 'dropped' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {student.status}
-                    </span>
-                  </td>
+        <div className="overflow-x-auto">
+          {filteredStudents.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    #
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Student ID
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Student Name
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="px-6 py-12 text-center">
-            <Users className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No students enrolled</h3>
-            <p className="mt-1 text-sm text-gray-500">
-              No students are enrolled in this class yet.
-            </p>
-          </div>
-        )}
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredStudents.map((student, index) => (
+                  <tr key={student.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {index + 1}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {student.student_code}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {student.last_name}, {student.first_name} {student.middle_name || ''}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <button
+                        onClick={() => handleRemoveStudent(student.student_id, student.class_id)}
+                        className="text-red-600 hover:text-red-900 font-medium hover:underline transition-colors"
+                      >
+                        <Trash2 className="h-4 w-4 inline mr-1" />
+                        Remove
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="px-6 py-12 text-center">
+              <p className="text-gray-500">No data available.</p>
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Add Student Modal */}
+      {showAddModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowAddModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-4xl mx-4 relative max-h-[90vh] flex flex-col">
+            <button
+              type="button"
+              onClick={() => setShowAddModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+            >
+              ×
+            </button>
+            
+            <div className="text-center p-8 pb-4 flex-shrink-0">
+              <h2 className="text-2xl font-bold text-blue-600 mb-2">Add Students to Class</h2>
+              <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
+              <p className="text-gray-600 mt-4">Select students to enroll in {classInfo?.subject_code}</p>
+            </div>
+
+            <div className="px-8 pb-8 flex-1 overflow-hidden flex flex-col">
+              <div className="mb-4 flex-shrink-0">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+                    placeholder="Search students..."
+                  />
+                </div>
+              </div>
+
+              <div className="mb-2 text-sm text-gray-600 flex-shrink-0">
+                {selectedStudents.size > 0 ? (
+                  <span className="font-semibold text-blue-600">
+                    {selectedStudents.size} student{selectedStudents.size !== 1 ? 's' : ''} selected
+                  </span>
+                ) : (
+                  <span>Select students to enroll</span>
+                )}
+              </div>
+
+              <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg">
+                {filteredAvailableStudents.length > 0 ? (
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50 sticky top-0 z-10">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          <input
+                            type="checkbox"
+                            checked={filteredAvailableStudents.length > 0 && filteredAvailableStudents.every(s => selectedStudents.has(s.id))}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedStudents(new Set(filteredAvailableStudents.map(s => s.id)));
+                              } else {
+                                setSelectedStudents(new Set());
+                              }
+                            }}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                          />
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Student ID
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {filteredAvailableStudents.map((student) => (
+                        <tr 
+                          key={student.id} 
+                          className={`hover:bg-gray-50 cursor-pointer ${selectedStudents.has(student.id) ? 'bg-blue-50' : ''}`}
+                          onClick={() => toggleStudentSelection(student.id)}
+                        >
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <input
+                              type="checkbox"
+                              checked={selectedStudents.has(student.id)}
+                              onChange={() => toggleStudentSelection(student.id)}
+                              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {student.student_id}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {student.last_name}, {student.first_name} {student.middle_name || ''}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <div className="px-6 py-12 text-center">
+                    <Users className="mx-auto h-12 w-12 text-gray-400" />
+                    <h3 className="mt-2 text-sm font-medium text-gray-900">No students available</h3>
+                    <p className="mt-1 text-sm text-gray-500">
+                      {searchTerm ? 'No students match your search criteria.' : 'All students are already enrolled or there are no students in the system.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3 flex-shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowAddModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEnrollStudents}
+                  disabled={selectedStudents.size === 0 || enrolling}
+                  className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {enrolling ? 'Enrolling...' : `Enroll ${selectedStudents.size > 0 ? selectedStudents.size : ''} Student${selectedStudents.size !== 1 ? 's' : ''}`}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Class Modal */}
+      {showEditModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowEditModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 relative max-h-[90vh] flex flex-col">
+            <button
+              type="button"
+              onClick={() => setShowEditModal(false)}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+            >
+              ×
+            </button>
+            
+            <div className="text-center p-8 pb-4 flex-shrink-0">
+              <h2 className="text-2xl font-bold text-blue-600 mb-2">Edit Class</h2>
+              <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
+            </div>
+
+            <div className="px-8 pb-8 flex-1 overflow-y-auto">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">School Year</label>
+                  <input
+                    type="text"
+                    value={editFormData.schoolYear}
+                    onChange={(e) => setEditFormData({ ...editFormData, schoolYear: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Semester</label>
+                  <select
+                    value={editFormData.semester}
+                    onChange={(e) => setEditFormData({ ...editFormData, semester: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select Semester</option>
+                    <option value="1st Semester">1st Semester</option>
+                    <option value="2nd Semester">2nd Semester</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Schedule</label>
+                  <input
+                    type="text"
+                    value={editFormData.schedule}
+                    onChange={(e) => setEditFormData({ ...editFormData, schedule: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Room</label>
+                  <input
+                    type="text"
+                    value={editFormData.room}
+                    onChange={(e) => setEditFormData({ ...editFormData, room: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Year Level</label>
+                  <input
+                    type="text"
+                    value={editFormData.yearLevel}
+                    onChange={(e) => setEditFormData({ ...editFormData, yearLevel: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Section</label>
+                  <input
+                    type="text"
+                    value={editFormData.section}
+                    onChange={(e) => setEditFormData({ ...editFormData, section: e.target.value })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveEdit}
+                  disabled={saving}
+                  className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {saving ? 'Saving...' : 'Save Changes'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function AttendanceManagement() {
+function AttendanceClassSelection() {
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [classes, setClasses] = useState<Class[]>([]);
-  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
-  const [attendanceRecords, setAttendanceRecords] = useState<Attendance[]>([]);
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
-  const [loading, setLoading] = useState(false);
+  const [filteredClasses, setFilteredClasses] = useState<Class[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
-  const [editingRecord, setEditingRecord] = useState<number | null>(null);
-  const [editData, setEditData] = useState<{
-    timeIn: string;
-    timeOut: string;
-    pcNumber: string;
-    status: string;
-    remarks: string;
-  }>({
-    timeIn: '',
-    timeOut: '',
-    pcNumber: '',
-    status: 'present',
-    remarks: ''
-  });
+  const [searchTerm, setSearchTerm] = useState('');
+  const [entriesPerPage, setEntriesPerPage] = useState<number>(10);
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -543,11 +1190,9 @@ function AttendanceManagement() {
 
       setLoading(true);
       try {
-        const data = await GetTeacherClassesByUserID(user.id);
+        const data = await GetTeacherClassesCreatedByWorkingStudents(user.id);
         setClasses(data || []);
-        if (data && data.length > 0) {
-          setSelectedClass(data[0]);
-        }
+        setFilteredClasses(data || []);
         setError('');
       } catch (error) {
         console.error('Failed to load classes:', error);
@@ -561,96 +1206,22 @@ function AttendanceManagement() {
   }, [user?.id]);
 
   useEffect(() => {
-    if (selectedClass && selectedDate) {
-      loadAttendance();
-    }
-  }, [selectedClass, selectedDate]);
+    let filtered = classes;
 
-  const loadAttendance = async () => {
-    if (!selectedClass || !selectedDate) return;
-
-    setLoading(true);
-    try {
-      const records = await GetClassAttendance(selectedClass.id, selectedDate);
-      setAttendanceRecords(records || []);
-      setError('');
-    } catch (error) {
-      console.error('Failed to load attendance:', error);
-      setError('Unable to load attendance records.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleInitializeAttendance = async () => {
-    if (!selectedClass || !user?.id) return;
-
-    if (!confirm(`Initialize attendance for ${selectedClass.subject_code} on ${selectedDate}? All students will be marked as absent initially.`)) {
-      return;
-    }
-
-    try {
-      await InitializeAttendanceForClass(selectedClass.id, selectedDate, user.id);
-      await loadAttendance();
-      alert('Attendance initialized successfully!');
-    } catch (error) {
-      console.error('Failed to initialize attendance:', error);
-      alert('Failed to initialize attendance. Please try again.');
-    }
-  };
-
-  const handleStartEdit = (record: Attendance) => {
-    setEditingRecord(record.id);
-    setEditData({
-      timeIn: record.time_in || '',
-      timeOut: record.time_out || '',
-      pcNumber: record.pc_number || '',
-      status: record.status,
-      remarks: record.remarks || ''
-    });
-  };
-
-  const handleCancelEdit = () => {
-    setEditingRecord(null);
-    setEditData({
-      timeIn: '',
-      timeOut: '',
-      pcNumber: '',
-      status: 'present',
-      remarks: ''
-    });
-  };
-
-  const handleSaveEdit = async (attendanceId: number) => {
-    try {
-      await UpdateAttendanceRecord(
-        attendanceId,
-        editData.timeIn,
-        editData.timeOut,
-        editData.pcNumber,
-        editData.status,
-        editData.remarks
+    // Filter by search term
+    if (searchTerm) {
+      filtered = filtered.filter(cls =>
+        cls.teacher_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cls.subject_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        cls.subject_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (cls.school_year && cls.school_year.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (cls.year_level && cls.year_level.toLowerCase().includes(searchTerm.toLowerCase()))
       );
-      await loadAttendance();
-      setEditingRecord(null);
-      alert('Attendance updated successfully!');
-    } catch (error) {
-      console.error('Failed to update attendance:', error);
-      alert('Failed to update attendance. Please try again.');
     }
-  };
 
-  const handleExportAttendance = async () => {
-    if (!selectedClass) return;
-    
-    try {
-      const filename = await ExportAttendanceCSV(selectedClass.id);
-      alert(`Attendance exported to ${filename}`);
-    } catch (error) {
-      console.error('Failed to export attendance:', error);
-      alert('Failed to export attendance. Please try again.');
-    }
-  };
+    setFilteredClasses(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [searchTerm, classes]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -667,7 +1238,299 @@ function AttendanceManagement() {
     }
   };
 
-  if (loading && classes.length === 0) {
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredClasses.length / entriesPerPage);
+  const startIndex = (currentPage - 1) * entriesPerPage;
+  const endIndex = startIndex + entriesPerPage;
+  const currentClasses = filteredClasses.slice(startIndex, endIndex);
+  const startEntry = filteredClasses.length > 0 ? startIndex + 1 : 0;
+  const endEntry = Math.min(endIndex, filteredClasses.length);
+
+  return (
+    <div className="flex flex-col">
+      {/* Header Section */}
+      <div className="flex-shrink-0 mb-2">
+        <h2 className="text-xl font-bold text-gray-900">Select Class to Manage</h2>
+      </div>
+
+      {error && (
+        <div className="flex-shrink-0 mb-2 bg-yellow-50 border border-yellow-200 text-yellow-700 px-3 py-2 rounded-md text-sm">
+          <p>{error}</p>
+        </div>
+      )}
+
+      {/* Controls Section */}
+      <div className="flex-shrink-0 mb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-700">Show</span>
+            <select
+              value={entriesPerPage}
+              onChange={(e) => {
+                setEntriesPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500 bg-white"
+            >
+              <option value={10}>10 entries</option>
+              <option value={25}>25 entries</option>
+              <option value={50}>50 entries</option>
+              <option value={100}>100 entries</option>
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-700">Search</span>
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
+              placeholder=""
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* Table Section */}
+      <div className="flex-1 bg-white shadow rounded-lg overflow-hidden">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-blue-600">
+            <tr>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                #
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                School Year
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Semester
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Offering Code
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Subject Name
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Schedule
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Room
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Teacher
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Action
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {currentClasses.map((cls, index) => (
+              <tr key={cls.id} className="hover:bg-gray-50">
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {startIndex + index + 1}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {cls.school_year || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {cls.semester || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {cls.offering_code || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {cls.subject_name || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {cls.schedule || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {cls.room || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {cls.teacher_name || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs font-medium">
+                  <button
+                    onClick={() => navigate(`/teacher/attendance/${cls.id}`)}
+                    className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    SELECT
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Pagination Section */}
+      {filteredClasses.length > 0 && (
+        <div className="flex-shrink-0 mt-2 flex items-center justify-between">
+          <div className="text-xs text-gray-700">
+            Showing {startEntry} to {endEntry} of {filteredClasses.length} entries
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-2 py-1 text-xs text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Previous
+            </button>
+            <button
+              className="px-2 py-1 text-xs font-medium text-white bg-blue-600 border border-blue-600 rounded-md hover:bg-blue-700"
+            >
+              {currentPage}
+            </button>
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="px-2 py-1 text-xs text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      )}
+
+      {filteredClasses.length === 0 && !error && (
+        <div className="text-center py-6">
+          {searchTerm ? (
+            <>
+              <svg className="mx-auto h-8 w-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <h3 className="mt-2 text-xs font-medium text-gray-900">No matching classes found</h3>
+              <div className="mt-4">
+                <button
+                  onClick={() => setSearchTerm('')}
+                  className="inline-flex items-center px-3 py-1 border border-gray-300 rounded-md shadow-sm text-xs font-medium text-gray-700 bg-white hover:bg-gray-50"
+                >
+                  Clear Search
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
+                <BookOpen className="h-6 w-6 text-gray-400" />
+              </div>
+              <h3 className="mt-2 text-xs font-medium text-gray-900">No classes found</h3>
+              <p className="mt-1 text-xs text-gray-500">
+                You don't have any assigned classes yet.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+function StoredAttendance() {
+  const { user } = useAuth();
+  const [classes, setClasses] = useState<Class[]>([]);
+  const [allAttendanceRecords, setAllAttendanceRecords] = useState<Attendance[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+
+  useEffect(() => {
+    const loadClasses = async () => {
+      if (!user?.id) return;
+      setLoading(true);
+      try {
+        const data = await GetTeacherClassesCreatedByWorkingStudents(user.id);
+        setClasses(data || []);
+      } catch (error) {
+        console.error('Failed to load classes:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadClasses();
+  }, [user?.id]);
+
+  useEffect(() => {
+    if (classes.length > 0) {
+      loadAllStoredAttendance();
+    }
+  }, [classes.length]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'present':
+        return 'bg-green-100 text-green-800';
+      case 'absent':
+        return 'bg-red-100 text-red-800';
+      case 'late':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'excused':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const loadAllStoredAttendance = async () => {
+    if (!user?.id || classes.length === 0) return;
+    setLoadingAttendance(true);
+    try {
+      const allRecords: (Attendance & { classSubjectName?: string })[] = [];
+      const today = new Date();
+      const datesToCheck: string[] = [];
+      
+      for (let i = 0; i < 90; i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+        datesToCheck.push(date.toISOString().split('T')[0]);
+      }
+
+      for (const cls of classes) {
+        for (const date of datesToCheck) {
+          try {
+            const records = await GetClassAttendance(cls.id, date);
+            const savedRecords = records?.filter(r => r.id > 0) || [];
+            savedRecords.forEach(record => {
+              allRecords.push({
+                ...record,
+                classSubjectName: cls.subject_name
+              });
+            });
+          } catch (err) {
+            continue;
+          }
+        }
+      }
+
+      allRecords.sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateB - dateA;
+      });
+
+      setAllAttendanceRecords(allRecords as Attendance[]);
+    } catch (error) {
+      console.error('Failed to load all attendance:', error);
+      setAllAttendanceRecords([]);
+    } finally {
+      setLoadingAttendance(false);
+    }
+  };
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
@@ -677,20 +1540,243 @@ function AttendanceManagement() {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">Attendance Management</h2>
-          <p className="text-gray-600">Record and manage daily attendance logs</p>
+      <h2 className="text-xl font-bold text-gray-900 mb-4">Stored Attendance</h2>
+      
+      <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          {loadingAttendance ? (
+            <div className="px-6 py-12 text-center">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+            </div>
+          ) : allAttendanceRecords.length > 0 ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Class</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Full Name</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">PC Number</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Login Time</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Remarks</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {allAttendanceRecords.map((record) => (
+                  <tr key={`${record.id}-${record.classlist_id}-${record.student_id}-${record.date}`} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {new Date(record.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {(record as any).classSubjectName || record.subject_name || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                      {record.student_code}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {record.last_name}, {record.first_name} {record.middle_name || ''}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {record.pc_number || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {record.time_in ? (
+                        <span className="text-green-600 font-medium">{record.time_in}</span>
+                      ) : (
+                        <span className="text-gray-400">-</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {record.status ? (
+                        <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(record.status)}`}>
+                          {record.status === 'present' ? 'Present' : record.status === 'absent' ? 'Absent' : record.status}
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                          No Status
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          ) : (
+            <div className="px-6 py-12 text-center">
+              <ClipboardList className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-medium text-gray-900">No saved attendance records found</h3>
+            </div>
+          )}
         </div>
-        {selectedClass && (
+      </div>
+    </div>
+  );
+}
+
+function AttendanceManagementDetail() {
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const { user } = useAuth();
+  const [selectedClass, setSelectedClass] = useState<Class | null>(null);
+  const [attendanceRecords, setAttendanceRecords] = useState<Attendance[]>([]);
+  const [selectedDate, setSelectedDate] = useState<string>('');
+  const [loading, setLoading] = useState(false);
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+  const [error, setError] = useState<string>('');
+  const [hasSelectedDate, setHasSelectedDate] = useState(false);
+
+  useEffect(() => {
+    const loadClass = async () => {
+      if (!id || !user?.id) return;
+
+      setLoading(true);
+      try {
+        const classes = await GetTeacherClassesCreatedByWorkingStudents(user.id);
+        const foundClass = classes.find(c => c.id === parseInt(id));
+        setSelectedClass(foundClass || null);
+        setError('');
+      } catch (error) {
+        console.error('Failed to load class:', error);
+        setError('Unable to load class from server.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadClass();
+  }, [id, user?.id]);
+
+  useEffect(() => {
+    if (selectedClass && selectedDate && hasSelectedDate) {
+      loadAttendance();
+    } else if (!selectedDate) {
+      setAttendanceRecords([]);
+      setHasSelectedDate(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClass?.id, selectedDate, hasSelectedDate]);
+
+  const loadAttendance = async () => {
+    if (!selectedClass || !selectedDate) return;
+
+    setLoadingAttendance(true);
+    setError('');
+    try {
+      const records = await GetClassAttendance(selectedClass.id, selectedDate);
+      console.log('Loaded attendance records:', records?.length || 0);
+      setAttendanceRecords(records || []);
+      // If no records found but we have a class, it might mean no students are enrolled
+      if ((!records || records.length === 0) && selectedClass) {
+        console.log('No attendance records found. This might mean no students are enrolled.');
+      }
+    } catch (error) {
+      console.error('Failed to load attendance:', error);
+      setError('Unable to load attendance records. Please try again.');
+      setAttendanceRecords([]);
+    } finally {
+      setLoadingAttendance(false);
+    }
+  };
+
+  const handleDateChange = async (date: string) => {
+    setSelectedDate(date);
+    if (date) {
+      setHasSelectedDate(true);
+      setAttendanceRecords([]); // Clear previous records
+      // The useEffect will automatically trigger loadAttendance
+    } else {
+      setHasSelectedDate(false);
+      setAttendanceRecords([]);
+    }
+  };
+
+
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'present':
+        return 'bg-green-100 text-green-800';
+      case 'absent':
+        return 'bg-red-100 text-red-800';
+      case 'late':
+        return 'bg-yellow-100 text-yellow-800';
+      case 'excused':
+        return 'bg-blue-100 text-blue-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  if (loading && !selectedClass) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  if (!selectedClass) {
+    return (
+      <div className="p-6">
+        <div className="text-center py-8">
+          <p className="text-gray-500">Class not found</p>
           <button
-            onClick={handleExportAttendance}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
+            onClick={() => navigate('/teacher/attendance')}
+            className="mt-4 text-primary-600 hover:text-primary-900"
           >
-            <FileText className="h-4 w-4 mr-2" />
-            Export Attendance
+            Back to Class Selection
           </button>
-        )}
+        </div>
+      </div>
+    );
+  }
+
+  const handleSaveAll = async () => {
+    // Save all attendance records
+    if (!selectedClass || !selectedDate) return;
+    
+    try {
+      // Initialize attendance if not already done
+      if (attendanceRecords.length === 0) {
+        await InitializeAttendanceForClass(selectedClass.id, selectedDate, user?.id || 0);
+        await loadAttendance();
+      }
+      
+      // Small delay to ensure save completes
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Navigate to stored attendance page
+      navigate('/teacher/stored-attendance', { replace: true });
+    } catch (error) {
+      console.error('Failed to save attendance:', error);
+      alert('Failed to save attendance. Please try again.');
+    }
+  };
+
+  return (
+    <div className="p-6">
+      {/* 
+        ATTENDANCE MANAGEMENT LAYOUT:
+        The attendance section is placed in the following order:
+        1. Header with back button
+        2. Class Details Section - Shows class information
+        3. Date of Class Section - Date picker to select the class date
+        4. Attendance List Section - Shows all enrolled students with their attendance status
+           (Only appears after a date is selected)
+        5. Save Button - Appears when date is selected
+      */}
+      
+      {/* Header */}
+      <div className="mb-6">
+        <div className="flex items-center mb-4">
+          <button
+            onClick={() => navigate('/teacher/attendance')}
+            className="mr-4 p-2 hover:bg-gray-100 rounded-full transition-colors"
+          >
+            <ArrowLeft className="h-5 w-5 text-gray-600" />
+          </button>
+          <h2 className="text-2xl font-bold text-gray-900">Class Attendance Management</h2>
+        </div>
       </div>
 
       {error && (
@@ -699,243 +1785,209 @@ function AttendanceManagement() {
         </div>
       )}
 
-      {/* Class and Date Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            Select Class
-          </label>
-          <select
-            value={selectedClass?.id || ''}
-            onChange={(e) => {
-              const cls = classes.find(c => c.id === parseInt(e.target.value));
-              setSelectedClass(cls || null);
-            }}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-          >
-            <option value="">Select a class</option>
-            {classes.map((cls) => (
-              <option key={cls.id} value={cls.id}>
-                {cls.subject_code} - {cls.subject_name} {cls.section ? `(Section ${cls.section})` : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            <Calendar className="inline h-4 w-4 mr-1" />
-            Select Date
-          </label>
-          <input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-primary-500 focus:border-primary-500"
-          />
-        </div>
-      </div>
-
-      {/* Class Info and Actions */}
+      {/* Class Details Section */}
       {selectedClass && (
         <div className="bg-white shadow rounded-lg p-6 mb-6">
-          <div className="flex justify-between items-start">
-            <div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                {selectedClass.subject_code} - {selectedClass.subject_name}
-              </h3>
-              <div className="flex items-center gap-4 text-sm text-gray-600">
-                {selectedClass.schedule && (
-                  <span className="flex items-center">
-                    <Clock className="h-4 w-4 mr-1" />
-                    {selectedClass.schedule}
-                  </span>
-                )}
-                {selectedClass.room && (
-                  <span className="flex items-center">
-                    <MapPin className="h-4 w-4 mr-1" />
-                    {selectedClass.room}
-                  </span>
-                )}
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Class Details</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-3">
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">School Year:</span>
+                <span className="text-gray-900">{selectedClass.school_year || '-'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Semester:</span>
+                <span className="text-gray-900">{selectedClass.semester || '-'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Offering Code:</span>
+                <span className="text-gray-900">{selectedClass.offering_code || '-'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Subject Name:</span>
+                <span className="text-gray-900">{selectedClass.subject_name || '-'}</span>
               </div>
             </div>
-            <button
-              onClick={handleInitializeAttendance}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-            >
-              Initialize Attendance
-            </button>
+            <div className="space-y-3">
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Schedule:</span>
+                <span className="text-gray-900">{selectedClass.schedule || '-'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Room:</span>
+                <span className="text-gray-900">{selectedClass.room || '-'}</span>
+              </div>
+              <div className="flex">
+                <span className="font-medium text-gray-700 w-32">Teacher:</span>
+                <span className="text-gray-900">{selectedClass.teacher_name || '-'}</span>
+              </div>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Attendance Records Table */}
-      {selectedClass && (
-        <div className="bg-white shadow rounded-lg overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">
-              Attendance for {selectedDate}
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Total: {attendanceRecords.length} students | 
-              Present: {attendanceRecords.filter(r => r.status === 'present').length} | 
-              Absent: {attendanceRecords.filter(r => r.status === 'absent').length}
-            </p>
+      {/* Date of Class Section */}
+      <div className="bg-white shadow rounded-lg p-6 mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Date of Class</h3>
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-xs">
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => handleDateChange(e.target.value)}
+              className="block w-full px-4 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+              style={{ zIndex: 1 }}
+            />
+            <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" style={{ zIndex: 0 }} />
+          </div>
+          {selectedDate && (
+            <button
+              onClick={() => {
+                setSelectedDate('');
+                setHasSelectedDate(false);
+                setAttendanceRecords([]);
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+            >
+              Clear Date
+            </button>
+          )}
+        </div>
+        {!hasSelectedDate && (
+          <p className="mt-2 text-sm text-gray-500">Please select a date to view the attendance list.</p>
+        )}
+        {hasSelectedDate && (
+          <p className="mt-2 text-sm text-green-600 font-medium">Date selected: {new Date(selectedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+        )}
+      </div>
+
+      {/* Attendance List Section - Only show after date is selected */}
+      {selectedClass && hasSelectedDate && (
+        <div className="bg-white shadow rounded-lg overflow-hidden mb-6">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 className="text-lg font-semibold text-gray-900">Attendance List</h3>
+            {attendanceRecords.length > 0 && (
+              <span className="text-sm text-gray-600">
+                Total Students: {attendanceRecords.length}
+              </span>
+            )}
           </div>
           <div className="overflow-x-auto">
-            {attendanceRecords.length > 0 ? (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Ctrl No.
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Student ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Full Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      PC Number
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Time In
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Time Out
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Remarks
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {attendanceRecords.map((record) => (
-                    <tr key={record.id || `${record.classlist_id}-${record.student_id}`} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {String(record.ctrl_no).padStart(3, '0')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {record.student_code}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {record.last_name}, {record.first_name} {record.middle_name || ''}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {editingRecord === record.id ? (
-                          <input
-                            type="text"
-                            value={editData.pcNumber}
-                            onChange={(e) => setEditData({ ...editData, pcNumber: e.target.value })}
-                            className="w-20 px-2 py-1 border border-gray-300 rounded"
-                            placeholder="PC#"
-                          />
-                        ) : (
-                          record.pc_number || '-'
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {editingRecord === record.id ? (
-                          <input
-                            type="time"
-                            value={editData.timeIn}
-                            onChange={(e) => setEditData({ ...editData, timeIn: e.target.value })}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded"
-                          />
-                        ) : (
-                          record.time_in || '-'
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {editingRecord === record.id ? (
-                          <input
-                            type="time"
-                            value={editData.timeOut}
-                            onChange={(e) => setEditData({ ...editData, timeOut: e.target.value })}
-                            className="w-24 px-2 py-1 border border-gray-300 rounded"
-                          />
-                        ) : (
-                          record.time_out || '-'
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        {editingRecord === record.id ? (
-                          <select
-                            value={editData.status}
-                            onChange={(e) => setEditData({ ...editData, status: e.target.value })}
-                            className="px-2 py-1 border border-gray-300 rounded"
-                          >
-                            <option value="present">Present</option>
-                            <option value="absent">Absent</option>
-                            <option value="late">Late</option>
-                            <option value="excused">Excused</option>
-                          </select>
-                        ) : (
-                          <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(record.status)}`}>
-                            {record.status}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {editingRecord === record.id ? (
-                          <input
-                            type="text"
-                            value={editData.remarks}
-                            onChange={(e) => setEditData({ ...editData, remarks: e.target.value })}
-                            className="w-32 px-2 py-1 border border-gray-300 rounded"
-                            placeholder="Remarks"
-                          />
-                        ) : (
-                          record.remarks || '-'
-                        )}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {editingRecord === record.id ? (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleSaveEdit(record.id)}
-                              className="text-green-600 hover:text-green-900"
-                            >
-                              Save
-                            </button>
-                            <button
-                              onClick={handleCancelEdit}
-                              className="text-gray-600 hover:text-gray-900"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleStartEdit(record)}
-                            className="text-primary-600 hover:text-primary-900"
-                            disabled={record.id === 0}
-                          >
-                            Edit
-                          </button>
-                        )}
-                      </td>
+            {loadingAttendance ? (
+              <div className="px-6 py-12 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-2 text-sm text-gray-500">Loading attendance records...</p>
+              </div>
+            ) : attendanceRecords.length > 0 ? (
+              <div>
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        #
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Student ID
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Full Name
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        PC Number
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Login Time
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Remarks
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {attendanceRecords.map((record, index) => (
+                      <tr key={record.id || `${record.classlist_id}-${record.student_id}`} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {index + 1}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {record.student_code}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {record.last_name}, {record.first_name} {record.middle_name || ''}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {record.pc_number || '-'}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          {record.time_in ? (
+                            <span className="text-green-600 font-medium">{record.time_in}</span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {record.status ? (
+                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(record.status)}`}>
+                              {record.status === 'present' ? 'Present' : record.status === 'absent' ? 'Absent' : record.status}
+                            </span>
+                          ) : (
+                            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                              No Status
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+                  <div className="flex justify-center text-sm">
+                    <div className="text-gray-600">
+                      <span className="font-medium text-green-600">
+                        Present: {attendanceRecords.filter(r => r.status === 'present').length}
+                      </span>
+                      {' | '}
+                      <span className="font-medium text-red-600">
+                        Absent: {attendanceRecords.filter(r => r.status === 'absent').length}
+                      </span>
+                      {' | '}
+                      <span className="font-medium text-gray-600">
+                        No Status: {attendanceRecords.filter(r => !r.status || r.status === '').length}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
             ) : (
               <div className="px-6 py-12 text-center">
                 <ClipboardList className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No attendance records</h3>
+                <h3 className="mt-2 text-sm font-medium text-gray-900">No enrolled students found</h3>
                 <p className="mt-1 text-sm text-gray-500">
-                  Click "Initialize Attendance" to create attendance records for this date.
+                  {error ? error : 'This class has no enrolled students. Please add students to the class first.'}
                 </p>
+                {!error && selectedClass && (
+                  <button
+                    onClick={() => navigate(`/teacher/class-management/${selectedClass.id}`)}
+                    className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                  >
+                    Go to Class Management
+                  </button>
+                )}
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Save Button - Only show when date is selected */}
+      {selectedClass && hasSelectedDate && (
+        <div className="flex justify-center">
+          <button
+            onClick={handleSaveAll}
+            className="inline-flex items-center px-8 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Save
+          </button>
         </div>
       )}
     </div>
@@ -947,17 +1999,20 @@ function TeacherDashboard() {
   
   const navigationItems = [
     { name: 'Dashboard', href: '/teacher', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/teacher' },
-    { name: 'Class Lists', href: '/teacher/classlists', icon: <Users className="h-5 w-5" />, current: location.pathname === '/teacher/classlists' },
-    { name: 'Attendance', href: '/teacher/attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/teacher/attendance' },
+    { name: 'Class Management', href: '/teacher/class-management', icon: <Library className="h-5 w-5" />, current: location.pathname.startsWith('/teacher/class-management') },
+    { name: 'Attendance', href: '/teacher/attendance', icon: <CalendarPlus className="h-5 w-5" />, current: location.pathname.startsWith('/teacher/attendance') && !location.pathname.includes('/stored') },
+    { name: 'Stored Attendance', href: '/teacher/stored-attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/teacher/stored-attendance' },
   ];
 
   return (
     <Layout navigationItems={navigationItems} title="Teacher Dashboard">
       <Routes>
         <Route index element={<DashboardOverview />} />
-        <Route path="classlists" element={<Classlists />} />
-        <Route path="classlists/:id" element={<ViewClassList />} />
-        <Route path="attendance" element={<AttendanceManagement />} />
+        <Route path="class-management" element={<ClassManagement />} />
+        <Route path="class-management/:id" element={<ClassManagementDetail />} />
+        <Route path="attendance/:id" element={<AttendanceManagementDetail />} />
+        <Route path="attendance" element={<AttendanceClassSelection />} />
+        <Route path="stored-attendance" element={<StoredAttendance />} />
       </Routes>
     </Layout>
   );
