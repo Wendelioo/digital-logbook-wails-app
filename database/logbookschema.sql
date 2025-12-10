@@ -1,16 +1,4 @@
--- ============================================================================
--- Digital Logbook Database Schema
--- Updated: 2024
--- ============================================================================
--- This schema includes all tables, views, and relationships for the
--- Digital Logbook application with support for:
--- - User management (Admin, Teacher, Student, Working Student)
--- - Department management
--- - Subject and Class management
--- - Attendance tracking
--- - Equipment feedback system
--- - Login logging
--- ============================================================================
+
 
 CREATE DATABASE IF NOT EXISTS logbookdb 
     CHARACTER SET utf8mb4 
@@ -37,11 +25,6 @@ DROP VIEW IF EXISTS v_classes_complete;
 DROP VIEW IF EXISTS v_users_complete;
 DROP VIEW IF EXISTS v_login_logs_complete;
 
--- ============================================================================
--- CORE TABLES
--- ============================================================================
-
--- Users table: Base authentication and authorization
 CREATE TABLE users (
     id INT AUTO_INCREMENT PRIMARY KEY,
     username VARCHAR(50) NOT NULL UNIQUE,
@@ -56,7 +39,6 @@ CREATE TABLE users (
     INDEX idx_is_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Departments table: Academic departments
 CREATE TABLE departments (
     id INT AUTO_INCREMENT PRIMARY KEY,
     department_code VARCHAR(20) NOT NULL UNIQUE,
@@ -71,7 +53,6 @@ CREATE TABLE departments (
     INDEX idx_is_active (is_active)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Admins table: Administrator user details
 CREATE TABLE admins (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
@@ -94,7 +75,6 @@ CREATE TABLE admins (
     INDEX idx_admin_name (last_name, first_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Teachers table: Teacher user details
 CREATE TABLE teachers (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
@@ -120,7 +100,6 @@ CREATE TABLE teachers (
     INDEX idx_department_id (department_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Students table: Regular student user details
 CREATE TABLE students (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
@@ -143,7 +122,6 @@ CREATE TABLE students (
     INDEX idx_student_name (last_name, first_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Working Students table: Working student user details
 CREATE TABLE working_students (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL UNIQUE,
@@ -166,11 +144,6 @@ CREATE TABLE working_students (
     INDEX idx_working_student_name (last_name, first_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================================
--- ACADEMIC TABLES
--- ============================================================================
-
--- Subjects table: Course subjects
 CREATE TABLE subjects (
     id INT AUTO_INCREMENT PRIMARY KEY,
     subject_code VARCHAR(20) NOT NULL UNIQUE COMMENT 'Manually entered subject code (e.g., IT301, CS101)',
@@ -187,7 +160,6 @@ CREATE TABLE subjects (
     INDEX idx_subject_name (subject_name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Classes table: Class instances of subjects
 CREATE TABLE classes (
     id INT AUTO_INCREMENT PRIMARY KEY,
     subject_id INT NOT NULL,
@@ -218,7 +190,6 @@ CREATE TABLE classes (
     INDEX idx_created_by (created_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Classlist table: Student enrollments in classes
 CREATE TABLE classlist (
     id INT AUTO_INCREMENT PRIMARY KEY,
     class_id INT NOT NULL,
@@ -241,7 +212,6 @@ CREATE TABLE classlist (
     INDEX idx_classlist_student_status (student_id, status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Attendance table: Student attendance records
 CREATE TABLE attendance (
     id INT AUTO_INCREMENT PRIMARY KEY,
     classlist_id INT NOT NULL,
@@ -266,11 +236,6 @@ CREATE TABLE attendance (
     INDEX idx_attendance_status_date (status, date DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================================
--- SYSTEM TABLES
--- ============================================================================
-
--- Login Logs table: User login/logout tracking
 CREATE TABLE login_logs (
     id INT AUTO_INCREMENT PRIMARY KEY,
     user_id INT NOT NULL,
@@ -291,7 +256,6 @@ CREATE TABLE login_logs (
     INDEX idx_login_logs_status_time (login_status, login_time DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Feedback table: Equipment feedback from students
 CREATE TABLE feedback (
     id INT AUTO_INCREMENT PRIMARY KEY,
     student_id INT NOT NULL,
@@ -325,11 +289,6 @@ CREATE TABLE feedback (
     INDEX idx_feedback_status_date (status, date_submitted DESC)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ============================================================================
--- VIEWS
--- ============================================================================
-
--- Complete Users View: Unified view of all user types with their details
 CREATE OR REPLACE VIEW v_users_complete AS
 SELECT 
     u.id,
@@ -393,7 +352,6 @@ LEFT JOIN teachers t ON u.id = t.user_id AND u.user_type = 'teacher'
 LEFT JOIN students s ON u.id = s.user_id AND u.user_type = 'student'
 LEFT JOIN working_students ws ON u.id = ws.user_id AND u.user_type = 'working_student';
 
--- Complete Login Logs View: Login logs with user details
 CREATE OR REPLACE VIEW v_login_logs_complete AS
 SELECT 
     ll.id,
@@ -413,7 +371,6 @@ SELECT
 FROM login_logs ll
 JOIN v_users_complete vu ON ll.user_id = vu.id;
 
--- Complete Classes View: Classes with subject and teacher details
 CREATE OR REPLACE VIEW v_classes_complete AS
 SELECT 
     c.id AS class_id,
@@ -439,7 +396,6 @@ FROM classes c
 JOIN subjects s ON c.subject_id = s.id
 JOIN teachers t ON c.teacher_id = t.id;
 
--- Complete Classlist View: Class enrollments with student details
 CREATE OR REPLACE VIEW v_classlist_complete AS
 SELECT 
     cl.id AS classlist_id,
@@ -470,6 +426,3 @@ JOIN users u ON cl.student_id = u.id
 LEFT JOIN students st ON u.id = st.user_id AND u.user_type = 'student'
 LEFT JOIN working_students ws ON u.id = ws.user_id AND u.user_type = 'working_student';
 
--- ============================================================================
--- END OF SCHEMA
--- ============================================================================

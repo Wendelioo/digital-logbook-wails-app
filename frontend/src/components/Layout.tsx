@@ -244,13 +244,11 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="h-screen overflow-hidden bg-gray-50">
       {/* Static sidebar - always visible - Icon-only design */}
-      <div className="flex flex-shrink-0 relative">
-        <div className="flex flex-col w-16">
-          <div className="flex flex-col h-screen bg-gray-200 shadow-lg border-r border-gray-300 overflow-visible">
-            {/* Navigation Section - Icon only */}
-            <div className="flex-1 pt-2 pb-4 overflow-y-auto">
+      <div className="fixed left-0 top-0 bottom-0 flex flex-col w-16 bg-gray-200 shadow-lg border-r border-gray-300 z-10">
+        {/* Navigation Section - Icon only */}
+        <div className="flex-1 pt-2 pb-4 overflow-y-auto overflow-x-hidden">
               <nav className="flex flex-col items-center space-y-3 px-2">
                 {navigationItems.map((item) => (
                   <Link
@@ -269,43 +267,43 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                   </Link>
                 ))}
               </nav>
-            </div>
-            
-            {/* Footer Section - User Profile */}
-            <div className="flex-shrink-0 pb-4 flex items-center justify-center">
-              {user?.photo_url || photoPreview ? (
-                <img 
-                  src={photoPreview || user?.photo_url} 
-                  alt="Profile" 
-                  className="h-10 w-10 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-gray-400 transition-all"
-                  data-profile-icon
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setProfileDropdownOpen(!profileDropdownOpen);
-                  }}
-                />
-              ) : (
-                <div 
-                  className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-gray-400 transition-all"
-                  data-profile-icon
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setProfileDropdownOpen(!profileDropdownOpen);
-                  }}
-                >
-                  <User className="h-6 w-6 text-gray-600" />
-                </div>
-              )}
-            </div>
-          </div>
         </div>
-        {/* Profile dropdown - positioned outside sidebar to avoid clipping */}
-        {profileDropdownOpen && (
-          <div 
-            className="absolute left-full bottom-4 ml-2 w-48 rounded-md shadow-xl py-1 bg-white ring-1 ring-black ring-opacity-5 z-[9999]"
-            ref={dropdownRef}
-            onClick={(e) => e.stopPropagation()}
-          >
+        
+        {/* Footer Section - User Profile */}
+        <div className="flex-shrink-0 pb-4 flex items-center justify-center">
+          {user?.photo_url || photoPreview ? (
+            <img 
+              src={photoPreview || user?.photo_url} 
+              alt="Profile" 
+              className="h-10 w-10 rounded-full object-cover cursor-pointer hover:ring-2 hover:ring-gray-400 transition-all"
+              data-profile-icon
+              onClick={(e) => {
+                e.stopPropagation();
+                setProfileDropdownOpen(!profileDropdownOpen);
+              }}
+            />
+          ) : (
+            <div 
+              className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center cursor-pointer hover:ring-2 hover:ring-gray-400 transition-all"
+              data-profile-icon
+              onClick={(e) => {
+                e.stopPropagation();
+                setProfileDropdownOpen(!profileDropdownOpen);
+              }}
+            >
+              <User className="h-6 w-6 text-gray-600" />
+            </div>
+          )}
+        </div>
+      </div>
+      
+      {/* Profile dropdown - positioned outside sidebar to avoid clipping */}
+      {profileDropdownOpen && (
+        <div 
+          className="fixed left-16 bottom-4 w-48 rounded-md shadow-xl py-1 bg-white ring-1 ring-black ring-opacity-5 z-[9999]"
+          ref={dropdownRef}
+          onClick={(e) => e.stopPropagation()}
+        >
             <div className="px-4 py-2 border-b border-gray-200">
               <div className="text-sm font-medium text-gray-900">{user?.first_name || user?.name || 'User'}</div>
               <div className="text-xs text-gray-500 capitalize">{user?.role?.replace('_', ' ') || 'Role'}</div>
@@ -335,12 +333,11 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
             </button>
           </div>
         )}
-      </div>
 
       {/* Main content */}
-      <div className="flex flex-col flex-1 min-w-0 bg-gray-50">
+      <div className="flex flex-col h-screen bg-gray-50 ml-16 overflow-hidden">
         {/* Top navigation */}
-        <div className="sticky top-0 z-10 flex-shrink-0 flex h-16 bg-white shadow-md border-b border-gray-300">
+        <div className="flex-shrink-0 flex h-16 bg-white shadow-md border-b border-gray-300 z-10">
           <div className="flex-1 px-4 flex justify-between">
             <div className="flex-1 flex">
               <div className="w-full flex md:ml-0">
@@ -357,7 +354,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         </div>
 
         {/* Page content */}
-        <main className="flex-1 bg-gray-50">
+        <main className="flex-1 bg-gray-50 overflow-y-auto overflow-x-hidden">
           <div className="py-6">
             <div className="max-w-full mx-auto px-4 sm:px-6 md:px-8">
               <div className="bg-white rounded-lg shadow-sm border border-gray-300 p-6">
