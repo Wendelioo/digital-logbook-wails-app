@@ -221,11 +221,11 @@ func (a *App) Login(username, password string) (*User, error) {
 	case "admin":
 		detailQuery = `SELECT first_name, middle_name, last_name, gender, admin_id, email, profile_photo FROM admins WHERE user_id = ?`
 	case "teacher":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, teacher_id, email, contact_number, profile_photo FROM teachers WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, teacher_id, email, contact_number, profile_photo FROM teachers WHERE user_id = ?`
 	case "student":
 		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, email, contact_number, profile_photo FROM students WHERE user_id = ?`
 	case "working_student":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, email, contact_number, profile_photo FROM working_students WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, student_id, email, contact_number, profile_photo FROM working_students WHERE user_id = ?`
 	}
 
 	var firstName, middleName, lastName, gender sql.NullString
@@ -259,7 +259,7 @@ func (a *App) Login(username, password string) (*User, error) {
 			}
 		}
 	case "teacher":
-		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &employeeID, &email, &contactNumber, &photoURL)
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &employeeID, &email, &contactNumber, &photoURL)
 		if err == nil {
 			if firstName.Valid {
 				user.FirstName = &firstName.String
@@ -269,9 +269,6 @@ func (a *App) Login(username, password string) (*User, error) {
 			}
 			if lastName.Valid {
 				user.LastName = &lastName.String
-			}
-			if gender.Valid {
-				user.Gender = &gender.String
 			}
 			if employeeID.Valid {
 				user.EmployeeID = &employeeID.String
@@ -286,7 +283,7 @@ func (a *App) Login(username, password string) (*User, error) {
 				user.PhotoURL = &photoURL.String
 			}
 		}
-	case "student", "working_student":
+	case "student":
 		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &studentID, &email, &contactNumber, &photoURL)
 		if err == nil {
 			if firstName.Valid {
@@ -300,6 +297,31 @@ func (a *App) Login(username, password string) (*User, error) {
 			}
 			if gender.Valid {
 				user.Gender = &gender.String
+			}
+			if studentID.Valid {
+				user.StudentID = &studentID.String
+			}
+			if email.Valid {
+				user.Email = &email.String
+			}
+			if contactNumber.Valid {
+				user.ContactNumber = &contactNumber.String
+			}
+			if photoURL.Valid {
+				user.PhotoURL = &photoURL.String
+			}
+		}
+	case "working_student":
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &studentID, &email, &contactNumber, &photoURL)
+		if err == nil {
+			if firstName.Valid {
+				user.FirstName = &firstName.String
+			}
+			if middleName.Valid {
+				user.MiddleName = &middleName.String
+			}
+			if lastName.Valid {
+				user.LastName = &lastName.String
 			}
 			if studentID.Valid {
 				user.StudentID = &studentID.String
@@ -844,16 +866,16 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 		query = `INSERT INTO admins (user_id, admin_id, first_name, middle_name, last_name, gender, email) VALUES (?, ?, ?, ?, ?, ?, ?)`
 		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email))
 	case "teacher":
-		query = `INSERT INTO teachers (user_id, teacher_id, first_name, middle_name, last_name, gender, email, contact_number, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber), nullInt(departmentID))
+		query = `INSERT INTO teachers (user_id, teacher_id, first_name, middle_name, last_name, email, contact_number, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(email), nullString(contactNumber), nullInt(departmentID))
 	case "student":
 		query = `INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber))
 	case "working_student":
-		query = `INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-		log.Printf("📝 Inserting working student - user_id: %d, student_id: %s, name: %s %s, gender: %s, email: %s",
-			userID, studentID, firstName, lastName, gender, email)
-		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber))
+		query = `INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?)`
+		log.Printf("📝 Inserting working student - user_id: %d, student_id: %s, name: %s %s, email: %s",
+			userID, studentID, firstName, lastName, email)
+		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(email), nullString(contactNumber))
 	}
 
 	if err != nil {
@@ -1430,14 +1452,14 @@ func (a *App) UpdateUser(id int, name, firstName, middleName, lastName, gender, 
 		query = `UPDATE admins SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, admin_id = ?, email = ? WHERE user_id = ?`
 		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(employeeID), nullString(email), id)
 	case "teacher":
-		query = `UPDATE teachers SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, teacher_id = ?, email = ?, contact_number = ?, department_id = ? WHERE user_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(employeeID), nullString(email), nullString(contactNumber), nullInt(departmentID), id)
+		query = `UPDATE teachers SET first_name = ?, middle_name = ?, last_name = ?, teacher_id = ?, email = ?, contact_number = ?, department_id = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(employeeID), nullString(email), nullString(contactNumber), nullInt(departmentID), id)
 	case "student":
 		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
 		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(email), nullString(contactNumber), id)
 	case "working_student":
-		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(email), nullString(contactNumber), id)
+		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ?, student_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(studentID), nullString(email), nullString(contactNumber), id)
 	}
 
 	return err

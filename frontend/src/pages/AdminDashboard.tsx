@@ -223,9 +223,6 @@ function UserManagement() {
     firstName: '',
     middleName: '',
     lastName: '',
-    gender: '',
-    birthdate: '',
-    address: '',
     role: 'teacher',
     employeeId: '',
     studentId: '',
@@ -391,10 +388,6 @@ function UserManagement() {
           showNotification('error', 'Student ID is required for Working Students');
           return;
         }
-        if (!formData.gender) {
-          showNotification('error', 'Gender is required for Working Students');
-          return;
-        }
       } else if (formData.role === 'teacher') {
         if (!formData.employeeId) {
           showNotification('error', 'Employee ID is required for Teachers');
@@ -426,7 +419,6 @@ function UserManagement() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         middleName: formData.middleName,
-        gender: formData.gender,
         employeeId: formData.employeeId,
         studentId: formData.studentId,
         year: formData.year,
@@ -436,10 +428,10 @@ function UserManagement() {
       const departmentId = formData.role === 'teacher' ? formData.departmentId : 0;
       
       if (editingUser) {
-        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
+        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, '', formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
         showNotification('success', 'User updated successfully!');
       } else {
-        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
+        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, '', formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
         
         // Show specific notification based on user role
         const roleMessages = {
@@ -454,7 +446,7 @@ function UserManagement() {
       
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+      setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
       setAvatarFile(null);
       setAvatarPreview(null);
       loadUsers();
@@ -474,9 +466,6 @@ function UserManagement() {
       firstName: user.first_name || '',
       middleName: user.middle_name || '',
       lastName: user.last_name || '',
-      gender: user.gender || '',
-      birthdate: '',
-      address: '',
       role: user.role,
       employeeId: user.employee_id || '',
       studentId: user.student_id || '',
@@ -637,7 +626,7 @@ function UserManagement() {
             if (e.target === e.currentTarget) {
               setShowForm(false);
               setEditingUser(null);
-              setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+              setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
               setAvatarFile(null);
               setAvatarPreview(null);
             }
@@ -650,7 +639,7 @@ function UserManagement() {
               onClick={() => {
                 setShowForm(false);
                 setEditingUser(null);
-                setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+                setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
                 setAvatarFile(null);
                 setAvatarPreview(null);
               }}
@@ -719,33 +708,6 @@ function UserManagement() {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
-                      <select
-                        value={formData.gender}
-                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Please Select Here</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Birthdate</label>
-                      <div className="relative">
-                        <input
-                          type="date"
-                          value={formData.birthdate}
-                          onChange={(e) => setFormData({ ...formData, birthdate: e.target.value })}
-                          className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                      </div>
-                    </div>
-
-                    <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Contact</label>
                       <input
                         type="tel"
@@ -753,16 +715,6 @@ function UserManagement() {
                         onChange={(e) => setFormData({ ...formData, contactNumber: e.target.value })}
                         className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         placeholder="09789436123"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
-                      <textarea
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        rows={2}
                       />
                     </div>
                   </div>
@@ -899,7 +851,7 @@ function UserManagement() {
                   onClick={() => {
                     setShowForm(false);
                     setEditingUser(null);
-                    setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+                    setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
                     setAvatarFile(null);
                     setAvatarPreview(null);
                   }}
@@ -1157,24 +1109,12 @@ function ViewUserDetailsModal({ user, isOpen, onClose, departmentName }: ViewUse
                 <span className="text-sm text-gray-900 ml-2">{getFullName()}</span>
               </div>
               <div>
-                <span className="text-sm font-semibold text-gray-700">Gender:</span>
-                <span className="text-sm text-gray-900 ml-2">{user.gender || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-sm font-semibold text-gray-700">Birthday:</span>
-                <span className="text-sm text-gray-900 ml-2">N/A</span>
-              </div>
-              <div>
                 <span className="text-sm font-semibold text-gray-700">Contact:</span>
                 <span className="text-sm text-gray-900 ml-2">{user.contact_number || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-sm font-semibold text-gray-700">Email:</span>
                 <span className="text-sm text-gray-900 ml-2">{user.email || ''}</span>
-              </div>
-              <div>
-                <span className="text-sm font-semibold text-gray-700">Address:</span>
-                <span className="text-sm text-gray-900 ml-2">N/A</span>
               </div>
               <div>
                 <span className="text-sm font-semibold text-gray-700">
