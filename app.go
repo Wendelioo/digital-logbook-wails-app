@@ -343,9 +343,9 @@ func (a *App) Login(username, password string) (*User, error) {
 	}
 
 	// Create a login log entry
-	insertLog := `INSERT INTO login_logs (user_id, user_type, pc_number, login_time, login_status) 
-				  VALUES (?, ?, ?, NOW(), 'success')`
-	result, err := a.db.Exec(insertLog, user.ID, user.Role, hostname)
+	insertLog := `INSERT INTO login_logs (user_id, pc_number, login_time, login_status) 
+				  VALUES (?, ?, NOW(), 'success')`
+	result, err := a.db.Exec(insertLog, user.ID, hostname)
 	if err != nil {
 		log.Printf("Failed to create login log: %v", err)
 		// Don't fail the login if logging fails
