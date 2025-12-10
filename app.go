@@ -596,7 +596,7 @@ func (a *App) GetUsers() ([]User, error) {
 	query := `
 		SELECT 
 			id, username, user_type, created_at,
-			first_name, middle_name, last_name, gender,
+			first_name, middle_name, last_name,
 			employee_id, student_id_str,
 			email, contact_number
 		FROM v_users_complete
@@ -612,12 +612,12 @@ func (a *App) GetUsers() ([]User, error) {
 	for rows.Next() {
 		var user User
 		var createdAt time.Time
-		var firstName, middleName, lastName, gender sql.NullString
+		var firstName, middleName, lastName sql.NullString
 		var employeeID, studentID sql.NullString
 		var email, contactNumber sql.NullString
 
 		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
-			&firstName, &middleName, &lastName, &gender,
+			&firstName, &middleName, &lastName,
 			&employeeID, &studentID,
 			&email, &contactNumber)
 		if err != nil {
@@ -634,9 +634,6 @@ func (a *App) GetUsers() ([]User, error) {
 		}
 		if lastName.Valid {
 			user.LastName = &lastName.String
-		}
-		if gender.Valid {
-			user.Gender = &gender.String
 		}
 		if employeeID.Valid {
 			user.EmployeeID = &employeeID.String
@@ -666,7 +663,7 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 	query := `
 		SELECT 
 			id, username, user_type, created_at,
-			first_name, middle_name, last_name, gender,
+			first_name, middle_name, last_name,
 			employee_id, student_id_str,
 			email, contact_number
 		FROM v_users_complete
@@ -683,12 +680,12 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 	for rows.Next() {
 		var user User
 		var createdAt time.Time
-		var firstName, middleName, lastName, gender sql.NullString
+		var firstName, middleName, lastName sql.NullString
 		var employeeID, studentID sql.NullString
 		var email, contactNumber sql.NullString
 
 		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
-			&firstName, &middleName, &lastName, &gender,
+			&firstName, &middleName, &lastName,
 			&employeeID, &studentID,
 			&email, &contactNumber)
 		if err != nil {
@@ -705,9 +702,6 @@ func (a *App) GetUsersByType(userType string) ([]User, error) {
 		}
 		if lastName.Valid {
 			user.LastName = &lastName.String
-		}
-		if gender.Valid {
-			user.Gender = &gender.String
 		}
 		if employeeID.Valid {
 			user.EmployeeID = &employeeID.String
@@ -737,7 +731,7 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 	query := `
 		SELECT 
 			id, username, user_type, created_at,
-			first_name, middle_name, last_name, gender,
+			first_name, middle_name, last_name,
 			employee_id, student_id_str,
 			email, contact_number
 		FROM v_users_complete
@@ -746,14 +740,13 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 			first_name LIKE ? OR
 			last_name LIKE ? OR
 			middle_name LIKE ? OR
-			gender LIKE ? OR
 			employee_id LIKE ? OR
 			student_id_str LIKE ? OR
 			DATE_FORMAT(created_at, '%Y-%m-%d') LIKE ?
 		)
 	`
 	searchPattern := "%" + searchTerm + "%"
-	args := []interface{}{searchPattern, searchPattern, searchPattern, searchPattern, searchPattern,
+	args := []interface{}{searchPattern, searchPattern, searchPattern, searchPattern,
 		searchPattern, searchPattern, searchPattern}
 
 	if userType != "" {
@@ -773,12 +766,12 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 	for rows.Next() {
 		var user User
 		var createdAt time.Time
-		var firstName, middleName, lastName, gender sql.NullString
+		var firstName, middleName, lastName sql.NullString
 		var employeeID, studentID sql.NullString
 		var email, contactNumber sql.NullString
 
 		err := rows.Scan(&user.ID, &user.Name, &user.Role, &createdAt,
-			&firstName, &middleName, &lastName, &gender,
+			&firstName, &middleName, &lastName,
 			&employeeID, &studentID,
 			&email, &contactNumber)
 		if err != nil {
@@ -795,9 +788,6 @@ func (a *App) SearchUsers(searchTerm, userType string) ([]User, error) {
 		}
 		if lastName.Valid {
 			user.LastName = &lastName.String
-		}
-		if gender.Valid {
-			user.Gender = &gender.String
 		}
 		if employeeID.Valid {
 			user.EmployeeID = &employeeID.String

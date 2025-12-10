@@ -60,7 +60,6 @@ CREATE TABLE admins (
     first_name VARCHAR(100) NOT NULL,
     middle_name VARCHAR(100) NULL,
     last_name VARCHAR(100) NOT NULL,
-    gender ENUM('Male', 'Female', 'Other') NULL,
     email VARCHAR(255) NULL,
     contact_number VARCHAR(20) NULL,
     profile_photo MEDIUMTEXT NULL,
@@ -311,10 +310,6 @@ SELECT
         WHEN u.user_type = 'student' THEN s.last_name
         WHEN u.user_type = 'working_student' THEN ws.last_name
     END AS last_name,
-    CASE 
-        WHEN u.user_type = 'admin' THEN a.gender
-        ELSE NULL
-    END AS gender,
     CASE 
         WHEN u.user_type = 'admin' THEN a.email
         WHEN u.user_type = 'teacher' THEN t.email
