@@ -223,7 +223,7 @@ func (a *App) Login(username, password string) (*User, error) {
 	case "teacher":
 		detailQuery = `SELECT first_name, middle_name, last_name, teacher_id, email, contact_number, profile_photo FROM teachers WHERE user_id = ?`
 	case "student":
-		detailQuery = `SELECT first_name, middle_name, last_name, gender, student_id, email, contact_number, profile_photo FROM students WHERE user_id = ?`
+		detailQuery = `SELECT first_name, middle_name, last_name, student_id, email, contact_number, profile_photo FROM students WHERE user_id = ?`
 	case "working_student":
 		detailQuery = `SELECT first_name, middle_name, last_name, student_id, email, contact_number, profile_photo FROM working_students WHERE user_id = ?`
 	}
@@ -284,7 +284,7 @@ func (a *App) Login(username, password string) (*User, error) {
 			}
 		}
 	case "student":
-		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &gender, &studentID, &email, &contactNumber, &photoURL)
+		err = a.db.QueryRow(detailQuery, user.ID).Scan(&firstName, &middleName, &lastName, &studentID, &email, &contactNumber, &photoURL)
 		if err == nil {
 			if firstName.Valid {
 				user.FirstName = &firstName.String
@@ -294,9 +294,6 @@ func (a *App) Login(username, password string) (*User, error) {
 			}
 			if lastName.Valid {
 				user.LastName = &lastName.String
-			}
-			if gender.Valid {
-				user.Gender = &gender.String
 			}
 			if studentID.Valid {
 				user.StudentID = &studentID.String
@@ -869,8 +866,8 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 		query = `INSERT INTO teachers (user_id, teacher_id, first_name, middle_name, last_name, email, contact_number, department_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 		_, err = a.db.Exec(query, userID, nullString(employeeID), firstName, nullString(middleName), lastName, nullString(email), nullString(contactNumber), nullInt(departmentID))
 	case "student":
-		query = `INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, gender, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(gender), nullString(email), nullString(contactNumber))
+		query = `INSERT INTO students (user_id, student_id, first_name, middle_name, last_name, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?)`
+		_, err = a.db.Exec(query, userID, nullString(studentID), firstName, nullString(middleName), lastName, nullString(email), nullString(contactNumber))
 	case "working_student":
 		query = `INSERT INTO working_students (user_id, student_id, first_name, middle_name, last_name, email, contact_number) VALUES (?, ?, ?, ?, ?, ?, ?)`
 		log.Printf("📝 Inserting working student - user_id: %d, student_id: %s, name: %s %s, email: %s",
@@ -1126,7 +1123,6 @@ func (a *App) CreateUsersBulkFromFile(fileDataBase64 string, fileName string) (m
 			strings.Contains(firstRowLower, "code") ||
 			strings.Contains(firstRowLower, "id") ||
 			strings.Contains(firstRowLower, "name") ||
-			strings.Contains(firstRowLower, "gender") ||
 			strings.Contains(firstRowLower, "email") ||
 			strings.Contains(firstRowLower, "contact") ||
 			strings.Contains(firstRowLower, "phone")
@@ -1187,11 +1183,6 @@ func (a *App) CreateUsersBulkFromFile(fileDataBase64 string, fileName string) (m
 					columnMap["contact"] = colIdx
 				}
 
-				// Gender detection
-				if _, exists := columnMap["gender"]; !exists && (strings.Contains(headerLower, "gender") ||
-					strings.Contains(headerLower, "sex")) {
-					columnMap["gender"] = colIdx
-				}
 			}
 		}
 	}
@@ -1205,10 +1196,7 @@ func (a *App) CreateUsersBulkFromFile(fileDataBase64 string, fileName string) (m
 			columnMap["middle_name"] = 3
 		}
 		if len(records) > 0 && len(records[0]) > 4 {
-			columnMap["gender"] = 4
-		}
-		if len(records) > 0 && len(records[0]) > 5 {
-			columnMap["contact"] = 5
+			columnMap["contact"] = 4
 		}
 	}
 
@@ -1238,7 +1226,6 @@ func (a *App) CreateUsersBulkFromFile(fileDataBase64 string, fileName string) (m
 		firstNameIdx, hasFirstName := columnMap["first_name"]
 		lastNameIdx, hasLastName := columnMap["last_name"]
 		middleNameIdx, hasMiddleName := columnMap["middle_name"]
-		genderIdx, hasGender := columnMap["gender"]
 		contactIdx, hasContact := columnMap["contact"]
 		emailIdx, hasEmail := columnMap["email"]
 
@@ -1246,7 +1233,6 @@ func (a *App) CreateUsersBulkFromFile(fileDataBase64 string, fileName string) (m
 		firstName := getColumnValue(record, firstNameIdx, hasFirstName)
 		lastName := getColumnValue(record, lastNameIdx, hasLastName)
 		middleName := getColumnValue(record, middleNameIdx, hasMiddleName)
-		gender := getColumnValue(record, genderIdx, hasGender)
 		contactNumber := getColumnValue(record, contactIdx, hasContact)
 		email := getColumnValue(record, emailIdx, hasEmail)
 
@@ -1280,7 +1266,7 @@ func (a *App) CreateUsersBulkFromFile(fileDataBase64 string, fileName string) (m
 			firstName,
 			middleName,
 			lastName,
-			gender,
+			"", // gender (removed)
 			"student",
 			"",          // employeeID
 			studentCode, // studentID
@@ -1312,7 +1298,7 @@ func (a *App) CreateUsersBulkFromFile(fileDataBase64 string, fileName string) (m
 }
 
 // CreateUsersBulk creates multiple students from CSV data (kept for backward compatibility)
-// CSV format: Student Code, First Name, Middle Name (optional), Last Name, Gender, Contact Number (optional)
+// CSV format: Student Code, First Name, Middle Name (optional), Last Name, Contact Number (optional)
 func (a *App) CreateUsersBulk(csvData string) (map[string]interface{}, error) {
 	if a.db == nil {
 		return nil, fmt.Errorf("database not connected")
@@ -1335,7 +1321,7 @@ func (a *App) CreateUsersBulk(csvData string) (map[string]interface{}, error) {
 		// Check if first row looks like a header (contains "student" or "code" etc.)
 		firstRow := strings.ToLower(strings.Join(records[0], " "))
 		if strings.Contains(firstRow, "student") || strings.Contains(firstRow, "code") ||
-			strings.Contains(firstRow, "name") || strings.Contains(firstRow, "gender") {
+			strings.Contains(firstRow, "name") {
 			startIndex = 1
 		}
 	}
@@ -1359,7 +1345,6 @@ func (a *App) CreateUsersBulk(csvData string) (map[string]interface{}, error) {
 		firstName := strings.TrimSpace(record[1])
 		middleName := ""
 		lastName := ""
-		gender := ""
 		contactNumber := ""
 		email := "" // Email not supported in legacy CreateUsersBulk function
 
@@ -1371,10 +1356,7 @@ func (a *App) CreateUsersBulk(csvData string) (map[string]interface{}, error) {
 			middleName = strings.TrimSpace(record[3])
 		}
 		if len(record) >= 5 {
-			gender = strings.TrimSpace(record[4])
-		}
-		if len(record) >= 6 {
-			contactNumber = strings.TrimSpace(record[5])
+			contactNumber = strings.TrimSpace(record[4])
 		}
 
 		// Validate required fields
@@ -1407,7 +1389,7 @@ func (a *App) CreateUsersBulk(csvData string) (map[string]interface{}, error) {
 			firstName,
 			middleName,
 			lastName,
-			gender,
+			"", // gender (removed)
 			"student",
 			"",          // employeeID
 			studentCode, // studentID
@@ -1455,8 +1437,8 @@ func (a *App) UpdateUser(id int, name, firstName, middleName, lastName, gender, 
 		query = `UPDATE teachers SET first_name = ?, middle_name = ?, last_name = ?, teacher_id = ?, email = ?, contact_number = ?, department_id = ? WHERE user_id = ?`
 		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(employeeID), nullString(email), nullString(contactNumber), nullInt(departmentID), id)
 	case "student":
-		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ?, gender = ?, student_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
-		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(gender), nullString(studentID), nullString(email), nullString(contactNumber), id)
+		query = `UPDATE students SET first_name = ?, middle_name = ?, last_name = ?, student_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
+		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(studentID), nullString(email), nullString(contactNumber), id)
 	case "working_student":
 		query = `UPDATE working_students SET first_name = ?, middle_name = ?, last_name = ?, student_id = ?, email = ?, contact_number = ? WHERE user_id = ?`
 		_, err = a.db.Exec(query, firstName, nullString(middleName), lastName, nullString(studentID), nullString(email), nullString(contactNumber), id)
@@ -3323,7 +3305,7 @@ func (a *App) GetAllTeachers() ([]User, error) {
 
 	query := `
 		SELECT 
-			t.user_id, t.id, t.teacher_id, t.first_name, t.middle_name, t.last_name, t.gender
+			t.user_id, t.id, t.teacher_id, t.first_name, t.middle_name, t.last_name
 		FROM teachers t
 		ORDER BY t.last_name, t.first_name
 	`
@@ -3337,17 +3319,14 @@ func (a *App) GetAllTeachers() ([]User, error) {
 	var teachers []User
 	for rows.Next() {
 		var teacher User
-		var middleName, gender, employeeID sql.NullString
+		var middleName, employeeID sql.NullString
 		var teachersTableID int
-		err := rows.Scan(&teacher.ID, &teachersTableID, &employeeID, &teacher.FirstName, &middleName, &teacher.LastName, &gender)
+		err := rows.Scan(&teacher.ID, &teachersTableID, &employeeID, &teacher.FirstName, &middleName, &teacher.LastName)
 		if err != nil {
 			continue
 		}
 		if middleName.Valid {
 			teacher.MiddleName = &middleName.String
-		}
-		if gender.Valid {
-			teacher.Gender = &gender.String
 		}
 		if employeeID.Valid {
 			teacher.EmployeeID = &employeeID.String
@@ -3369,7 +3348,7 @@ func (a *App) GetAllRegisteredStudents(yearLevelFilter, sectionFilter string) ([
 	query := `
 		SELECT 
 			s.user_id as id, s.student_id, s.first_name, s.middle_name, s.last_name, 
-			s.gender, s.email, s.contact_number, s.profile_photo
+			s.email, s.contact_number, s.profile_photo
 		FROM students s
 		ORDER BY s.last_name, s.first_name
 	`
@@ -3384,17 +3363,14 @@ func (a *App) GetAllRegisteredStudents(yearLevelFilter, sectionFilter string) ([
 	var students []ClassStudent
 	for rows.Next() {
 		var student ClassStudent
-		var middleName, gender, email, contactNumber, profilePhoto sql.NullString
+		var middleName, email, contactNumber, profilePhoto sql.NullString
 		err := rows.Scan(&student.ID, &student.StudentID, &student.FirstName, &middleName,
-			&student.LastName, &gender, &email, &contactNumber, &profilePhoto)
+			&student.LastName, &email, &contactNumber, &profilePhoto)
 		if err != nil {
 			continue
 		}
 		if middleName.Valid {
 			student.MiddleName = &middleName.String
-		}
-		if gender.Valid {
-			student.Gender = &gender.String
 		}
 		if email.Valid {
 			student.Email = &email.String

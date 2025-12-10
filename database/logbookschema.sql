@@ -82,7 +82,6 @@ CREATE TABLE teachers (
     first_name VARCHAR(100) NOT NULL,
     middle_name VARCHAR(100) NULL,
     last_name VARCHAR(100) NOT NULL,
-    gender ENUM('Male', 'Female', 'Other') NULL,
     email VARCHAR(255) NULL,
     contact_number VARCHAR(20) NULL,
     department_id INT NULL,
@@ -107,7 +106,6 @@ CREATE TABLE students (
     first_name VARCHAR(100) NOT NULL,
     middle_name VARCHAR(100) NULL,
     last_name VARCHAR(100) NOT NULL,
-    gender ENUM('Male', 'Female', 'Other') NULL,
     email VARCHAR(255) NULL,
     contact_number VARCHAR(20) NULL,
     profile_photo MEDIUMTEXT NULL,
@@ -129,7 +127,6 @@ CREATE TABLE working_students (
     first_name VARCHAR(100) NOT NULL,
     middle_name VARCHAR(100) NULL,
     last_name VARCHAR(100) NOT NULL,
-    gender ENUM('Male', 'Female', 'Other') NULL,
     email VARCHAR(255) NULL,
     contact_number VARCHAR(20) NULL,
     profile_photo MEDIUMTEXT NULL,
@@ -316,9 +313,7 @@ SELECT
     END AS last_name,
     CASE 
         WHEN u.user_type = 'admin' THEN a.gender
-        WHEN u.user_type = 'teacher' THEN t.gender
-        WHEN u.user_type = 'student' THEN s.gender
-        WHEN u.user_type = 'working_student' THEN ws.gender
+        ELSE NULL
     END AS gender,
     CASE 
         WHEN u.user_type = 'admin' THEN a.email

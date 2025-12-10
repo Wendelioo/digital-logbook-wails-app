@@ -216,8 +216,6 @@ function RegisterStudentModal({ onClose, onSuccess }: RegisterStudentModalProps)
     firstName: '',
     middleName: '',
     lastName: '',
-    gender: '',
-    birthdate: '',
     contactNumber: '',
     department: ''
   });
@@ -256,7 +254,7 @@ function RegisterStudentModal({ onClose, onSuccess }: RegisterStudentModalProps)
         formData.firstName, 
         formData.middleName, 
         formData.lastName, 
-        formData.gender,
+        '',
         'student', 
         '',
         formData.studentCode,
@@ -400,36 +398,10 @@ function RegisterStudentModal({ onClose, onSuccess }: RegisterStudentModalProps)
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
-                    <select
-                      value={formData.gender}
-                      onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                      className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      required
-                    >
-                      <option value="">Please Select Here</option>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                    </select>
-                  </div>
                 </div>
 
                 {/* Right Column */}
                 <div className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">Birthdate</label>
-                    <div className="relative">
-                      <input
-                        type="date"
-                        value={formData.birthdate}
-                        onChange={(e) => setFormData({ ...formData, birthdate: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      />
-                      <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                    </div>
-                  </div>
-
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">Contact</label>
                     <input
@@ -620,10 +592,10 @@ function BulkRegisterStudentModal({ onClose, onSuccess }: BulkRegisterStudentMod
   };
 
   const downloadTemplate = () => {
-    const template = `Student Code,First Name,Last Name,Middle Name,Gender,Contact Number
-2024-001,John,Doe,Smith,Male,09123456789
-2024-002,Jane,Smith,,Female,09123456790
-2024-003,Mike,Johnson,David,Male,`;
+    const template = `Student Code,First Name,Last Name,Middle Name,Contact Number
+2024-001,John,Doe,Smith,09123456789
+2024-002,Jane,Smith,,09123456790
+2024-003,Mike,Johnson,David,`;
     
     const blob = new Blob([template], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
@@ -1999,24 +1971,12 @@ function ViewStudentDetailsModal({ student, isOpen, onClose }: ViewStudentDetail
                 <span className="text-sm text-gray-900 ml-2">{getFullName()}</span>
               </div>
               <div>
-                <span className="text-sm font-semibold text-gray-700">Gender:</span>
-                <span className="text-sm text-gray-900 ml-2">{(student as any).gender || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-sm font-semibold text-gray-700">Birthday:</span>
-                <span className="text-sm text-gray-900 ml-2">N/A</span>
-              </div>
-              <div>
                 <span className="text-sm font-semibold text-gray-700">Contact:</span>
                 <span className="text-sm text-gray-900 ml-2">{(student as any).contact_number || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-sm font-semibold text-gray-700">Email:</span>
                 <span className="text-sm text-gray-900 ml-2">{(student as any).email || ''}</span>
-              </div>
-              <div>
-                <span className="text-sm font-semibold text-gray-700">Address:</span>
-                <span className="text-sm text-gray-900 ml-2">N/A</span>
               </div>
               <div>
                 <span className="text-sm font-semibold text-gray-700">Username:</span>
