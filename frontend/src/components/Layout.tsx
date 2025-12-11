@@ -27,7 +27,7 @@ interface NavigationItem {
 }
 
 function Layout({ children, navigationItems, title }: LayoutProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showLogoutConfirmModal, setShowLogoutConfirmModal] = useState(false);
@@ -127,24 +127,56 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Please select an image file.');
+        return;
+      }
+      
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Image size must be less than 5MB.');
+        return;
+      }
+      
       setPhotoFile(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setPhotoPreview(reader.result as string);
+      };
+      reader.onerror = () => {
+        alert('Failed to read the image file.');
       };
       reader.readAsDataURL(file);
     }
   };
 
   const handlePhotoSave = async () => {
-    if (!photoFile || !user) return;
+    if (!photoFile || !user || !photoPreview) {
+      alert('Please select an image first.');
+      return;
+    }
     
     try {
-      // In a real app, you would upload the file to a server
-      // For now, we'll just save the data URL
+      // Save the data URL to the database
       await UpdateUserPhoto(user.id, user.role, photoPreview);
-      alert('Photo updated successfully!');
+      
+      // Update user object in localStorage
+      const updatedUser = {
+        ...user,
+        photo_url: photoPreview
+      };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      
+      // Update user in context by reloading the page
+      // This ensures the photo appears everywhere (sidebar, etc.)
       setPhotoFile(null);
+      alert('Photo updated successfully!');
+      
+      // Reload to refresh user data everywhere
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error) {
       console.error('Failed to update photo:', error);
       alert('Failed to update photo. Make sure you are connected to the database.');
@@ -202,6 +234,8 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         email: user.email || '',
         contactNumber: user.contact_number || ''
       });
+      // Sync photo preview with user photo
+      setPhotoPreview(user.photo_url || '');
     }
   }, [user]);
 
@@ -252,12 +286,23 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         '' // departmentCode
       );
 
+      // Update user in context and localStorage
+      const updatedUserData = {
+        first_name: profileFormData.firstName,
+        middle_name: profileFormData.middleName,
+        last_name: profileFormData.lastName,
+        email: profileFormData.email,
+        contact_number: profileFormData.contactNumber,
+        name: fullName
+      };
+      updateUser(updatedUserData);
+
       setProfileSuccess('Profile updated successfully!');
       setEditingProfile(false);
       
-      // Refresh user data - you might need to reload from context
+      // Close modal after showing success message
       setTimeout(() => {
-        window.location.reload(); // Simple reload to refresh user data
+        handleCloseAccountModal();
       }, 1500);
     } catch (error) {
       console.error('Failed to update profile:', error);
@@ -272,6 +317,10 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     setActiveTab('profile');
     setPhotoFile(null);
     setPhotoPreview(user?.photo_url || '');
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
     setOldPassword('');
     setNewPassword('');
     setConfirmPassword('');
@@ -287,6 +336,15 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     });
     setProfileError('');
     setProfileSuccess('');
+  };
+
+  const handleCancelPhotoChange = () => {
+    setPhotoFile(null);
+    setPhotoPreview(user?.photo_url || '');
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
   const handleModalBackdropClick = (e: React.MouseEvent) => {
@@ -470,9 +528,9 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
           onClick={handleModalBackdropClick}
           style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0 }}
         >
-          <div className="relative bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto z-[10001]">
-            {/* Modal Header */}
-            <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+          <div className="relative bg-white rounded-lg shadow-xl w-auto max-w-lg max-h-[90vh] flex flex-col z-[10001]">
+            {/* Modal Header - Fixed */}
+            <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center flex-shrink-0">
               <h3 className="text-xl font-semibold text-gray-900">Account Settings</h3>
               <button
                 type="button"
@@ -485,8 +543,8 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
               </button>
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-gray-200">
+            {/* Tabs - Fixed */}
+            <div className="border-b border-gray-200 flex-shrink-0">
               <div className="flex space-x-8 px-6">
                 <button
                   onClick={() => setActiveTab('profile')}
@@ -517,385 +575,496 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
               </div>
             </div>
 
-            {/* Tab Content */}
-            <div className="p-6">
+            {/* Tab Content - Scrollable */}
+            <div className="px-6 py-4 overflow-y-auto flex-1">
               {activeTab === 'profile' && (
                 <div className="space-y-6">
-                  {/* Basic Information Section */}
-                  <div className="mb-8">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-6">Basic Information</h4>
-                    
-                    {/* Profile Picture and Student ID Row */}
-                    <div className="flex items-center gap-8 mb-6">
-                      {/* Profile Picture */}
-                      <div className="flex flex-col items-center">
-                        {photoPreview ? (
-                          <img 
-                            src={photoPreview} 
-                            alt="Profile" 
-                            className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
-                          />
-                        ) : (
-                          <div className="h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-300">
-                            <User className="h-14 w-14 text-gray-600" />
-                          </div>
-                        )}
-                        <input
-                          ref={fileInputRef}
-                          type="file"
-                          accept="image/*"
-                          onChange={handlePhotoChange}
-                          className="hidden"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => fileInputRef.current?.click()}
-                          className="mt-3 text-sm text-blue-600 hover:text-blue-800 underline font-medium"
-                        >
-                          Change Photo
-                        </button>
-                        {photoFile && (
-                          <button
-                            type="button"
-                            onClick={handlePhotoSave}
-                            className="mt-1 text-sm text-green-600 hover:text-green-800 underline font-medium"
-                          >
-                            Save Photo
-                          </button>
-                        )}
-                      </div>
-                      
-                      {/* ID - positioned next to profile picture */}
-                      <div className="flex-1">
-                        <label className="block text-sm font-medium text-gray-700 mb-2">
-                          {user?.role === 'admin' ? 'Admin ID' : 
-                           user?.role === 'teacher' ? 'Teacher ID' : 'Student ID'}
-                        </label>
-                        <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">
-                            {user?.role === 'admin' ? (user?.employee_id || user?.name || 'N/A') :
-                             user?.role === 'teacher' ? (user?.employee_id || user?.name || 'N/A') :
-                             user?.student_id || user?.name || 'N/A'}
-                          </span>
+                  {/* Student/Working Student specific layout */}
+                  {(user?.role === 'student' || user?.role === 'working_student') ? (
+                    <form onSubmit={handleSaveProfile} className="space-y-6">
+                      {profileError && (
+                        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                          {profileError}
                         </div>
-                      </div>
-                    </div>
+                      )}
+                      
+                      {profileSuccess && (
+                        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+                          {profileSuccess}
+                        </div>
+                      )}
 
-                    {/* Student/Working Student specific fields */}
-                    {(user?.role === 'student' || user?.role === 'working_student') ? (
-                      <form onSubmit={handleSaveProfile} className="space-y-6">
-                        {profileError && (
-                          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-                            {profileError}
-                          </div>
-                        )}
+                      {/* Basic Information Section */}
+                      <div className="mb-6">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-3">Basic Information</h4>
                         
-                        {profileSuccess && (
-                          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
-                            {profileSuccess}
-                          </div>
-                        )}
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                          {/* Last Name */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                            {editingProfile ? (
-                              <input
-                                type="text"
-                                value={profileFormData.lastName}
-                                onChange={(e) => setProfileFormData({ ...profileFormData, lastName: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                required
+                        {/* Profile Photo and Fields Layout */}
+                        <div className="flex gap-6 items-start mb-4">
+                          {/* Profile Photo - Left Side */}
+                          <div className="flex flex-col items-start flex-shrink-0">
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Profile Photo</label>
+                            {photoPreview ? (
+                              <img 
+                                src={photoPreview} 
+                                alt="Profile" 
+                                className="h-20 w-20 rounded-full object-cover border-2 border-gray-300"
                               />
                             ) : (
-                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                              <div className="h-20 w-20 rounded-full bg-gray-200 flex items-center justify-center border-2 border-gray-300">
+                                <User className="h-10 w-10 text-gray-400" />
                               </div>
                             )}
+                            <input
+                              ref={fileInputRef}
+                              type="file"
+                              accept="image/*"
+                              onChange={handlePhotoChange}
+                              className="hidden"
+                              onClick={(e) => {
+                                // Reset input value to allow selecting the same file again
+                                (e.target as HTMLInputElement).value = '';
+                              }}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => fileInputRef.current?.click()}
+                              className="mt-2 text-xs text-blue-600 hover:text-blue-800 underline font-medium"
+                            >
+                              Change Photo
+                            </button>
+                            {photoFile && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={handlePhotoSave}
+                                  className="mt-1 text-xs text-green-600 hover:text-green-800 underline font-medium"
+                                >
+                                  Save Photo
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelPhotoChange}
+                                  className="mt-1 text-xs text-gray-600 hover:text-gray-800 underline font-medium"
+                                >
+                                  Cancel
+                                </button>
+                              </>
+                            )}
+                          </div>
+
+                          {/* Form Fields - Right Side */}
+                          <div className="space-y-3">
+                          {/* Student ID */}
+                          <div className="flex items-center">
+                            <label className="block text-sm font-medium text-gray-700 w-28 text-left">Student ID</label>
+                            <div className="ml-3">
+                              {editingProfile ? (
+                                <input
+                                  type="text"
+                                  value={user?.student_id || user?.name || ''}
+                                  className="px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600 w-56"
+                                  disabled
+                                />
+                              ) : (
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 w-64">
+                                  <span className="text-gray-900">{user?.student_id || user?.name || 'N/A'}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Last Name */}
+                          <div className="flex items-center">
+                            <label className="block text-sm font-medium text-gray-700 w-28 text-left">Last Name</label>
+                            <div className="ml-3">
+                              {editingProfile ? (
+                                <input
+                                  type="text"
+                                  value={profileFormData.lastName}
+                                  onChange={(e) => setProfileFormData({ ...profileFormData, lastName: e.target.value })}
+                                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent w-56"
+                                  required
+                                />
+                              ) : (
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 w-64">
+                                  <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* First Name */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                            {editingProfile ? (
-                              <input
-                                type="text"
-                                value={profileFormData.firstName}
-                                onChange={(e) => setProfileFormData({ ...profileFormData, firstName: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                required
-                              />
-                            ) : (
-                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
-                              </div>
-                            )}
+                          <div className="flex items-center">
+                            <label className="block text-sm font-medium text-gray-700 w-28 text-left">First Name</label>
+                            <div className="ml-3">
+                              {editingProfile ? (
+                                <input
+                                  type="text"
+                                  value={profileFormData.firstName}
+                                  onChange={(e) => setProfileFormData({ ...profileFormData, firstName: e.target.value })}
+                                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent w-56"
+                                  required
+                                />
+                              ) : (
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 w-64">
+                                  <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
+                                </div>
+                              )}
+                            </div>
                           </div>
 
                           {/* Middle Name */}
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
-                            {editingProfile ? (
+                          <div className="flex items-center">
+                            <label className="block text-sm font-medium text-gray-700 w-28 text-left">Middle Name</label>
+                            <div className="ml-3">
+                              {editingProfile ? (
+                                <input
+                                  type="text"
+                                  value={profileFormData.middleName}
+                                  onChange={(e) => setProfileFormData({ ...profileFormData, middleName: e.target.value })}
+                                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent w-56"
+                                />
+                              ) : (
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 w-64">
+                                  <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Contact Details Section */}
+                      <div className="mb-6">
+                        <h4 className="text-lg font-semibold text-gray-900 mb-3">Contact Details</h4>
+                        
+                        <div className="space-y-3">
+                          {/* Contact Number */}
+                          <div className="flex items-center">
+                            <label className="block text-sm font-medium text-gray-700 w-28 text-left">Contact No.</label>
+                            <div className="ml-3">
+                              {editingProfile ? (
+                                <input
+                                  type="text"
+                                  value={profileFormData.contactNumber}
+                                  onChange={(e) => setProfileFormData({ ...profileFormData, contactNumber: e.target.value })}
+                                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent w-56"
+                                />
+                              ) : (
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 w-64">
+                                  <span className="text-gray-900">{user?.contact_number || 'N/A'}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Email */}
+                          <div className="flex items-center">
+                            <label className="block text-sm font-medium text-gray-700 w-28 text-left">Email</label>
+                            <div className="ml-3">
+                              {editingProfile ? (
+                                <input
+                                  type="email"
+                                  value={profileFormData.email}
+                                  onChange={(e) => setProfileFormData({ ...profileFormData, email: e.target.value })}
+                                  className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent w-56"
+                                />
+                              ) : (
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 w-64">
+                                  <span className="text-gray-900">{user?.email || 'N/A'}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Account Created */}
+                          <div className="flex items-center">
+                            <label className="block text-sm font-medium text-gray-700 w-28 text-left">Account Created</label>
+                            <div className="ml-3">
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200 w-64">
+                                <span className="text-gray-900">
+                                  {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric'
+                                  }) : 'N/A'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex justify-end gap-3 pt-3 border-t border-gray-200 mt-4">
+                        <button
+                          type="button"
+                          onClick={editingProfile ? handleCancelEditProfile : handleEditProfile}
+                          className="px-6 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors font-medium"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="submit"
+                          disabled={!editingProfile || savingProfile}
+                          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {savingProfile ? 'Updating...' : 'Update'}
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      {/* For admins and teachers - keep existing layout */}
+                      <div className="space-y-6">
+                        {/* Basic Information Section */}
+                        <div className="mb-8">
+                          <h4 className="text-lg font-semibold text-gray-900 mb-6">Basic Information</h4>
+                          
+                          {/* Profile Picture and ID Row */}
+                          <div className="flex items-center gap-8 mb-6">
+                            {/* Profile Picture */}
+                            <div className="flex flex-col items-center">
+                              {photoPreview ? (
+                                <img 
+                                  src={photoPreview} 
+                                  alt="Profile" 
+                                  className="h-24 w-24 rounded-full object-cover border-2 border-gray-300"
+                                />
+                              ) : (
+                                <div className="h-24 w-24 rounded-full bg-gray-100 flex items-center justify-center border-2 border-gray-300">
+                                  <User className="h-14 w-14 text-gray-600" />
+                                </div>
+                              )}
                               <input
-                                type="text"
-                                value={profileFormData.middleName}
-                                onChange={(e) => setProfileFormData({ ...profileFormData, middleName: e.target.value })}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                ref={fileInputRef}
+                                type="file"
+                                accept="image/*"
+                                onChange={handlePhotoChange}
+                                className="hidden"
+                                onClick={(e) => {
+                                  // Reset input value to allow selecting the same file again
+                                  (e.target as HTMLInputElement).value = '';
+                                }}
                               />
-                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="mt-3 text-sm text-blue-600 hover:text-blue-800 underline font-medium"
+                              >
+                                Change Photo
+                              </button>
+                              {photoFile && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={handlePhotoSave}
+                                    className="mt-1 text-sm text-green-600 hover:text-green-800 underline font-medium"
+                                  >
+                                    Save Photo
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleCancelPhotoChange}
+                                    className="mt-1 text-sm text-gray-600 hover:text-gray-800 underline font-medium"
+                                  >
+                                    Cancel
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                            
+                            {/* ID - positioned next to profile picture */}
+                            <div className="flex-1">
+                              <label className="block text-sm font-medium text-gray-700 mb-2">
+                                {user?.role === 'admin' ? 'Admin ID' : 
+                                 user?.role === 'teacher' ? 'Teacher ID' : 'Student ID'}
+                              </label>
                               <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                                <span className="text-gray-900">
+                                  {user?.role === 'admin' ? (user?.employee_id || user?.name || 'N/A') :
+                                   user?.role === 'teacher' ? (user?.employee_id || user?.name || 'N/A') :
+                                   user?.student_id || user?.name || 'N/A'}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* For admins */}
+                          {user?.role === 'admin' ? (
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Last Name */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                  <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                                </div>
+                              </div>
+
+                              {/* First Name */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                  <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
+                                </div>
+                              </div>
+
+                              {/* Middle Name */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                  <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            /* For teachers */
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Last Name */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                  <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                                </div>
+                              </div>
+
+                              {/* First Name */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                  <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
+                                </div>
+                              </div>
+
+                              {/* Middle Name */}
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                  <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Contact Details Section */}
+                        <div className="mb-8">
+                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Details</h4>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Contact Number - only show for teachers */}
+                            {user?.role === 'teacher' && (
+                              <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-2">Contact No.</label>
+                                <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                  <span className="text-gray-900">{user?.contact_number || 'N/A'}</span>
+                                </div>
                               </div>
                             )}
+
+                            {/* Email */}
+                            <div>
+                              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                <span className="text-gray-900">{user?.email || 'N/A'}</span>
+                              </div>
+                            </div>
                           </div>
                         </div>
 
-                        {editingProfile && (
-                          <div className="flex justify-end gap-3 pt-4">
-                            <button
-                              type="button"
-                              onClick={handleCancelEditProfile}
-                              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors font-medium"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="submit"
-                              disabled={savingProfile}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {savingProfile ? 'Saving...' : 'Save Changes'}
-                            </button>
-                          </div>
-                        )}
-
-                        {!editingProfile && (
-                          <div className="flex justify-end pt-4">
-                            <button
-                              type="button"
-                              onClick={handleEditProfile}
-                              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
-                            >
-                              Edit Profile
-                            </button>
-                          </div>
-                        )}
-                      </form>
-                    ) : (
-                      <>
-                        {/* For admins */}
-                        {user?.role === 'admin' ? (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Last Name */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
-                              </div>
-                            </div>
-
-                            {/* First Name */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
-                              </div>
-                            </div>
-
-                            {/* Middle Name */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
-                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        ) : (
-                          /* For teachers */
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            {/* Last Name */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
-                              </div>
-                            </div>
-
-                            {/* First Name */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
-                              </div>
-                            </div>
-
-                            {/* Middle Name */}
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
-                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                                <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
-
-                  {/* Contact Details Section */}
-                  {(user?.role === 'student' || user?.role === 'working_student') ? (
-                    <div className="mb-8">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Details</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Contact Number */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Contact No.</label>
-                          {editingProfile ? (
-                            <input
-                              type="text"
-                              value={profileFormData.contactNumber}
-                              onChange={(e) => setProfileFormData({ ...profileFormData, contactNumber: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          ) : (
-                            <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                              <span className="text-gray-900">{user?.contact_number || 'N/A'}</span>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Email */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                          {editingProfile ? (
-                            <input
-                              type="email"
-                              value={profileFormData.email}
-                              onChange={(e) => setProfileFormData({ ...profileFormData, email: e.target.value })}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                            />
-                          ) : (
-                            <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                              <span className="text-gray-900">{user?.email || 'N/A'}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mb-8">
-                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Details</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Contact Number - only show for teachers */}
-                        {user?.role === 'teacher' && (
+                        {/* Account Created Section */}
+                        <div className="mb-8">
+                          <h4 className="text-lg font-semibold text-gray-900 mb-4">Account Created</h4>
                           <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Contact No.</label>
                             <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                              <span className="text-gray-900">{user?.contact_number || 'N/A'}</span>
+                              <span className="text-gray-900">
+                                {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'long',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                }) : 'N/A'}
+                              </span>
                             </div>
-                          </div>
-                        )}
-
-                        {/* Email */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                            <span className="text-gray-900">{user?.email || 'N/A'}</span>
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </>
                   )}
-
-                  {/* Account Created Section */}
-                  <div className="mb-8">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Account Created</h4>
-                    <div>
-                      <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                        <span className="text-gray-900">
-                          {user?.created ? new Date(user.created).toLocaleDateString('en-US', {
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          }) : 'N/A'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               )}
 
               {activeTab === 'password' && (
-                <form onSubmit={handlePasswordChange} className="space-y-6">
-                  {passwordError && (
-                    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-                      {passwordError}
-                    </div>
-                  )}
+                <div className="space-y-4">
+                  {/* Title */}
+                  <h4 className="text-2xl font-bold text-gray-900 mb-4">Change Password</h4>
                   
-                  {passwordSuccess && (
-                    <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
-                      {passwordSuccess}
+                  <form onSubmit={handlePasswordChange} className="space-y-4">
+                    {passwordError && (
+                      <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                        {passwordError}
+                      </div>
+                    )}
+                    
+                    {passwordSuccess && (
+                      <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+                        {passwordSuccess}
+                      </div>
+                    )}
+
+                    {/* Current Password */}
+                    <div>
+                      <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                        Current Password
+                      </label>
+                      <input
+                        type="password"
+                        id="oldPassword"
+                        value={oldPassword}
+                        onChange={(e) => setOldPassword(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      />
                     </div>
-                  )}
 
-                  {/* Old Password */}
-                  <div>
-                    <label htmlFor="oldPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                      Old Password
-                    </label>
-                    <input
-                      type="password"
-                      id="oldPassword"
-                      value={oldPassword}
-                      onChange={(e) => setOldPassword(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter your current password"
-                    />
-                  </div>
+                    {/* New Password */}
+                    <div>
+                      <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                        New Password
+                      </label>
+                      <input
+                        type="password"
+                        id="newPassword"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      />
+                    </div>
 
-                  {/* New Password */}
-                  <div>
-                    <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                      New Password
-                    </label>
-                    <input
-                      type="password"
-                      id="newPassword"
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Enter your new password"
-                    />
-                  </div>
+                    {/* Confirm New Password */}
+                    <div>
+                      <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+                        Confirm New Password
+                      </label>
+                      <input
+                        type="password"
+                        id="confirmPassword"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                      />
+                    </div>
 
-                  {/* Confirm New Password */}
-                  <div>
-                    <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
-                      Confirm New Password
-                    </label>
-                    <input
-                      type="password"
-                      id="confirmPassword"
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Confirm your new password"
-                    />
-                  </div>
-
-                  <div className="flex justify-end pt-4">
-                    <button
-                      type="submit"
-                      className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      Change Password
-                    </button>
-                  </div>
-                </form>
+                    <div className="pt-3">
+                      <button
+                        type="submit"
+                        className="w-full px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors font-medium"
+                      >
+                        Change Password
+                      </button>
+                    </div>
+                  </form>
+                </div>
               )}
             </div>
 
