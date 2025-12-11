@@ -38,7 +38,11 @@ import {
   GetAllStudentsForEnrollment,
   EnrollMultipleStudents,
   UnenrollStudentFromClassByIDs,
-  GetAllClasses
+  GetAllClasses,
+  CreateClass,
+  CreateSubject,
+  GetSubjects,
+  GetAllTeachers
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
 import { main } from '../../wailsjs/go/models';
@@ -48,6 +52,8 @@ type Class = main.CourseClass;
 type ClasslistEntry = main.ClasslistEntry;
 type Attendance = main.Attendance;
 type ClassStudent = main.ClassStudent;
+type User = main.User;
+type Subject = main.Subject;
 
 // Helper function to get subject icon and color
 function getSubjectIconAndColor(subjectCode: string, subjectName: string) {
@@ -202,9 +208,9 @@ function DashboardOverview() {
               const { icon, headerColor, iconColor } = getSubjectIconAndColor(cls.subject_code, cls.subject_name);
               return (
                 <div 
-                  key={cls.id} 
+                  key={cls.class_id} 
                   className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/teacher/class-management/${cls.id}`)}
+                  onClick={() => navigate(`/teacher/class-management/${cls.class_id}`)}
                 >
                   {/* Card Header */}
                   <div className={`${headerColor} px-4 py-3 flex items-center justify-between`}>
@@ -275,7 +281,8 @@ function ClassManagement() {
 
       setLoading(true);
       try {
-        const data = await GetTeacherClassesCreatedByWorkingStudents(user.id);
+        // Get all classes for this teacher (not just those created by working students)
+        const data = await GetTeacherClassesByUserID(user.id);
         setClasses(data || []);
         setFilteredClasses(data || []);
         setError('');
@@ -336,6 +343,13 @@ function ClassManagement() {
       <div className="flex-shrink-0 mb-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">Class Management</h2>
+          <button
+            onClick={() => navigate('/teacher/create-classlist')}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            <Plus className="h-4 w-4 mr-1" />
+            ADD NEW
+          </button>
         </div>
       </div>
 
@@ -417,7 +431,7 @@ function ClassManagement() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {currentClasses.map((cls, index) => (
-              <tr key={cls.id} className="hover:bg-gray-50">
+              <tr key={cls.class_id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {startIndex + index + 1}
                 </td>
@@ -448,14 +462,14 @@ function ClassManagement() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => handleViewClassList(cls.id)}
+                      onClick={() => handleViewClassList(cls.class_id)}
                       className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       title="View"
                     >
                       <Eye className="h-3 w-3" />
                     </button>
                     <button
-                      onClick={() => navigate(`/teacher/class-management/${cls.id}`)}
+                      onClick={() => navigate(`/teacher/class-management/${cls.class_id}`)}
                       className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       title="Edit"
                     >
@@ -465,7 +479,7 @@ function ClassManagement() {
                       onClick={async () => {
                         if (window.confirm('Are you sure you want to delete this class?')) {
                           try {
-                            await DeleteClass(cls.id);
+                            await DeleteClass(cls.class_id);
                             // Reload classes
                             const data = await GetTeacherClassesCreatedByWorkingStudents(user?.id || 0);
                             setClasses(data || []);
@@ -544,13 +558,453 @@ function ClassManagement() {
               </div>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No classes found</h3>
               <p className="mt-1 text-sm text-gray-500">
-                No class lists have been created by working students and assigned to you yet.
+                You haven't created any classes yet.
               </p>
+              <div className="mt-6">
+                <button
+                  onClick={() => navigate('/teacher/create-classlist')}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add New Class
+                </button>
+              </div>
             </>
           )}
         </div>
       )}
     </div>
+  );
+}
+
+function CreateClasslist() {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const [formData, setFormData] = useState({
+    schoolYear: '2024-2025',
+    semester: '1st Semester',
+    offeringCode: '',
+    subjectCode: '',
+    subjectName: '',
+    schedule: '',
+    room: '',
+    selectedDays: [] as string[],
+    startTime: '',
+    endTime: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [message, setMessage] = useState('');
+  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+
+  const toggleDay = (day: string) => {
+    setFormData(prev => {
+      const newDays = prev.selectedDays.includes(day)
+        ? prev.selectedDays.filter(d => d !== day)
+        : [...prev.selectedDays, day];
+      return { ...prev, selectedDays: newDays };
+    });
+  };
+
+  const formatSchedule = (days: string[], startTime: string, endTime: string): string => {
+    if (!days.length || !startTime || !endTime) return '';
+    
+    // Sort days in order
+    const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+    const sortedDays = [...days].sort((a, b) => {
+      return dayOrder.indexOf(a) - dayOrder.indexOf(b);
+    });
+    
+    // Format days (Mon, Tue -> MW or Mon, Wed, Fri -> MWF)
+    const dayAbbrs: Record<string, string> = {
+      'Mon': 'M',
+      'Tue': 'T',
+      'Wed': 'W',
+      'Thu': 'Th',
+      'Fri': 'F',
+      'Sat': 'S',
+      'Sun': 'Su'
+    };
+    
+    let dayString = '';
+    if (sortedDays.length === 2 && sortedDays.includes('Tue') && sortedDays.includes('Thu')) {
+      dayString = 'TTh';
+    } else {
+      dayString = sortedDays.map(d => dayAbbrs[d] || d).join('');
+    }
+    
+    // Format time range
+    const formatTime = (time: string) => {
+      const [hours, minutes] = time.split(':');
+      const hour = parseInt(hours);
+      const ampm = hour >= 12 ? 'PM' : 'AM';
+      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
+      return `${displayHour}:${minutes} ${ampm}`;
+    };
+    
+    return `${dayString} ${formatTime(startTime)}-${formatTime(endTime)}`;
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+
+    try {
+      // Validate required fields
+      if (!formData.subjectCode) {
+        setMessage('Subject Code is required.');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.subjectName) {
+        setMessage('Subject Name is required.');
+        setLoading(false);
+        return;
+      }
+
+      if (formData.selectedDays.length === 0) {
+        setMessage('Please select at least one day of the week.');
+        setLoading(false);
+        return;
+      }
+
+      if (!formData.startTime || !formData.endTime) {
+        setMessage('Please select both start and end time.');
+        setLoading(false);
+        return;
+      }
+
+      // Format schedule from selected days and time
+      const formattedSchedule = formatSchedule(formData.selectedDays, formData.startTime, formData.endTime);
+
+      // Use the manually entered subject code
+      const subjectCode = formData.subjectCode.toUpperCase().trim();
+
+      // Create the subject (teacher_user_id is not needed for subjects table)
+      await CreateSubject(
+        subjectCode,
+        formData.subjectName,
+        user?.id || 0,
+        ''
+      );
+
+      // Create the class (teacher creates it for themselves)
+      await CreateClass(
+        subjectCode,
+        user?.id || 0,
+        formData.offeringCode,
+        formattedSchedule,
+        formData.room,
+        '',
+        '',
+        formData.semester,
+        formData.schoolYear,
+        user?.id || 0  // Teacher creates the class themselves
+      );
+
+      setNotification({ type: 'success', message: 'Class created successfully!' });
+      setMessage('Class created successfully!');
+      
+      setTimeout(() => {
+        navigate('/teacher/class-management');
+      }, 2000);
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+      setMessage(`Failed to create class: ${errorMessage}`);
+      setNotification({ type: 'error', message: `Failed to create class: ${errorMessage}` });
+      setTimeout(() => setNotification(null), 5000);
+      console.error('Creation error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <>
+      <style>{`
+        input[type="time"]::-webkit-datetime-edit-hour-field:empty,
+        input[type="time"]::-webkit-datetime-edit-minute-field:empty {
+          color: transparent;
+        }
+        input[type="time"]::-webkit-datetime-edit-hour-field:not(:empty),
+        input[type="time"]::-webkit-datetime-edit-minute-field:not(:empty) {
+          color: inherit;
+        }
+      `}</style>
+      {/* Notification */}
+      {notification && (
+        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
+          notification.type === 'success' ? 'border-l-4 border-green-400' : 'border-l-4 border-red-400'
+        }`}>
+          <div className="p-4">
+            <div className="flex items-start">
+              <div className="flex-shrink-0">
+                {notification.type === 'success' ? (
+                  <svg className="h-6 w-6 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : (
+                  <svg className="h-6 w-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                )}
+              </div>
+              <div className="ml-3 w-0 flex-1 pt-0.5">
+                <p className={`text-sm font-medium ${
+                  notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+                }`}>
+                  {notification.message}
+                </p>
+              </div>
+              <div className="ml-4 flex-shrink-0 flex">
+                <button
+                  className="bg-white rounded-md inline-flex text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                  onClick={() => setNotification(null)}
+                >
+                  <span className="sr-only">Close</span>
+                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div 
+        className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            navigate('/teacher/class-management');
+          }
+        }}
+      >
+        <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl mx-4 relative max-h-[90vh] flex flex-col">
+          <button
+            type="button"
+            onClick={() => navigate('/teacher/class-management')}
+            className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+          >
+            ×
+          </button>
+          
+          <div className="p-3 pb-2 flex-shrink-0 border-b">
+            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+              <Plus className="h-4 w-4" />
+              Add class
+            </h2>
+          </div>
+
+          <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-y-auto p-3">
+              <div className="max-w-5xl mx-auto">
+                {/* Two Column Layout */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  
+                  {/* Left Block: Basic Information */}
+                  <div className="bg-gray-50 p-3 rounded-lg border space-y-2.5">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Basic Information</h3>
+                    
+                    <div>
+                      <label htmlFor="schoolYear" className="block text-xs font-medium text-gray-700 mb-1">
+                        School Year
+                      </label>
+                      <select
+                        id="schoolYear"
+                        value={formData.schoolYear}
+                        onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="2023-2024">2023-2024</option>
+                        <option value="2024-2025">2024-2025</option>
+                        <option value="2025-2026">2025-2026</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="semester" className="block text-xs font-medium text-gray-700 mb-1">
+                        Semester
+                      </label>
+                      <select
+                        id="semester"
+                        value={formData.semester}
+                        onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      >
+                        <option value="1st Semester">1st Semester</option>
+                        <option value="2nd Semester">2nd Semester</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="offeringCode" className="block text-xs font-medium text-gray-700 mb-1">
+                        Offering Code
+                      </label>
+                      <input
+                        type="text"
+                        id="offeringCode"
+                        value={formData.offeringCode}
+                        onChange={(e) => setFormData({ ...formData, offeringCode: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="subjectCode" className="block text-xs font-medium text-gray-700 mb-1">
+                        Subject Code
+                      </label>
+                      <input
+                        type="text"
+                        id="subjectCode"
+                        value={formData.subjectCode}
+                        onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value.toUpperCase() })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="subjectName" className="block text-xs font-medium text-gray-700 mb-1">
+                        Subject Name
+                      </label>
+                      <input
+                        type="text"
+                        id="subjectName"
+                        value={formData.subjectName}
+                        onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  {/* Right Block: Schedule & Location */}
+                  <div className="bg-gray-50 p-3 rounded-lg border space-y-2.5">
+                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Schedule & Location</h3>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                        Schedule
+                      </label>
+                      
+                      {/* Days of the week selection */}
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                          Days of the Week
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                          {[
+                            { value: 'Mon', label: 'Mon' },
+                            { value: 'Tue', label: 'Tue' },
+                            { value: 'Wed', label: 'Wed' },
+                            { value: 'Thu', label: 'Thu' },
+                            { value: 'Fri', label: 'Fri' },
+                            { value: 'Sat', label: 'Sat' },
+                            { value: 'Sun', label: 'Sun' }
+                          ].map((day) => (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() => toggleDay(day.value)}
+                              className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
+                                formData.selectedDays.includes(day.value)
+                                  ? 'bg-blue-600 text-white border-blue-600'
+                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                              }`}
+                            >
+                              {day.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Time range */}
+                      <div className="mb-2">
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                          Time Range
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          <input
+                            type="time"
+                            id="startTime"
+                            value={formData.startTime}
+                            onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
+                            className="flex-1 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            required
+                          />
+                          <span className="text-xs text-gray-500 font-medium">to</span>
+                          <input
+                            type="time"
+                            id="endTime"
+                            value={formData.endTime}
+                            onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
+                            className="flex-1 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      {/* Preview of formatted schedule */}
+                      {formData.selectedDays.length > 0 && formData.startTime && formData.endTime && (
+                        <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
+                          <p className="text-xs text-gray-600 mb-0.5">Schedule Preview:</p>
+                          <p className="text-xs font-medium text-blue-700">
+                            {formatSchedule(formData.selectedDays, formData.startTime, formData.endTime)}
+                          </p>
+                        </div>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="room" className="block text-xs font-medium text-gray-700 mb-1">
+                        Room
+                      </label>
+                      <input
+                        type="text"
+                        id="room"
+                        value={formData.room}
+                        onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {message && (
+                <div className={`mt-4 p-4 rounded-md ${
+                  message.includes('successfully') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                }`}>
+                  {message}
+                </div>
+              )}
+            </div>
+
+            {/* Footer Buttons */}
+            <div className="flex-shrink-0 border-t bg-gray-50 px-3 py-2.5 flex justify-between">
+              <button
+                type="button"
+                onClick={() => navigate('/teacher/class-management')}
+                className="px-4 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                CANCEL
+              </button>
+              <button
+                type="submit"
+                disabled={loading}
+                className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Saving...' : 'SAVE'}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
   );
 }
 
@@ -585,7 +1039,7 @@ function ClassManagementDetail() {
     setLoading(true);
     try {
       const classes = await GetTeacherClassesCreatedByWorkingStudents(user?.id || 0);
-      const selectedClass = classes.find(c => c.id === parseInt(id));
+      const selectedClass = classes.find(c => c.class_id === parseInt(id));
       
       if (selectedClass) {
         setClassInfo(selectedClass);
@@ -892,7 +1346,7 @@ function ClassManagementDetail() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredStudents.map((student, index) => (
-                  <tr key={student.id} className="hover:bg-gray-50">
+                  <tr key={student.student_user_id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {index + 1}
                     </td>
@@ -904,7 +1358,7 @@ function ClassManagementDetail() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
-                        onClick={() => handleRemoveStudent(student.student_id, student.class_id)}
+                        onClick={() => handleRemoveStudent(student.student_user_id, student.class_id)}
                         className="text-red-600 hover:text-red-900 font-medium hover:underline transition-colors"
                       >
                         <Trash2 className="h-4 w-4 inline mr-1" />
@@ -1190,7 +1644,8 @@ function AttendanceClassSelection() {
 
       setLoading(true);
       try {
-        const data = await GetTeacherClassesCreatedByWorkingStudents(user.id);
+        // Get all classes for this teacher (not just those created by working students)
+        const data = await GetTeacherClassesByUserID(user.id);
         setClasses(data || []);
         setFilteredClasses(data || []);
         setError('');
@@ -1336,7 +1791,7 @@ function AttendanceClassSelection() {
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
             {currentClasses.map((cls, index) => (
-              <tr key={cls.id} className="hover:bg-gray-50">
+              <tr key={cls.class_id} className="hover:bg-gray-50">
                 <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                   {startIndex + index + 1}
                 </td>
@@ -1363,7 +1818,7 @@ function AttendanceClassSelection() {
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-xs font-medium">
                   <button
-                    onClick={() => navigate(`/teacher/attendance/${cls.id}`)}
+                    onClick={() => navigate(`/teacher/attendance/${cls.class_id}`)}
                     className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                   >
                     SELECT
@@ -1501,8 +1956,8 @@ function StoredAttendance() {
       for (const cls of classes) {
         for (const date of datesToCheck) {
           try {
-            const records = await GetClassAttendance(cls.id, date);
-            const savedRecords = records?.filter(r => r.id > 0) || [];
+            const records = await GetClassAttendance(cls.class_id, date);
+            const savedRecords = records || [];
             savedRecords.forEach(record => {
               allRecords.push({
                 ...record,
@@ -1563,7 +2018,7 @@ function StoredAttendance() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {allAttendanceRecords.map((record) => (
-                  <tr key={`${record.id}-${record.classlist_id}-${record.student_id}-${record.date}`} className="hover:bg-gray-50">
+                  <tr key={`${record.class_id}-${record.student_user_id}-${record.date}`} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {new Date(record.date).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                     </td>
@@ -1632,7 +2087,7 @@ function AttendanceManagementDetail() {
       setLoading(true);
       try {
         const classes = await GetTeacherClassesCreatedByWorkingStudents(user.id);
-        const foundClass = classes.find(c => c.id === parseInt(id));
+        const foundClass = classes.find(c => c.class_id === parseInt(id));
         setSelectedClass(foundClass || null);
         setError('');
       } catch (error) {
@@ -1654,7 +2109,7 @@ function AttendanceManagementDetail() {
       setHasSelectedDate(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedClass?.id, selectedDate, hasSelectedDate]);
+  }, [selectedClass?.class_id, selectedDate, hasSelectedDate]);
 
   const loadAttendance = async () => {
     if (!selectedClass || !selectedDate) return;
@@ -1662,7 +2117,7 @@ function AttendanceManagementDetail() {
     setLoadingAttendance(true);
     setError('');
     try {
-      const records = await GetClassAttendance(selectedClass.id, selectedDate);
+      const records = await GetClassAttendance(selectedClass.class_id, selectedDate);
       console.log('Loaded attendance records:', records?.length || 0);
       setAttendanceRecords(records || []);
       // If no records found but we have a class, it might mean no students are enrolled
@@ -1738,7 +2193,7 @@ function AttendanceManagementDetail() {
     try {
       // Initialize attendance if not already done
       if (attendanceRecords.length === 0) {
-        await InitializeAttendanceForClass(selectedClass.id, selectedDate, user?.id || 0);
+        await InitializeAttendanceForClass(selectedClass.class_id, selectedDate, user?.id || 0);
         await loadAttendance();
       }
       
@@ -1905,7 +2360,7 @@ function AttendanceManagementDetail() {
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
                     {attendanceRecords.map((record, index) => (
-                      <tr key={record.id || `${record.classlist_id}-${record.student_id}`} className="hover:bg-gray-50">
+                      <tr key={`${record.class_id}-${record.student_user_id}-${record.date}`} className="hover:bg-gray-50">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                           {index + 1}
                         </td>
@@ -1967,7 +2422,7 @@ function AttendanceManagementDetail() {
                 </p>
                 {!error && selectedClass && (
                   <button
-                    onClick={() => navigate(`/teacher/class-management/${selectedClass.id}`)}
+                    onClick={() => navigate(`/teacher/class-management/${selectedClass.class_id}`)}
                     className="mt-4 inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
                   >
                     Go to Class Management
@@ -2009,6 +2464,7 @@ function TeacherDashboard() {
       <Routes>
         <Route index element={<DashboardOverview />} />
         <Route path="class-management" element={<ClassManagement />} />
+        <Route path="create-classlist" element={<CreateClasslist />} />
         <Route path="class-management/:id" element={<ClassManagementDetail />} />
         <Route path="attendance/:id" element={<AttendanceManagementDetail />} />
         <Route path="attendance" element={<AttendanceClassSelection />} />

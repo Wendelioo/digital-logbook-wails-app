@@ -213,8 +213,7 @@ function LoginHistory() {
   const [error, setError] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   useEffect(() => {
     const loadLoginLogs = async () => {
@@ -251,23 +250,20 @@ function LoginHistory() {
     loadLoginLogs();
   }, [user]);
 
-  // Filter logs based on date range and search
+  // Filter logs based on date and search
   useEffect(() => {
     let filtered = loginLogs;
 
-    // Apply date filters
-    if (startDate || endDate) {
+    // Apply date filter
+    if (selectedDate) {
       filtered = filtered.filter(log => {
         if (!log.login_time) return false;
         
         const logDate = new Date(log.login_time);
-        const start = startDate ? new Date(startDate) : null;
-        const end = endDate ? new Date(endDate) : null;
+        const selected = new Date(selectedDate);
         
-        if (start && logDate < start) return false;
-        if (end && logDate > end) return false;
-        
-        return true;
+        // Compare only the date part (ignore time)
+        return logDate.toDateString() === selected.toDateString();
       });
     }
 
@@ -281,15 +277,14 @@ function LoginHistory() {
     }
     
     setFilteredLogs(filtered);
-  }, [loginLogs, startDate, endDate, searchQuery]);
+  }, [loginLogs, selectedDate, searchQuery]);
 
   const clearFilters = () => {
-    setStartDate('');
-    setEndDate('');
+    setSelectedDate(null);
     setSearchQuery('');
   };
 
-  const activeFilterCount = (startDate ? 1 : 0) + (endDate ? 1 : 0);
+  const activeFilterCount = selectedDate ? 1 : 0;
 
   if (loading) {
     return (
@@ -344,41 +339,32 @@ function LoginHistory() {
               )}
             </button>
             
-            {/* Dropdown Filters Panel */}
+            {/* Dropdown with Date Picker */}
             {showFilters && (
               <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium text-gray-700">Filter by Date Range:</label>
+                    <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Start Date</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
+                      <label className="block text-xs text-gray-600 mb-1">Select Date</label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={selectedDate ? selectedDate.toISOString().split('T')[0] : ''}
+                          onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+                          max={new Date().toISOString().split('T')[0]}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">End Date</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    {(startDate || endDate) && (
+                    {selectedDate && (
                       <button
-                        onClick={() => {
-                          setStartDate('');
-                          setEndDate('');
-                        }}
+                        onClick={() => setSelectedDate(null)}
                         className="w-full text-xs text-gray-600 hover:text-gray-900 underline text-left"
                       >
-                        Clear Date Filters
+                        Clear Date Filter
                       </button>
                     )}
                   </div>
@@ -386,7 +372,7 @@ function LoginHistory() {
               </div>
             )}
           </div>
-          {(searchQuery || startDate || endDate) && (
+          {(searchQuery || selectedDate) && (
             <button
               onClick={clearFilters}
               className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -507,8 +493,7 @@ function FeedbackHistory() {
   const [error, setError] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   useEffect(() => {
     const loadFeedback = async () => {
@@ -530,23 +515,20 @@ function FeedbackHistory() {
     loadFeedback();
   }, [user]);
 
-  // Filter feedback based on date range and search
+  // Filter feedback based on date and search
   useEffect(() => {
     let filtered = feedbackList;
 
-    // Apply date filters
-    if (startDate || endDate) {
+    // Apply date filter
+    if (selectedDate) {
       filtered = filtered.filter(feedback => {
         if (!feedback.date_submitted) return false;
         
         const feedbackDate = new Date(feedback.date_submitted);
-        const start = startDate ? new Date(startDate) : null;
-        const end = endDate ? new Date(endDate) : null;
+        const selected = new Date(selectedDate);
         
-        if (start && feedbackDate < start) return false;
-        if (end && feedbackDate > end) return false;
-        
-        return true;
+        // Compare only the date part (ignore time)
+        return feedbackDate.toDateString() === selected.toDateString();
       });
     }
 
@@ -561,15 +543,14 @@ function FeedbackHistory() {
     }
     
     setFilteredFeedback(filtered);
-  }, [feedbackList, startDate, endDate, searchQuery]);
+  }, [feedbackList, selectedDate, searchQuery]);
 
   const clearFilters = () => {
-    setStartDate('');
-    setEndDate('');
+    setSelectedDate(null);
     setSearchQuery('');
   };
 
-  const activeFilterCount = (startDate ? 1 : 0) + (endDate ? 1 : 0);
+  const activeFilterCount = selectedDate ? 1 : 0;
 
   if (loading) {
     return (
@@ -624,41 +605,32 @@ function FeedbackHistory() {
               )}
             </button>
             
-            {/* Dropdown Filters Panel */}
+            {/* Dropdown with Date Picker */}
             {showFilters && (
               <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium text-gray-700">Filter by Date Range:</label>
+                    <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Start Date</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
+                      <label className="block text-xs text-gray-600 mb-1">Select Date</label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={selectedDate ? selectedDate.toISOString().split('T')[0] : ''}
+                          onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+                          max={new Date().toISOString().split('T')[0]}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">End Date</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    {(startDate || endDate) && (
+                    {selectedDate && (
                       <button
-                        onClick={() => {
-                          setStartDate('');
-                          setEndDate('');
-                        }}
+                        onClick={() => setSelectedDate(null)}
                         className="w-full text-xs text-gray-600 hover:text-gray-900 underline text-left"
                       >
-                        Clear Date Filters
+                        Clear Date Filter
                       </button>
                     )}
                   </div>
@@ -666,7 +638,7 @@ function FeedbackHistory() {
               </div>
             )}
           </div>
-          {(searchQuery || startDate || endDate) && (
+          {(searchQuery || selectedDate) && (
             <button
               onClick={clearFilters}
               className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"

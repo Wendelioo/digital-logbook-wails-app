@@ -68,6 +68,7 @@ interface User {
   photo_url?: string;
   email?: string;
   contact_number?: string;
+  department_code?: string;
   created: string;
 }
 
@@ -75,6 +76,7 @@ interface LoginLog {
   id: number;
   user_id: number;
   user_name: string;
+  user_id_number: string;
   user_type: string;
   pc_number?: string;
   login_time: string;
@@ -230,7 +232,7 @@ function UserManagement() {
     section: '',
     email: '',
     contactNumber: '',
-    departmentId: 0
+    departmentCode: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -383,9 +385,9 @@ function UserManagement() {
         return;
       }
 
-      if (formData.role === 'working_student') {
+      if (formData.role === 'working_student' || formData.role === 'student') {
         if (!formData.studentId) {
-          showNotification('error', 'Student ID is required for Working Students');
+          showNotification('error', `Student ID is required for ${formData.role === 'student' ? 'Students' : 'Working Students'}`);
           return;
         }
       } else if (formData.role === 'teacher') {
@@ -425,13 +427,13 @@ function UserManagement() {
         section: formData.section
       });
 
-      const departmentId = formData.role === 'teacher' ? formData.departmentId : 0;
+      const departmentCode = formData.role === 'teacher' ? formData.departmentCode : '';
       
       if (editingUser) {
-        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, '', formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
+        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, '', formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentCode);
         showNotification('success', 'User updated successfully!');
       } else {
-        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, '', formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
+        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, '', formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentCode);
         
         // Show specific notification based on user role
         const roleMessages = {
@@ -446,7 +448,7 @@ function UserManagement() {
       
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+      setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentCode: '' });
       setAvatarFile(null);
       setAvatarPreview(null);
       loadUsers();
@@ -471,9 +473,9 @@ function UserManagement() {
       studentId: user.student_id || '',
       year: user.year || '',
       section: user.section || '',
-      email: '',
-      contactNumber: '',
-      departmentId: 0
+      email: user.email || '',
+      contactNumber: user.contact_number || '',
+      departmentCode: user.department_code || ''
     });
     setAvatarFile(null);
     setAvatarPreview(null);
@@ -626,7 +628,7 @@ function UserManagement() {
             if (e.target === e.currentTarget) {
               setShowForm(false);
               setEditingUser(null);
-              setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+              setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentCode: '' });
               setAvatarFile(null);
               setAvatarPreview(null);
             }
@@ -639,7 +641,7 @@ function UserManagement() {
               onClick={() => {
                 setShowForm(false);
                 setEditingUser(null);
-                setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+                setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentCode: '' });
                 setAvatarFile(null);
                 setAvatarPreview(null);
               }}
@@ -652,7 +654,7 @@ function UserManagement() {
             <div className="p-4 pb-3 flex-shrink-0 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Plus className="h-5 w-5" />
-                {editingUser ? `Edit ${formData.role === 'teacher' ? 'Teacher' : 'Working Student'}` : `Add ${formData.role === 'teacher' ? 'Teacher' : 'Working Student'}`}
+                {editingUser ? `Edit ${formData.role === 'teacher' ? 'Teacher' : formData.role === 'student' ? 'Student' : 'Working Student'}` : `Add ${formData.role === 'teacher' ? 'Teacher' : formData.role === 'student' ? 'Student' : 'Working Student'}`}
               </h3>
             </div>
             
@@ -674,6 +676,7 @@ function UserManagement() {
                       className="w-full max-w-xs px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="teacher">Teacher</option>
+                      <option value="student">Student</option>
                       <option value="working_student">Working Student</option>
                     </select>
                   </div>
@@ -693,6 +696,16 @@ function UserManagement() {
                         onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                         className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Middle Name</label>
+                      <input
+                        type="text"
+                        value={formData.middleName}
+                        onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       />
                     </div>
 
@@ -727,13 +740,13 @@ function UserManagement() {
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
                         <select
-                          value={formData.departmentId}
-                          onChange={(e) => setFormData({ ...formData, departmentId: Number(e.target.value) })}
+                          value={formData.departmentCode}
+                          onChange={(e) => setFormData({ ...formData, departmentCode: e.target.value })}
                           className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
-                          <option value={0}>Please Select Here</option>
+                          <option value="">Please Select Here</option>
                           {departments.filter(dept => dept.is_active).map((dept) => (
-                            <option key={dept.id} value={dept.id}>
+                            <option key={dept.department_code} value={dept.department_code}>
                               {dept.department_code} - {dept.department_name}
                             </option>
                           ))}
@@ -851,7 +864,7 @@ function UserManagement() {
                   onClick={() => {
                     setShowForm(false);
                     setEditingUser(null);
-                    setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+                    setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentCode: '' });
                     setAvatarFile(null);
                     setAvatarPreview(null);
                   }}
@@ -1214,6 +1227,7 @@ function ViewLogs() {
     
     const matchesSearch = searchQuery === '' || 
       log.user_name.toLowerCase().includes(searchLower) ||
+      (log.user_id_number || '').toLowerCase().includes(searchLower) ||
       log.user_type.toLowerCase().includes(searchLower) ||
       (log.pc_number || '').toLowerCase().includes(searchLower) ||
       logDate.includes(searchLower) ||
@@ -1356,6 +1370,9 @@ function ViewLogs() {
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ID Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Full Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1379,6 +1396,9 @@ function ViewLogs() {
                 {filteredLogs.length > 0 ? (
                   filteredLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {log.user_id_number || log.user_name}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {log.user_name}
                       </td>
@@ -1421,7 +1441,7 @@ function ViewLogs() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={7} className="px-6 py-12 text-center">
                       <p className="text-gray-500 font-medium">No logs found</p>
                     </td>
                   </tr>
@@ -1948,7 +1968,6 @@ function Reports() {
 }
 
 interface Department {
-  id: number;
   department_code: string;
   department_name: string;
   description?: string;
@@ -2006,7 +2025,7 @@ function DepartmentManagement() {
       }
 
       if (editingDepartment) {
-        await UpdateDepartment(editingDepartment.id, formData.departmentCode, formData.departmentName, formData.description, formData.isActive);
+        await UpdateDepartment(editingDepartment.department_code, formData.departmentCode, formData.departmentName, formData.description, formData.isActive);
         showNotification('success', 'Department updated successfully!');
       } else {
         await CreateDepartment(formData.departmentCode, formData.departmentName, formData.description);
@@ -2035,10 +2054,10 @@ function DepartmentManagement() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (departmentCode: string) => {
     if (confirm('Are you sure you want to delete this department?')) {
       try {
-        await DeleteDepartment(id);
+        await DeleteDepartment(departmentCode);
         showNotification('success', 'Department deleted successfully!');
         loadDepartments();
       } catch (error) {
@@ -2298,7 +2317,7 @@ function DepartmentManagement() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {pagedDepartments.map((dept, index) => (
-                <tr key={dept.id} className="hover:bg-gray-50">
+                <tr key={dept.department_code} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {startIndex + index + 1}
                   </td>
@@ -2326,7 +2345,7 @@ function DepartmentManagement() {
                         Edit
                       </button>
                       <button
-                        onClick={() => handleDelete(dept.id)}
+                        onClick={() => handleDelete(dept.department_code)}
                         className="text-red-600 hover:text-red-900 font-medium"
                       >
                         Delete

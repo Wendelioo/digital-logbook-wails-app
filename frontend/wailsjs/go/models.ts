@@ -19,12 +19,9 @@ export namespace main {
 	    }
 	}
 	export class Attendance {
-	    id: number;
-	    classlist_id: number;
 	    class_id: number;
-	    ctrl_no: number;
+	    student_user_id: number;
 	    date: string;
-	    student_id: number;
 	    student_code: string;
 	    first_name: string;
 	    middle_name?: string;
@@ -44,12 +41,9 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.classlist_id = source["classlist_id"];
 	        this.class_id = source["class_id"];
-	        this.ctrl_no = source["ctrl_no"];
+	        this.student_user_id = source["student_user_id"];
 	        this.date = source["date"];
-	        this.student_id = source["student_id"];
 	        this.student_code = source["student_code"];
 	        this.first_name = source["first_name"];
 	        this.middle_name = source["middle_name"];
@@ -97,9 +91,8 @@ export namespace main {
 	    }
 	}
 	export class ClasslistEntry {
-	    id: number;
 	    class_id: number;
-	    student_id: number;
+	    student_user_id: number;
 	    student_code: string;
 	    first_name: string;
 	    middle_name?: string;
@@ -116,9 +109,8 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
 	        this.class_id = source["class_id"];
-	        this.student_id = source["student_id"];
+	        this.student_user_id = source["student_user_id"];
 	        this.student_code = source["student_code"];
 	        this.first_name = source["first_name"];
 	        this.middle_name = source["middle_name"];
@@ -131,12 +123,11 @@ export namespace main {
 	    }
 	}
 	export class CourseClass {
-	    id: number;
-	    subject_id: number;
+	    class_id: number;
 	    subject_code: string;
 	    subject_name: string;
 	    offering_code?: string;
-	    teacher_id: number;
+	    teacher_user_id: number;
 	    teacher_code?: string;
 	    teacher_name: string;
 	    schedule?: string;
@@ -147,7 +138,7 @@ export namespace main {
 	    school_year?: string;
 	    enrolled_count: number;
 	    is_active: boolean;
-	    created_by?: number;
+	    created_by_user_id?: number;
 	    created_at: string;
 	
 	    static createFrom(source: any = {}) {
@@ -156,12 +147,11 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
-	        this.subject_id = source["subject_id"];
+	        this.class_id = source["class_id"];
 	        this.subject_code = source["subject_code"];
 	        this.subject_name = source["subject_name"];
 	        this.offering_code = source["offering_code"];
-	        this.teacher_id = source["teacher_id"];
+	        this.teacher_user_id = source["teacher_user_id"];
 	        this.teacher_code = source["teacher_code"];
 	        this.teacher_name = source["teacher_name"];
 	        this.schedule = source["schedule"];
@@ -172,12 +162,11 @@ export namespace main {
 	        this.school_year = source["school_year"];
 	        this.enrolled_count = source["enrolled_count"];
 	        this.is_active = source["is_active"];
-	        this.created_by = source["created_by"];
+	        this.created_by_user_id = source["created_by_user_id"];
 	        this.created_at = source["created_at"];
 	    }
 	}
 	export class Department {
-	    id: number;
 	    department_code: string;
 	    department_name: string;
 	    description?: string;
@@ -191,7 +180,6 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
 	        this.department_code = source["department_code"];
 	        this.department_name = source["department_name"];
 	        this.description = source["description"];
@@ -202,7 +190,7 @@ export namespace main {
 	}
 	export class Feedback {
 	    id: number;
-	    student_id: number;
+	    student_user_id: number;
 	    student_id_str: string;
 	    first_name: string;
 	    middle_name?: string;
@@ -216,7 +204,7 @@ export namespace main {
 	    comments?: string;
 	    date_submitted: string;
 	    status: string;
-	    forwarded_by?: number;
+	    forwarded_by_user_id?: number;
 	    forwarded_by_name?: string;
 	    forwarded_at?: string;
 	    working_student_notes?: string;
@@ -228,7 +216,7 @@ export namespace main {
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
 	        this.id = source["id"];
-	        this.student_id = source["student_id"];
+	        this.student_user_id = source["student_user_id"];
 	        this.student_id_str = source["student_id_str"];
 	        this.first_name = source["first_name"];
 	        this.middle_name = source["middle_name"];
@@ -242,7 +230,7 @@ export namespace main {
 	        this.comments = source["comments"];
 	        this.date_submitted = source["date_submitted"];
 	        this.status = source["status"];
-	        this.forwarded_by = source["forwarded_by"];
+	        this.forwarded_by_user_id = source["forwarded_by_user_id"];
 	        this.forwarded_by_name = source["forwarded_by_name"];
 	        this.forwarded_at = source["forwarded_at"];
 	        this.working_student_notes = source["working_student_notes"];
@@ -252,6 +240,7 @@ export namespace main {
 	    id: number;
 	    user_id: number;
 	    user_name: string;
+	    user_id_number: string;
 	    user_type: string;
 	    pc_number?: string;
 	    login_time: string;
@@ -266,6 +255,7 @@ export namespace main {
 	        this.id = source["id"];
 	        this.user_id = source["user_id"];
 	        this.user_name = source["user_name"];
+	        this.user_id_number = source["user_id_number"];
 	        this.user_type = source["user_type"];
 	        this.pc_number = source["pc_number"];
 	        this.login_time = source["login_time"];
@@ -305,10 +295,9 @@ export namespace main {
 		}
 	}
 	export class Subject {
-	    id: number;
 	    code: string;
 	    name: string;
-	    teacher_id: number;
+	    teacher_user_id: number;
 	    teacher_name?: string;
 	    description?: string;
 	    created_at: string;
@@ -319,10 +308,9 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.id = source["id"];
 	        this.code = source["code"];
 	        this.name = source["name"];
-	        this.teacher_id = source["teacher_id"];
+	        this.teacher_user_id = source["teacher_user_id"];
 	        this.teacher_name = source["teacher_name"];
 	        this.description = source["description"];
 	        this.created_at = source["created_at"];
@@ -376,6 +364,7 @@ export namespace main {
 	    email?: string;
 	    contact_number?: string;
 	    photo_url?: string;
+	    department_code?: string;
 	    created: string;
 	    login_log_id: number;
 	
@@ -400,6 +389,7 @@ export namespace main {
 	        this.email = source["email"];
 	        this.contact_number = source["contact_number"];
 	        this.photo_url = source["photo_url"];
+	        this.department_code = source["department_code"];
 	        this.created = source["created"];
 	        this.login_log_id = source["login_log_id"];
 	    }

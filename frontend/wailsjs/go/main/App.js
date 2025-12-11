@@ -74,6 +74,10 @@ export function ForwardFeedbackToAdmin(arg1, arg2, arg3) {
   return window['go']['main']['App']['ForwardFeedbackToAdmin'](arg1, arg2, arg3);
 }
 
+export function ForwardMultipleFeedbackToAdmin(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ForwardMultipleFeedbackToAdmin'](arg1, arg2, arg3);
+}
+
 export function GetAdminDashboard() {
   return window['go']['main']['App']['GetAdminDashboard']();
 }
@@ -222,12 +226,12 @@ export function UnenrollStudentFromClassByIDs(arg1, arg2) {
   return window['go']['main']['App']['UnenrollStudentFromClassByIDs'](arg1, arg2);
 }
 
-export function UpdateAttendanceRecord(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['UpdateAttendanceRecord'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function UpdateAttendanceRecord(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['UpdateAttendanceRecord'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
-export function UpdateAttendanceTime(arg1, arg2, arg3) {
-  return window['go']['main']['App']['UpdateAttendanceTime'](arg1, arg2, arg3);
+export function UpdateAttendanceTime(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['UpdateAttendanceTime'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function UpdateClass(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
