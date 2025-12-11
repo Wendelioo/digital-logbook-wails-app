@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { UpdateUserPhoto, ChangePassword, SaveEquipmentFeedback } from '../../wailsjs/go/main/App';
+import { UpdateUserPhoto, ChangePassword, SaveEquipmentFeedback, UpdateUser } from '../../wailsjs/go/main/App';
 import { 
   LayoutDashboard, 
   User,
@@ -42,6 +42,19 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
+  
+  // Profile edit states (for students and working students)
+  const [editingProfile, setEditingProfile] = useState(false);
+  const [profileFormData, setProfileFormData] = useState({
+    firstName: user?.first_name || '',
+    middleName: user?.middle_name || '',
+    lastName: user?.last_name || '',
+    email: user?.email || '',
+    contactNumber: user?.contact_number || ''
+  });
+  const [profileError, setProfileError] = useState('');
+  const [profileSuccess, setProfileSuccess] = useState('');
+  const [savingProfile, setSavingProfile] = useState(false);
   
   const navigate = useNavigate();
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -179,6 +192,81 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     }
   };
 
+  // Initialize profile form data when user changes
+  useEffect(() => {
+    if (user) {
+      setProfileFormData({
+        firstName: user.first_name || '',
+        middleName: user.middle_name || '',
+        lastName: user.last_name || '',
+        email: user.email || '',
+        contactNumber: user.contact_number || ''
+      });
+    }
+  }, [user]);
+
+  const handleEditProfile = () => {
+    setEditingProfile(true);
+    setProfileError('');
+    setProfileSuccess('');
+  };
+
+  const handleCancelEditProfile = () => {
+    setEditingProfile(false);
+    setProfileFormData({
+      firstName: user?.first_name || '',
+      middleName: user?.middle_name || '',
+      lastName: user?.last_name || '',
+      email: user?.email || '',
+      contactNumber: user?.contact_number || ''
+    });
+    setProfileError('');
+    setProfileSuccess('');
+  };
+
+  const handleSaveProfile = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user) return;
+
+    setProfileError('');
+    setProfileSuccess('');
+    setSavingProfile(true);
+
+    try {
+      const fullName = `${profileFormData.lastName}, ${profileFormData.firstName}${profileFormData.middleName ? ' ' + profileFormData.middleName : ''}`;
+      
+      await UpdateUser(
+        user.id,
+        fullName,
+        profileFormData.firstName,
+        profileFormData.middleName,
+        profileFormData.lastName,
+        '', // gender
+        user.role || '',
+        '', // employeeID
+        user.student_id || user.name || '', // studentID
+        '', // year - not editable
+        '', // section - not editable
+        profileFormData.email,
+        profileFormData.contactNumber,
+        '' // departmentCode
+      );
+
+      setProfileSuccess('Profile updated successfully!');
+      setEditingProfile(false);
+      
+      // Refresh user data - you might need to reload from context
+      setTimeout(() => {
+        window.location.reload(); // Simple reload to refresh user data
+      }, 1500);
+    } catch (error) {
+      console.error('Failed to update profile:', error);
+      setProfileError('Failed to update profile. Please try again.');
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   const handleCloseAccountModal = () => {
     setShowAccountModal(false);
     setActiveTab('profile');
@@ -189,6 +277,16 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     setConfirmPassword('');
     setPasswordError('');
     setPasswordSuccess('');
+    setEditingProfile(false);
+    setProfileFormData({
+      firstName: user?.first_name || '',
+      middleName: user?.middle_name || '',
+      lastName: user?.last_name || '',
+      email: user?.email || '',
+      contactNumber: user?.contact_number || ''
+    });
+    setProfileError('');
+    setProfileSuccess('');
   };
 
   const handleModalBackdropClick = (e: React.MouseEvent) => {
@@ -485,47 +583,105 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
 
                     {/* Student/Working Student specific fields */}
                     {(user?.role === 'student' || user?.role === 'working_student') ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {/* Last Name */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
-                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                            <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                      <form onSubmit={handleSaveProfile} className="space-y-6">
+                        {profileError && (
+                          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                            {profileError}
+                          </div>
+                        )}
+                        
+                        {profileSuccess && (
+                          <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+                            {profileSuccess}
+                          </div>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                          {/* Last Name */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Last Name</label>
+                            {editingProfile ? (
+                              <input
+                                type="text"
+                                value={profileFormData.lastName}
+                                onChange={(e) => setProfileFormData({ ...profileFormData, lastName: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                              />
+                            ) : (
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                <span className="text-gray-900">{user?.last_name || 'N/A'}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* First Name */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
+                            {editingProfile ? (
+                              <input
+                                type="text"
+                                value={profileFormData.firstName}
+                                onChange={(e) => setProfileFormData({ ...profileFormData, firstName: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                required
+                              />
+                            ) : (
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Middle Name */}
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
+                            {editingProfile ? (
+                              <input
+                                type="text"
+                                value={profileFormData.middleName}
+                                onChange={(e) => setProfileFormData({ ...profileFormData, middleName: e.target.value })}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                              />
+                            ) : (
+                              <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                                <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                              </div>
+                            )}
                           </div>
                         </div>
 
-                        {/* First Name */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">First Name</label>
-                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                            <span className="text-gray-900">{user?.first_name || 'N/A'}</span>
+                        {editingProfile && (
+                          <div className="flex justify-end gap-3 pt-4">
+                            <button
+                              type="button"
+                              onClick={handleCancelEditProfile}
+                              className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors font-medium"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              disabled={savingProfile}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                              {savingProfile ? 'Saving...' : 'Save Changes'}
+                            </button>
                           </div>
-                        </div>
+                        )}
 
-                        {/* Middle Name */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Middle Name</label>
-                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                            <span className="text-gray-900">{user?.middle_name || 'N/A'}</span>
+                        {!editingProfile && (
+                          <div className="flex justify-end pt-4">
+                            <button
+                              type="button"
+                              onClick={handleEditProfile}
+                              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+                            >
+                              Edit Profile
+                            </button>
                           </div>
-                        </div>
-
-                        {/* Year Level */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Year Level</label>
-                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                            <span className="text-gray-900">{user?.year || 'N/A'}</span>
-                          </div>
-                        </div>
-
-                        {/* Section */}
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">Section</label>
-                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                            <span className="text-gray-900">{user?.section || 'N/A'}</span>
-                          </div>
-                        </div>
-                      </div>
+                        )}
+                      </form>
                     ) : (
                       <>
                         {/* For admins */}
@@ -588,28 +744,69 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
                   </div>
 
                   {/* Contact Details Section */}
-                  <div className="mb-8">
-                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Details</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      {/* Contact Number - only show for students, working students, and teachers */}
-                      {(user?.role === 'student' || user?.role === 'working_student' || user?.role === 'teacher') && (
+                  {(user?.role === 'student' || user?.role === 'working_student') ? (
+                    <div className="mb-8">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Contact Number */}
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-2">Contact No.</label>
-                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                            <span className="text-gray-900">{user?.contact_number || 'N/A'}</span>
-                          </div>
+                          {editingProfile ? (
+                            <input
+                              type="text"
+                              value={profileFormData.contactNumber}
+                              onChange={(e) => setProfileFormData({ ...profileFormData, contactNumber: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          ) : (
+                            <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                              <span className="text-gray-900">{user?.contact_number || 'N/A'}</span>
+                            </div>
+                          )}
                         </div>
-                      )}
 
-                      {/* Email */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                        <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
-                          <span className="text-gray-900">{user?.email || 'N/A'}</span>
+                        {/* Email */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                          {editingProfile ? (
+                            <input
+                              type="email"
+                              value={profileFormData.email}
+                              onChange={(e) => setProfileFormData({ ...profileFormData, email: e.target.value })}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            />
+                          ) : (
+                            <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                              <span className="text-gray-900">{user?.email || 'N/A'}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="mb-8">
+                      <h4 className="text-lg font-semibold text-gray-900 mb-4">Contact Details</h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        {/* Contact Number - only show for teachers */}
+                        {user?.role === 'teacher' && (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Contact No.</label>
+                            <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                              <span className="text-gray-900">{user?.contact_number || 'N/A'}</span>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Email */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                          <div className="px-3 py-2 bg-gray-50 rounded-md border border-gray-200">
+                            <span className="text-gray-900">{user?.email || 'N/A'}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Account Created Section */}
                   <div className="mb-8">

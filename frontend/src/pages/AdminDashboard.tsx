@@ -2337,18 +2337,20 @@ function DepartmentManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleEdit(dept)}
-                        className="text-blue-600 hover:text-blue-900 font-medium"
+                        className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        title="Edit"
                       >
-                        Edit
+                        <Edit className="h-3 w-3" />
                       </button>
                       <button
                         onClick={() => handleDelete(dept.department_code)}
-                        className="text-red-600 hover:text-red-900 font-medium"
+                        className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        title="Delete"
                       >
-                        Delete
+                        <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
                   </td>

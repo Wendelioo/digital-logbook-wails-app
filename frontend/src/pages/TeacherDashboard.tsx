@@ -90,7 +90,7 @@ function getSubjectIconAndColor(subjectCode: string, subjectName: string) {
   }
   // Default
   return {
-    icon: <GraduationCap className="h-6 w-6" />,
+    icon: null,
     headerColor: 'bg-indigo-600',
     iconColor: 'text-indigo-200'
   };
@@ -213,14 +213,16 @@ function DashboardOverview() {
                   onClick={() => navigate(`/teacher/class-management/${cls.class_id}`)}
                 >
                   {/* Card Header */}
-                  <div className={`${headerColor} px-4 py-3 flex items-center justify-between`}>
+                  <div className={`${headerColor} px-4 py-3 flex items-center ${icon ? 'justify-between' : 'justify-start'}`}>
                     <div className="flex-1">
                       <h3 className="text-white font-semibold text-lg">{cls.subject_name}</h3>
                       <p className="text-white text-sm opacity-90">{cls.subject_code}</p>
                     </div>
-                    <div className={iconColor}>
-                      {icon}
-                    </div>
+                    {icon && (
+                      <div className={iconColor}>
+                        {icon}
+                      </div>
+                    )}
                   </div>
                   
                   {/* Card Body */}
@@ -253,7 +255,6 @@ function DashboardOverview() {
       
       {!loading && classes.length === 0 && (
         <div className="bg-white shadow rounded-lg p-12 text-center">
-          <BookOpen className="mx-auto h-12 w-12 text-gray-400" />
           <h3 className="mt-4 text-lg font-medium text-gray-900">No classes found</h3>
           <p className="mt-2 text-sm text-gray-500">
             You don't have any assigned classes yet.
@@ -398,31 +399,16 @@ function ClassManagement() {
           <thead className="bg-blue-600">
             <tr>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                #
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                School Year
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Semester
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Offering Code
+                Subject Code
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                 Subject Name
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Year Level
+              </th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                 Schedule
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Room
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Teacher
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Students
               </th>
               <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
                 Action
@@ -433,31 +419,16 @@ function ClassManagement() {
             {currentClasses.map((cls, index) => (
               <tr key={cls.class_id} className="hover:bg-gray-50">
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {startIndex + index + 1}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.school_year || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.semester || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.offering_code || '-'}
+                  {cls.subject_code || '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {cls.subject_name || '-'}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  {cls.year_level || '-'}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {cls.schedule || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.room || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.teacher_name || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.enrolled_count}
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <div className="flex items-center gap-2">
@@ -481,7 +452,7 @@ function ClassManagement() {
                           try {
                             await DeleteClass(cls.class_id);
                             // Reload classes
-                            const data = await GetTeacherClassesCreatedByWorkingStudents(user?.id || 0);
+                            const data = await GetTeacherClassesByUserID(user?.id || 0);
                             setClasses(data || []);
                             setFilteredClasses(data || []);
                             alert('Class deleted successfully!');
@@ -553,9 +524,6 @@ function ClassManagement() {
             </>
           ) : (
             <>
-              <div className="mx-auto w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center">
-                <BookOpen className="h-8 w-8 text-gray-400" />
-              </div>
               <h3 className="mt-2 text-sm font-medium text-gray-900">No classes found</h3>
               <p className="mt-1 text-sm text-gray-500">
                 You haven't created any classes yet.
@@ -583,14 +551,17 @@ function CreateClasslist() {
   const [formData, setFormData] = useState({
     schoolYear: '2024-2025',
     semester: '1st Semester',
-    offeringCode: '',
     subjectCode: '',
     subjectName: '',
     schedule: '',
     room: '',
     selectedDays: [] as string[],
-    startTime: '',
-    endTime: ''
+    startHour: '9',
+    startMinute: '00',
+    startAmPm: 'AM',
+    endHour: '10',
+    endMinute: '00',
+    endAmPm: 'AM'
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
@@ -605,8 +576,24 @@ function CreateClasslist() {
     });
   };
 
-  const formatSchedule = (days: string[], startTime: string, endTime: string): string => {
-    if (!days.length || !startTime || !endTime) return '';
+  // Convert 12-hour format to 24-hour format (HH:MM)
+  const convertTo24Hour = (hour: string, minute: string, ampm: string): string => {
+    let h = parseInt(hour);
+    if (ampm === 'PM' && h !== 12) {
+      h += 12;
+    } else if (ampm === 'AM' && h === 12) {
+      h = 0;
+    }
+    return `${h.toString().padStart(2, '0')}:${minute}`;
+  };
+
+  // Format time for display (12-hour format)
+  const formatTimeDisplay = (hour: string, minute: string, ampm: string): string => {
+    return `${hour}:${minute} ${ampm}`;
+  };
+
+  const formatSchedule = (days: string[], startHour: string, startMinute: string, startAmPm: string, endHour: string, endMinute: string, endAmPm: string): string => {
+    if (!days.length) return '';
     
     // Sort days in order
     const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -619,29 +606,23 @@ function CreateClasslist() {
       'Mon': 'M',
       'Tue': 'T',
       'Wed': 'W',
-      'Thu': 'Th',
+      'Thu': 'TH',
       'Fri': 'F',
-      'Sat': 'S',
-      'Sun': 'Su'
+      'Sat': 'SAT',
+      'Sun': 'SUN'
     };
     
     let dayString = '';
     if (sortedDays.length === 2 && sortedDays.includes('Tue') && sortedDays.includes('Thu')) {
-      dayString = 'TTh';
+      dayString = 'TTH';
     } else {
       dayString = sortedDays.map(d => dayAbbrs[d] || d).join('');
     }
     
-    // Format time range
-    const formatTime = (time: string) => {
-      const [hours, minutes] = time.split(':');
-      const hour = parseInt(hours);
-      const ampm = hour >= 12 ? 'PM' : 'AM';
-      const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour;
-      return `${displayHour}:${minutes} ${ampm}`;
-    };
+    const startTimeStr = formatTimeDisplay(startHour, startMinute, startAmPm);
+    const endTimeStr = formatTimeDisplay(endHour, endMinute, endAmPm);
     
-    return `${dayString} ${formatTime(startTime)}-${formatTime(endTime)}`;
+    return `${dayString} ${startTimeStr}-${endTimeStr}`;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -669,14 +650,16 @@ function CreateClasslist() {
         return;
       }
 
-      if (!formData.startTime || !formData.endTime) {
-        setMessage('Please select both start and end time.');
-        setLoading(false);
-        return;
-      }
-
       // Format schedule from selected days and time
-      const formattedSchedule = formatSchedule(formData.selectedDays, formData.startTime, formData.endTime);
+      const formattedSchedule = formatSchedule(
+        formData.selectedDays,
+        formData.startHour,
+        formData.startMinute,
+        formData.startAmPm,
+        formData.endHour,
+        formData.endMinute,
+        formData.endAmPm
+      );
 
       // Use the manually entered subject code
       const subjectCode = formData.subjectCode.toUpperCase().trim();
@@ -693,7 +676,7 @@ function CreateClasslist() {
       await CreateClass(
         subjectCode,
         user?.id || 0,
-        formData.offeringCode,
+        '', // Offering code removed - same as subject code
         formattedSchedule,
         formData.room,
         '',
@@ -723,16 +706,6 @@ function CreateClasslist() {
 
   return (
     <>
-      <style>{`
-        input[type="time"]::-webkit-datetime-edit-hour-field:empty,
-        input[type="time"]::-webkit-datetime-edit-minute-field:empty {
-          color: transparent;
-        }
-        input[type="time"]::-webkit-datetime-edit-hour-field:not(:empty),
-        input[type="time"]::-webkit-datetime-edit-minute-field:not(:empty) {
-          color: inherit;
-        }
-      `}</style>
       {/* Notification */}
       {notification && (
         <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
@@ -792,186 +765,218 @@ function CreateClasslist() {
           </button>
           
           <div className="p-3 pb-2 flex-shrink-0 border-b">
-            <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-              <Plus className="h-4 w-4" />
-              Add class
+            <h2 className="text-lg font-bold text-gray-800">
+              Class Information
             </h2>
           </div>
 
           <form onSubmit={handleSubmit} className="flex-1 overflow-hidden flex flex-col">
-            <div className="flex-1 overflow-y-auto p-3">
-              <div className="max-w-5xl mx-auto">
-                {/* Two Column Layout */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                  
-                  {/* Left Block: Basic Information */}
-                  <div className="bg-gray-50 p-3 rounded-lg border space-y-2.5">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Basic Information</h3>
-                    
-                    <div>
-                      <label htmlFor="schoolYear" className="block text-xs font-medium text-gray-700 mb-1">
-                        School Year
-                      </label>
-                      <select
-                        id="schoolYear"
-                        value={formData.schoolYear}
-                        onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="2023-2024">2023-2024</option>
-                        <option value="2024-2025">2024-2025</option>
-                        <option value="2025-2026">2025-2026</option>
-                      </select>
-                    </div>
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="space-y-4">
+                {/* School Year and Semester - Side by Side */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="schoolYear" className="block text-sm font-medium text-gray-700 mb-1">
+                      School Year
+                    </label>
+                    <select
+                      id="schoolYear"
+                      value={formData.schoolYear}
+                      onChange={(e) => setFormData({ ...formData, schoolYear: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="2023-2024">2023-2024</option>
+                      <option value="2024-2025">2024-2025</option>
+                      <option value="2025-2026">2025-2026</option>
+                    </select>
+                  </div>
 
-                    <div>
-                      <label htmlFor="semester" className="block text-xs font-medium text-gray-700 mb-1">
-                        Semester
-                      </label>
-                      <select
-                        id="semester"
-                        value={formData.semester}
-                        onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      >
-                        <option value="1st Semester">1st Semester</option>
-                        <option value="2nd Semester">2nd Semester</option>
-                      </select>
-                    </div>
+                  <div>
+                    <label htmlFor="semester" className="block text-sm font-medium text-gray-700 mb-1">
+                      Semester
+                    </label>
+                    <select
+                      id="semester"
+                      value={formData.semester}
+                      onChange={(e) => setFormData({ ...formData, semester: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="1st Semester">1st Semester</option>
+                      <option value="2nd Semester">2nd Semester</option>
+                    </select>
+                  </div>
+                </div>
 
-                    <div>
-                      <label htmlFor="offeringCode" className="block text-xs font-medium text-gray-700 mb-1">
-                        Offering Code
-                      </label>
-                      <input
-                        type="text"
-                        id="offeringCode"
-                        value={formData.offeringCode}
-                        onChange={(e) => setFormData({ ...formData, offeringCode: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                      />
-                    </div>
+                {/* Subject Code and Subject Name - Side by Side */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="subjectCode" className="block text-sm font-medium text-gray-700 mb-1">
+                      Subject Code
+                    </label>
+                    <input
+                      type="text"
+                      id="subjectCode"
+                      value={formData.subjectCode}
+                      onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value.toUpperCase() })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
 
-                    <div>
-                      <label htmlFor="subjectCode" className="block text-xs font-medium text-gray-700 mb-1">
-                        Subject Code
-                      </label>
-                      <input
-                        type="text"
-                        id="subjectCode"
-                        value={formData.subjectCode}
-                        onChange={(e) => setFormData({ ...formData, subjectCode: e.target.value.toUpperCase() })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
-                    </div>
+                  <div>
+                    <label htmlFor="subjectName" className="block text-sm font-medium text-gray-700 mb-1">
+                      Subject Name
+                    </label>
+                    <input
+                      type="text"
+                      id="subjectName"
+                      value={formData.subjectName}
+                      onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                </div>
 
-                    <div>
-                      <label htmlFor="subjectName" className="block text-xs font-medium text-gray-700 mb-1">
-                        Subject Name
-                      </label>
-                      <input
-                        type="text"
-                        id="subjectName"
-                        value={formData.subjectName}
-                        onChange={(e) => setFormData({ ...formData, subjectName: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
+                {/* Schedule Section - Days and Time side by side */}
+                <div className="grid grid-cols-2 gap-4">
+                  {/* Days block */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Schedule
+                    </label>
+                    <div className="flex gap-2">
+                      {[
+                        { value: 'Mon', label: 'M' },
+                        { value: 'Tue', label: 'T' },
+                        { value: 'Wed', label: 'W' },
+                        { value: 'Thu', label: 'TH' },
+                        { value: 'Fri', label: 'F' },
+                        { value: 'Sat', label: 'SAT' },
+                        { value: 'Sun', label: 'SUN' }
+                      ].map((day) => (
+                        <button
+                          key={day.value}
+                          type="button"
+                          onClick={() => toggleDay(day.value)}
+                          className={`min-w-[40px] h-10 px-2 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors ${
+                            formData.selectedDays.includes(day.value)
+                              ? 'bg-blue-600 text-white border-blue-600'
+                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {day.label}
+                        </button>
+                      ))}
                     </div>
                   </div>
 
-                  {/* Right Block: Schedule & Location */}
-                  <div className="bg-gray-50 p-3 rounded-lg border space-y-2.5">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-2">Schedule & Location</h3>
-                    
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1.5">
-                        Schedule
-                      </label>
-                      
-                      {/* Days of the week selection */}
-                      <div className="mb-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                          Days of the Week
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {[
-                            { value: 'Mon', label: 'Mon' },
-                            { value: 'Tue', label: 'Tue' },
-                            { value: 'Wed', label: 'Wed' },
-                            { value: 'Thu', label: 'Thu' },
-                            { value: 'Fri', label: 'Fri' },
-                            { value: 'Sat', label: 'Sat' },
-                            { value: 'Sun', label: 'Sun' }
-                          ].map((day) => (
-                            <button
-                              key={day.value}
-                              type="button"
-                              onClick={() => toggleDay(day.value)}
-                              className={`px-2.5 py-1 text-xs font-medium rounded-md border transition-colors ${
-                                formData.selectedDays.includes(day.value)
-                                  ? 'bg-blue-600 text-white border-blue-600'
-                                  : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                              }`}
-                            >
-                              {day.label}
-                            </button>
+                  {/* Time block */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Time
+                    </label>
+                    <div className="space-y-2">
+                      {/* Start Time */}
+                      <div className="flex items-center gap-2">
+                        <select
+                          id="startHour"
+                          value={formData.startHour}
+                          onChange={(e) => setFormData({ ...formData, startHour: e.target.value })}
+                          className="px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        >
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                            <option key={hour} value={hour.toString()}>
+                              {hour}
+                            </option>
                           ))}
-                        </div>
+                        </select>
+                        <span className="text-gray-500">:</span>
+                        <select
+                          id="startMinute"
+                          value={formData.startMinute}
+                          onChange={(e) => setFormData({ ...formData, startMinute: e.target.value })}
+                          className="px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        >
+                          {['00', '15', '30', '45'].map((minute) => (
+                            <option key={minute} value={minute}>
+                              {minute}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          id="startAmPm"
+                          value={formData.startAmPm}
+                          onChange={(e) => setFormData({ ...formData, startAmPm: e.target.value })}
+                          className="px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </select>
                       </div>
-
-                      {/* Time range */}
-                      <div className="mb-2">
-                        <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                          Time Range
-                        </label>
-                        <div className="flex items-center gap-1.5">
-                          <input
-                            type="time"
-                            id="startTime"
-                            value={formData.startTime}
-                            onChange={(e) => setFormData({ ...formData, startTime: e.target.value })}
-                            className="flex-1 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            required
-                          />
-                          <span className="text-xs text-gray-500 font-medium">to</span>
-                          <input
-                            type="time"
-                            id="endTime"
-                            value={formData.endTime}
-                            onChange={(e) => setFormData({ ...formData, endTime: e.target.value })}
-                            className="flex-1 px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                            required
-                          />
-                        </div>
+                      {/* End Time */}
+                      <div className="flex items-center gap-2">
+                        <select
+                          id="endHour"
+                          value={formData.endHour}
+                          onChange={(e) => setFormData({ ...formData, endHour: e.target.value })}
+                          className="px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        >
+                          {Array.from({ length: 12 }, (_, i) => i + 1).map((hour) => (
+                            <option key={hour} value={hour.toString()}>
+                              {hour}
+                            </option>
+                          ))}
+                        </select>
+                        <span className="text-gray-500">:</span>
+                        <select
+                          id="endMinute"
+                          value={formData.endMinute}
+                          onChange={(e) => setFormData({ ...formData, endMinute: e.target.value })}
+                          className="px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        >
+                          {['00', '15', '30', '45'].map((minute) => (
+                            <option key={minute} value={minute}>
+                              {minute}
+                            </option>
+                          ))}
+                        </select>
+                        <select
+                          id="endAmPm"
+                          value={formData.endAmPm}
+                          onChange={(e) => setFormData({ ...formData, endAmPm: e.target.value })}
+                          className="px-2 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        >
+                          <option value="AM">AM</option>
+                          <option value="PM">PM</option>
+                        </select>
                       </div>
-
-                      {/* Preview of formatted schedule */}
-                      {formData.selectedDays.length > 0 && formData.startTime && formData.endTime && (
-                        <div className="mb-2 p-2 bg-blue-50 border border-blue-200 rounded-md">
-                          <p className="text-xs text-gray-600 mb-0.5">Schedule Preview:</p>
-                          <p className="text-xs font-medium text-blue-700">
-                            {formatSchedule(formData.selectedDays, formData.startTime, formData.endTime)}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div>
-                      <label htmlFor="room" className="block text-xs font-medium text-gray-700 mb-1">
-                        Room
-                      </label>
-                      <input
-                        type="text"
-                        id="room"
-                        value={formData.room}
-                        onChange={(e) => setFormData({ ...formData, room: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        required
-                      />
                     </div>
                   </div>
+                </div>
+
+                {/* Room - Aligned with School Year, Subject Code, and Schedule */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="room" className="block text-sm font-medium text-gray-700 mb-1">
+                      ROOM
+                    </label>
+                    <input
+                      type="text"
+                      id="room"
+                      value={formData.room}
+                      onChange={(e) => setFormData({ ...formData, room: e.target.value })}
+                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      required
+                    />
+                  </div>
+                  <div></div>
                 </div>
               </div>
 
@@ -985,18 +990,18 @@ function CreateClasslist() {
             </div>
 
             {/* Footer Buttons */}
-            <div className="flex-shrink-0 border-t bg-gray-50 px-3 py-2.5 flex justify-between">
+            <div className="flex-shrink-0 border-t px-6 py-4 flex justify-end gap-3">
               <button
                 type="button"
                 onClick={() => navigate('/teacher/class-management')}
-                className="px-4 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 CANCEL
               </button>
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-1.5 text-xs font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? 'Saving...' : 'SAVE'}
               </button>
@@ -1237,13 +1242,6 @@ function ClassManagementDetail() {
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <button
-                onClick={handleDeleteClass}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700"
-              >
-                <Trash2 className="h-4 w-4 inline mr-2" />
-                DELETE CLASS
-              </button>
               <button
                 onClick={handleEditClass}
                 className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
@@ -1761,28 +1759,16 @@ function AttendanceClassSelection() {
           <thead className="bg-blue-600">
             <tr>
               <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                #
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                School Year
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Semester
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Offering Code
+                Subject Code
               </th>
               <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
                 Subject Name
               </th>
               <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
+                Year Level
+              </th>
+              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
                 Schedule
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Room
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Teacher
               </th>
               <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
                 Action
@@ -1793,28 +1779,16 @@ function AttendanceClassSelection() {
             {currentClasses.map((cls, index) => (
               <tr key={cls.class_id} className="hover:bg-gray-50">
                 <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {startIndex + index + 1}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.school_year || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.semester || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.offering_code || '-'}
+                  {cls.subject_code || '-'}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                   {cls.subject_name || '-'}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
+                  {cls.year_level || '-'}
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
                   {cls.schedule || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.room || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.teacher_name || '-'}
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-xs font-medium">
                   <button
@@ -1879,9 +1853,6 @@ function AttendanceClassSelection() {
             </>
           ) : (
             <>
-              <div className="mx-auto w-12 h-12 bg-gray-100 rounded-full flex items-center justify-center">
-                <BookOpen className="h-6 w-6 text-gray-400" />
-              </div>
               <h3 className="mt-2 text-xs font-medium text-gray-900">No classes found</h3>
               <p className="mt-1 text-xs text-gray-500">
                 You don't have any assigned classes yet.
@@ -1995,7 +1966,7 @@ function StoredAttendance() {
 
   return (
     <div className="p-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Stored Attendance</h2>
+      <h2 className="text-xl font-bold text-gray-900 mb-4">Attendance Management</h2>
       
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -2456,7 +2427,7 @@ function TeacherDashboard() {
     { name: 'Dashboard', href: '/teacher', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/teacher' },
     { name: 'Class Management', href: '/teacher/class-management', icon: <Library className="h-5 w-5" />, current: location.pathname.startsWith('/teacher/class-management') },
     { name: 'Attendance', href: '/teacher/attendance', icon: <CalendarPlus className="h-5 w-5" />, current: location.pathname.startsWith('/teacher/attendance') && !location.pathname.includes('/stored') },
-    { name: 'Stored Attendance', href: '/teacher/stored-attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/teacher/stored-attendance' },
+    { name: 'Attendance Management', href: '/teacher/stored-attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/teacher/stored-attendance' },
   ];
 
   return (
