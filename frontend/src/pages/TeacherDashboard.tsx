@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Routes, Route, useLocation, useNavigate, useParams } from 'react-router-dom';
+import { Routes, Route, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
 import { 
   LayoutDashboard, 
@@ -22,7 +22,10 @@ import {
   Trash2,
   Plus,
   Library,
-  CalendarPlus
+  CalendarPlus,
+  AlertCircle,
+  X,
+  Archive
 } from 'lucide-react';
 import { 
   GetTeacherClassesByUserID,
@@ -317,7 +320,7 @@ function ClassManagement() {
   }, [searchTerm, classes]);
 
   const handleViewClassList = (classId: number) => {
-    navigate(`/teacher/class-management/${classId}`);
+    navigate(`/teacher/class-management/${classId}?mode=view`);
   };
 
   if (loading) {
@@ -440,7 +443,7 @@ function ClassManagement() {
                       <Eye className="h-3 w-3" />
                     </button>
                     <button
-                      onClick={() => navigate(`/teacher/class-management/${cls.class_id}`)}
+                      onClick={() => navigate(`/teacher/class-management/${cls.class_id}?mode=edit`)}
                       className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                       title="Edit"
                     >
@@ -1016,7 +1019,9 @@ function CreateClasslist() {
 function ClassManagementDetail() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
+  const isEditMode = searchParams.get('mode') === 'edit';
   const [classInfo, setClassInfo] = useState<Class | null>(null);
   const [students, setStudents] = useState<ClasslistEntry[]>([]);
   const [availableStudents, setAvailableStudents] = useState<ClassStudent[]>([]);
@@ -1241,22 +1246,6 @@ function ClassManagementDetail() {
                 <h2 className="text-2xl font-bold text-gray-900">Class Information</h2>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <button
-                onClick={handleEditClass}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-              >
-                <Edit className="h-4 w-4 inline mr-2" />
-                EDIT CLASS
-              </button>
-              <button
-                onClick={handleAddStudent}
-                className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                ADD STUDENT
-              </button>
-            </div>
           </div>
 
           <div className="border-t border-gray-200 pt-6">
@@ -1298,29 +1287,63 @@ function ClassManagementDetail() {
       )}
 
       <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-700">Class Student List</h3>
-        </div>
         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <div className="text-sm text-gray-600">
-            Show <select className="border border-gray-300 rounded px-2 py-1 mx-1">
-              <option value="10">10</option>
-              <option value="25">25</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-            </select> entries
-          </div>
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search"
-              value={studentSearchTerm}
-              onChange={(e) => setStudentSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-            <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          <h3 className="text-lg font-semibold text-gray-700">Class Student List</h3>
+          <button
+            onClick={loadClassDetails}
+            disabled={loading}
+            className="inline-flex items-center px-3 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+            title="Refresh class list"
+          >
+            <svg className="h-4 w-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
+            Refresh
+          </button>
+        </div>
+        <div className="px-6 py-4 border-b border-gray-200">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900">Enrolled Students</h3>
+            {isEditMode && (
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleEditClass}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                >
+                  <Edit className="h-4 w-4 inline mr-2" />
+                  EDIT CLASS
+                </button>
+                <button
+                  onClick={handleAddStudent}
+                  className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  ADD STUDENT
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              Show <select className="border border-gray-300 rounded px-2 py-1 mx-1">
+                <option value="10">10</option>
+                <option value="25">25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+              </select> entries
+            </div>
+            <div className="relative">
+              <input
+                type="text"
+                placeholder="Search"
+                value={studentSearchTerm}
+                onChange={(e) => setStudentSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -1335,7 +1358,13 @@ function ClassManagementDetail() {
                     Student ID
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Student Name
+                    Full Name
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Email
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Contact Number
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Actions
@@ -1353,6 +1382,12 @@ function ClassManagementDetail() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       {student.last_name}, {student.first_name} {student.middle_name || ''}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {student.email || 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {student.contact_number || 'N/A'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
@@ -1966,7 +2001,7 @@ function StoredAttendance() {
 
   return (
     <div className="p-6">
-      <h2 className="text-xl font-bold text-gray-900 mb-4">Attendance Management</h2>
+      <h2 className="text-xl font-bold text-gray-900 mb-4">Archive</h2>
       
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
@@ -2029,8 +2064,7 @@ function StoredAttendance() {
             </table>
           ) : (
             <div className="px-6 py-12 text-center">
-              <ClipboardList className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-medium text-gray-900">No saved attendance records found</h3>
+              <h3 className="text-sm font-medium text-gray-900">No saved attendance records found</h3>
             </div>
           )}
         </div>
@@ -2050,6 +2084,9 @@ function AttendanceManagementDetail() {
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [error, setError] = useState<string>('');
   const [hasSelectedDate, setHasSelectedDate] = useState(false);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [pendingDate, setPendingDate] = useState<string>('');
+  const [generating, setGenerating] = useState(false);
 
   useEffect(() => {
     const loadClass = async () => {
@@ -2105,15 +2142,46 @@ function AttendanceManagementDetail() {
   };
 
   const handleDateChange = async (date: string) => {
-    setSelectedDate(date);
     if (date) {
-      setHasSelectedDate(true);
-      setAttendanceRecords([]); // Clear previous records
-      // The useEffect will automatically trigger loadAttendance
+      // Show modal to confirm generating attendance
+      setPendingDate(date);
+      setShowGenerateModal(true);
     } else {
+      setSelectedDate('');
       setHasSelectedDate(false);
       setAttendanceRecords([]);
     }
+  };
+
+  const handleGenerateAttendance = async () => {
+    if (!selectedClass || !pendingDate || !user?.id) return;
+    
+    setGenerating(true);
+    try {
+      // Initialize attendance for the selected date
+      await InitializeAttendanceForClass(selectedClass.class_id, pendingDate, user.id);
+      
+      // Set the date and load attendance
+      setSelectedDate(pendingDate);
+      setHasSelectedDate(true);
+      setShowGenerateModal(false);
+      setPendingDate('');
+      
+      // Load attendance records
+      await loadAttendance();
+    } catch (error) {
+      console.error('Failed to generate attendance:', error);
+      setError('Failed to generate attendance. Please try again.');
+      setShowGenerateModal(false);
+      setPendingDate('');
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const handleCancelGenerate = () => {
+    setShowGenerateModal(false);
+    setPendingDate('');
   };
 
 
@@ -2280,7 +2348,7 @@ function AttendanceManagementDetail() {
           )}
         </div>
         {!hasSelectedDate && (
-          <p className="mt-2 text-sm text-gray-500">Please select a date to view the attendance list.</p>
+          <p className="mt-2 text-sm text-gray-500">Please select a date to generate attendance records.</p>
         )}
         {hasSelectedDate && (
           <p className="mt-2 text-sm text-green-600 font-medium">Date selected: {new Date(selectedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
@@ -2416,6 +2484,108 @@ function AttendanceManagementDetail() {
           </button>
         </div>
       )}
+
+      {/* Generate Attendance Modal */}
+      {showGenerateModal && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              handleCancelGenerate();
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 relative">
+            <button
+              type="button"
+              onClick={handleCancelGenerate}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+            >
+              <X className="h-5 w-5" />
+            </button>
+            
+            <div className="p-6">
+              <div className="flex items-center mb-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                    <Calendar className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-xl font-bold text-gray-900">
+                    Generate Attendance
+                  </h3>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Create attendance records for this date
+                  </p>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 rounded-lg p-4 mb-6">
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Class:</span>
+                    <span className="font-medium text-gray-900">{selectedClass?.subject_name || '-'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Date:</span>
+                    <span className="font-medium text-gray-900">
+                      {pendingDate ? new Date(pendingDate).toLocaleDateString('en-US', { 
+                        year: 'numeric', 
+                        month: 'long', 
+                        day: 'numeric' 
+                      }) : '-'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Schedule:</span>
+                    <span className="font-medium text-gray-900">{selectedClass?.schedule || '-'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6">
+                <div className="flex items-start">
+                  <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
+                  <p className="text-sm text-blue-800">
+                    This will create attendance records for all enrolled students on the selected date. 
+                    All students will initially be marked as absent.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={handleCancelGenerate}
+                  disabled={generating}
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateAttendance}
+                  disabled={generating}
+                  className="px-4 py-2 border border-transparent rounded-lg text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center"
+                >
+                  {generating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      Generating...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      Generate Attendance
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -2427,7 +2597,7 @@ function TeacherDashboard() {
     { name: 'Dashboard', href: '/teacher', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/teacher' },
     { name: 'Class Management', href: '/teacher/class-management', icon: <Library className="h-5 w-5" />, current: location.pathname.startsWith('/teacher/class-management') },
     { name: 'Attendance', href: '/teacher/attendance', icon: <CalendarPlus className="h-5 w-5" />, current: location.pathname.startsWith('/teacher/attendance') && !location.pathname.includes('/stored') },
-    { name: 'Attendance Management', href: '/teacher/stored-attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/teacher/stored-attendance' },
+    { name: 'Archive', href: '/teacher/stored-attendance', icon: <Archive className="h-5 w-5" />, current: location.pathname === '/teacher/stored-attendance' },
   ];
 
   return (

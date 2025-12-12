@@ -79,7 +79,7 @@ CREATE TABLE admins (
     last_name VARCHAR(100) NOT NULL,
     email VARCHAR(255) NULL,
     contact_number VARCHAR(20) NULL,
-    profile_photo VARCHAR(255) NULL COMMENT 'File path to profile photo (not the image itself)',
+    profile_photo MEDIUMTEXT NULL COMMENT 'Base64-encoded profile photo data URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -99,7 +99,7 @@ CREATE TABLE teachers (
     email VARCHAR(255) NULL,
     contact_number VARCHAR(20) NULL,
     department_code VARCHAR(20) NULL COMMENT 'Foreign key to departments.department_code',
-    profile_photo VARCHAR(255) NULL COMMENT 'File path to profile photo (not the image itself)',
+    profile_photo MEDIUMTEXT NULL COMMENT 'Base64-encoded profile photo data URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     
@@ -124,7 +124,7 @@ CREATE TABLE students (
     email VARCHAR(255) NULL,
     contact_number VARCHAR(20) NULL,
     is_working_student BOOLEAN DEFAULT FALSE COMMENT 'Flag to distinguish working students from regular students',
-    profile_photo VARCHAR(255) NULL COMMENT 'File path to profile photo (not the image itself)',
+    profile_photo MEDIUMTEXT NULL COMMENT 'Base64-encoded profile photo data URL',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     

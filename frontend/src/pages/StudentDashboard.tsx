@@ -11,13 +11,23 @@ import {
   AlertCircle,
   SlidersHorizontal,
   X,
-  Search
+  Search,
+  BookOpen,
+  Plus,
+  Loader2,
+  Users,
+  LogIn,
+  MapPin,
+  Library
 } from 'lucide-react';
 import { 
   GetStudentDashboard,
   RecordAttendance,
   GetStudentFeedback,
-  GetStudentLoginLogs
+  GetStudentLoginLogs,
+  GetStudentClasses,
+  GetClassesBySubjectCode,
+  JoinClassBySubjectCode
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
 import { main } from '../../wailsjs/go/models';
@@ -26,6 +36,7 @@ import { main } from '../../wailsjs/go/models';
 type Attendance = main.Attendance;
 type StudentDashboardData = main.StudentDashboard;
 type Feedback = main.Feedback;
+type CourseClass = main.CourseClass;
 
 // LoginLog interface matching the JSON structure from backend
 interface LoginLog {
@@ -353,7 +364,7 @@ function LoginHistory() {
       {/* Search and Filter Controls */}
       <div className="mb-6 bg-white shadow rounded-lg p-4">
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 w-64">
+          <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
@@ -619,7 +630,7 @@ function FeedbackHistory() {
       {/* Search and Filter Controls */}
       <div className="mb-6 bg-white shadow rounded-lg p-4">
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 w-64">
+          <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
@@ -833,11 +844,267 @@ function FeedbackHistory() {
   );
 }
 
+function MyClasses() {
+  const { user } = useAuth();
+  const [classes, setClasses] = useState<CourseClass[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [subjectCode, setSubjectCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string>('');
+  const [joinSuccess, setJoinSuccess] = useState<string>('');
+  const [showJoinForm, setShowJoinForm] = useState(false);
+
+  useEffect(() => {
+    loadClasses();
+  }, [user]);
+
+  const loadClasses = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const data = await GetStudentClasses(user.id);
+      setClasses(data || []);
+      setError('');
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+      setError('Unable to load your classes from server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleJoinClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !subjectCode.trim()) {
+      setJoinError('Please enter a subject code.');
+      return;
+    }
+
+    setJoining(true);
+    setJoinError('');
+    setJoinSuccess('');
+
+    try {
+      // First check if classes exist for this subject code
+      const availableClasses = await GetClassesBySubjectCode(subjectCode.trim().toUpperCase());
+      
+      if (availableClasses.length === 0) {
+        setJoinError('No classes found.');
+        setJoining(false);
+        return;
+      }
+
+      // Join the class
+      await JoinClassBySubjectCode(user.id, subjectCode.trim().toUpperCase());
+      setJoinSuccess('Successfully joined the class!');
+      
+      // Reload classes to show the new enrollment
+      await loadClasses();
+      
+      // Close modal and clear form after 1.5 seconds
+      setTimeout(() => {
+        setShowJoinForm(false);
+        setSubjectCode('');
+        setJoinSuccess('');
+      }, 1500);
+    } catch (error: any) {
+      console.error('Failed to join class:', error);
+      const errorMessage = error.message || 'Failed to join class. Please try again.';
+      if (errorMessage.includes('already enrolled')) {
+        setJoinError('You are already enrolled in this class.');
+      } else if (errorMessage.includes('no classes found')) {
+        setJoinError('No classes found.');
+      } else {
+        setJoinError(errorMessage);
+      }
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">My Classes</h2>
+          <button
+            onClick={() => {
+              setShowJoinForm(true);
+              setSubjectCode('');
+              setJoinError('');
+              setJoinSuccess('');
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+          >
+            Join Class
+          </button>
+        </div>
+      </div>
+
+      {/* Join Class Modal */}
+      {showJoinForm && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowJoinForm(false);
+              setSubjectCode('');
+              setJoinError('');
+              setJoinSuccess('');
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowJoinForm(false);
+                setSubjectCode('');
+                setJoinError('');
+                setJoinSuccess('');
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+            >
+              ×
+            </button>
+            
+            <div className="p-6">
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Join a Class</h3>
+                <p className="text-sm text-gray-600">Enter the Subject Code to join a class</p>
+              </div>
+              
+              <form onSubmit={handleJoinClass} className="space-y-4">
+                <div>
+                  <label htmlFor="subjectCode" className="block text-sm font-medium text-gray-700 mb-2">
+                    Subject Code
+                  </label>
+                  <input
+                    id="subjectCode"
+                    type="text"
+                    value={subjectCode}
+                    onChange={(e) => setSubjectCode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    autoFocus
+                  />
+                </div>
+                
+                {joinError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                    {joinError}
+                  </div>
+                )}
+                
+                {joinSuccess && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+                    {joinSuccess}
+                  </div>
+                )}
+                
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowJoinForm(false);
+                      setSubjectCode('');
+                      setJoinError('');
+                      setJoinSuccess('');
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={joining}
+                    className="flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {joining ? 'Joining...' : 'Join Class'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      {classes.length === 0 ? (
+        <div className="bg-white shadow rounded-lg p-12 text-center">
+          <Library className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <p className="text-gray-500 font-medium">No classes enrolled</p>
+          <p className="text-gray-400 text-sm mt-2">Join a class using a Subject Code to get started.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {classes.map((cls) => (
+            <div 
+              key={cls.class_id} 
+              className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+            >
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
+                <h3 className="text-white font-semibold text-lg">{cls.subject_name || cls.subject_code}</h3>
+                <p className="text-white text-sm opacity-90">{cls.subject_code}</p>
+              </div>
+              
+              <div className="px-4 py-4 bg-white">
+                <div className="space-y-2 text-sm">
+                  {cls.teacher_name && (
+                    <div className="flex items-center text-gray-600">
+                      <Users className="h-4 w-4 mr-2 text-gray-400" />
+                      <span className="font-medium">Teacher:</span>
+                      <span className="ml-2">{cls.teacher_name}</span>
+                    </div>
+                  )}
+                  {cls.schedule && (
+                    <div className="flex items-center text-gray-600">
+                      <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                      <span>{cls.schedule}</span>
+                    </div>
+                  )}
+                  {cls.room && (
+                    <div className="flex items-center text-gray-600">
+                      <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                      <span>{cls.room}</span>
+                    </div>
+                  )}
+                  {cls.section && (
+                    <div className="text-gray-600">
+                      <span className="font-medium">Section:</span> {cls.section}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StudentDashboard() {
   const location = useLocation();
   
   const navigationItems = [
     { name: 'Dashboard', href: '/student', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/student' },
+    { name: 'My Classes', href: '/student/classes', icon: <Library className="h-5 w-5" />, current: location.pathname === '/student/classes' },
     { name: 'Login History', href: '/student/attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/student/attendance' },
     { name: 'Feedback History', href: '/student/feedback', icon: <MessageSquare className="h-5 w-5" />, current: location.pathname === '/student/feedback' },
   ];
@@ -846,6 +1113,7 @@ function StudentDashboard() {
     <Layout navigationItems={navigationItems} title="Student Dashboard">
       <Routes>
         <Route index element={<DashboardOverview />} />
+        <Route path="classes" element={<MyClasses />} />
         <Route path="attendance" element={<LoginHistory />} />
         <Route path="feedback" element={<FeedbackHistory />} />
       </Routes>

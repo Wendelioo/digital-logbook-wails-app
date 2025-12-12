@@ -62,11 +62,15 @@ export function GetClassStudents(arg1:number):Promise<Array<main.ClasslistEntry>
 
 export function GetClassesByCreator(arg1:number):Promise<Array<main.CourseClass>>;
 
+export function GetClassesBySubjectCode(arg1:string):Promise<Array<main.CourseClass>>;
+
 export function GetDepartments():Promise<Array<main.Department>>;
 
 export function GetFeedback():Promise<Array<main.Feedback>>;
 
 export function GetPendingFeedback():Promise<Array<main.Feedback>>;
+
+export function GetStudentClasses(arg1:number):Promise<Array<main.CourseClass>>;
 
 export function GetStudentDashboard(arg1:number):Promise<main.StudentDashboard>;
 
@@ -95,6 +99,8 @@ export function GetWorkingStudentDashboard():Promise<main.WorkingStudentDashboar
 export function GetWorkingStudentID(arg1:number):Promise<number>;
 
 export function InitializeAttendanceForClass(arg1:number,arg2:string,arg3:number):Promise<void>;
+
+export function JoinClassBySubjectCode(arg1:number,arg2:string):Promise<number>;
 
 export function Login(arg1:string,arg2:string):Promise<main.User>;
 

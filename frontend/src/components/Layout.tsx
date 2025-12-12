@@ -60,6 +60,52 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
   const dropdownRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Utility function to compress and resize image
+  const compressImage = (file: File, maxWidth: number = 800, maxHeight: number = 800, quality: number = 0.8): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          // Calculate new dimensions
+          let width = img.width;
+          let height = img.height;
+          
+          if (width > maxWidth || height > maxHeight) {
+            if (width > height) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            } else {
+              width = (width * maxHeight) / height;
+              height = maxHeight;
+            }
+          }
+          
+          // Create canvas and resize
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'));
+            return;
+          }
+          
+          ctx.drawImage(img, 0, 0, width, height);
+          
+          // Convert to base64 with compression
+          const dataUrl = canvas.toDataURL('image/jpeg', quality);
+          resolve(dataUrl);
+        };
+        img.onerror = () => reject(new Error('Failed to load image'));
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => reject(new Error('Failed to read file'));
+      reader.readAsDataURL(file);
+    });
+  };
+
   const handleLogout = async () => {
     // Show confirmation modal for students
     if (user?.role === 'student') {
@@ -124,7 +170,7 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
     setShowFeedbackModal(false);
   };
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
       // Validate file type
@@ -139,15 +185,15 @@ function Layout({ children, navigationItems, title }: LayoutProps) {
         return;
       }
       
-      setPhotoFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.onerror = () => {
-        alert('Failed to read the image file.');
-      };
-      reader.readAsDataURL(file);
+      try {
+        // Compress and resize the image before saving
+        const compressedDataUrl = await compressImage(file, 800, 800, 0.8);
+        setPhotoFile(file);
+        setPhotoPreview(compressedDataUrl);
+      } catch (error) {
+        console.error('Failed to process image:', error);
+        alert('Failed to process the image file. Please try again.');
+      }
     }
   };
 

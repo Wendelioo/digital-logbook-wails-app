@@ -3277,6 +3277,201 @@ func (a *App) GetAllStudentsForEnrollment(classID int) ([]ClassStudent, error) {
 	return students, nil
 }
 
+// GetClassesBySubjectCode returns all active classes for a given subject code
+func (a *App) GetClassesBySubjectCode(subjectCode string) ([]CourseClass, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			c.class_id, c.subject_code, s.subject_name, c.offering_code,
+			c.teacher_user_id, CONCAT(t.last_name, ', ', t.first_name) as teacher_name,
+			c.schedule, c.room, c.year_level, c.section, c.semester, c.school_year,
+			COALESCE(enrollment_count.count, 0) as enrolled_count,
+			c.is_active, c.created_by_user_id, c.created_at
+		FROM classes c
+		LEFT JOIN subjects s ON c.subject_code = s.subject_code
+		LEFT JOIN teachers t ON c.teacher_user_id = t.user_id
+		LEFT JOIN (
+			SELECT class_id, COUNT(*) as count 
+			FROM classlist 
+			WHERE status = 'active'
+			GROUP BY class_id
+		) enrollment_count ON c.class_id = enrollment_count.class_id
+		WHERE c.subject_code = ? AND c.is_active = TRUE
+		ORDER BY c.created_at DESC, c.year_level, c.section
+	`
+	rows, err := a.db.Query(query, subjectCode)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var classes []CourseClass
+	for rows.Next() {
+		var class CourseClass
+		var offeringCode, schedule, room, yearLevel, section, semester, schoolYear sql.NullString
+		var createdBy sql.NullInt64
+		var createdAt time.Time
+		err := rows.Scan(
+			&class.ClassID, &class.SubjectCode, &class.SubjectName, &offeringCode,
+			&class.TeacherUserID, &class.TeacherName,
+			&schedule, &room, &yearLevel, &section, &semester, &schoolYear,
+			&class.EnrolledCount, &class.IsActive, &createdBy, &createdAt,
+		)
+		if err != nil {
+			continue
+		}
+		if offeringCode.Valid {
+			class.OfferingCode = &offeringCode.String
+		}
+		if schedule.Valid {
+			class.Schedule = &schedule.String
+		}
+		if room.Valid {
+			class.Room = &room.String
+		}
+		if yearLevel.Valid {
+			class.YearLevel = &yearLevel.String
+		}
+		if section.Valid {
+			class.Section = &section.String
+		}
+		if semester.Valid {
+			class.Semester = &semester.String
+		}
+		if schoolYear.Valid {
+			class.SchoolYear = &schoolYear.String
+		}
+		if createdBy.Valid {
+			createdByInt := int(createdBy.Int64)
+			class.CreatedByUserID = &createdByInt
+		}
+		class.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		classes = append(classes, class)
+	}
+
+	return classes, nil
+}
+
+// GetStudentClasses returns all classes a student is enrolled in
+func (a *App) GetStudentClasses(studentUserID int) ([]CourseClass, error) {
+	if a.db == nil {
+		return nil, fmt.Errorf("database not connected")
+	}
+
+	query := `
+		SELECT 
+			c.class_id, c.subject_code, s.subject_name, c.offering_code,
+			c.teacher_user_id, CONCAT(t.last_name, ', ', t.first_name) as teacher_name,
+			c.schedule, c.room, c.year_level, c.section, c.semester, c.school_year,
+			COALESCE(enrollment_count.count, 0) as enrolled_count,
+			c.is_active, c.created_by_user_id, c.created_at
+		FROM classlist cl
+		JOIN classes c ON cl.class_id = c.class_id
+		LEFT JOIN subjects s ON c.subject_code = s.subject_code
+		LEFT JOIN teachers t ON c.teacher_user_id = t.user_id
+		LEFT JOIN (
+			SELECT class_id, COUNT(*) as count 
+			FROM classlist 
+			WHERE status = 'active'
+			GROUP BY class_id
+		) enrollment_count ON c.class_id = enrollment_count.class_id
+		WHERE cl.student_user_id = ? AND cl.status = 'active' AND c.is_active = TRUE
+		ORDER BY s.subject_code, c.year_level, c.section
+	`
+	rows, err := a.db.Query(query, studentUserID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var classes []CourseClass
+	for rows.Next() {
+		var class CourseClass
+		var offeringCode, schedule, room, yearLevel, section, semester, schoolYear sql.NullString
+		var createdBy sql.NullInt64
+		var createdAt time.Time
+		err := rows.Scan(
+			&class.ClassID, &class.SubjectCode, &class.SubjectName, &offeringCode,
+			&class.TeacherUserID, &class.TeacherName,
+			&schedule, &room, &yearLevel, &section, &semester, &schoolYear,
+			&class.EnrolledCount, &class.IsActive, &createdBy, &createdAt,
+		)
+		if err != nil {
+			continue
+		}
+		if offeringCode.Valid {
+			class.OfferingCode = &offeringCode.String
+		}
+		if schedule.Valid {
+			class.Schedule = &schedule.String
+		}
+		if room.Valid {
+			class.Room = &room.String
+		}
+		if yearLevel.Valid {
+			class.YearLevel = &yearLevel.String
+		}
+		if section.Valid {
+			class.Section = &section.String
+		}
+		if semester.Valid {
+			class.Semester = &semester.String
+		}
+		if schoolYear.Valid {
+			class.SchoolYear = &schoolYear.String
+		}
+		if createdBy.Valid {
+			createdByInt := int(createdBy.Int64)
+			class.CreatedByUserID = &createdByInt
+		}
+		class.CreatedAt = createdAt.Format("2006-01-02 15:04:05")
+		classes = append(classes, class)
+	}
+
+	return classes, nil
+}
+
+// JoinClassBySubjectCode enrolls a student in a class by subject code
+// If multiple classes exist for the subject code, it enrolls in the first active one
+func (a *App) JoinClassBySubjectCode(studentUserID int, subjectCode string) (int, error) {
+	if a.db == nil {
+		return 0, fmt.Errorf("database not connected")
+	}
+
+	// First, find active classes with this subject code
+	classes, err := a.GetClassesBySubjectCode(subjectCode)
+	if err != nil {
+		return 0, fmt.Errorf("failed to find classes: %v", err)
+	}
+
+	if len(classes) == 0 {
+		return 0, fmt.Errorf("no classes found for subject code: %s", subjectCode)
+	}
+
+	// Check if student is already enrolled in any of these classes
+	for _, class := range classes {
+		var exists int
+		checkQuery := `SELECT 1 FROM classlist WHERE class_id = ? AND student_user_id = ? AND status = 'active'`
+		err := a.db.QueryRow(checkQuery, class.ClassID, studentUserID).Scan(&exists)
+		if err == nil {
+			// Already enrolled
+			return class.ClassID, nil
+		}
+	}
+
+	// Enroll in the first available class
+	classID := classes[0].ClassID
+	err = a.EnrollStudentInClass(studentUserID, classID, studentUserID)
+	if err != nil {
+		return 0, fmt.Errorf("failed to enroll student: %v", err)
+	}
+
+	return classID, nil
+}
+
 // GetAllTeachers returns all teachers for assignment purposes
 func (a *App) GetAllTeachers() ([]User, error) {
 	if a.db == nil {
@@ -3516,7 +3711,7 @@ func (a *App) GetClassAttendance(classID int, date string) ([]Attendance, error)
 }
 
 // InitializeAttendanceForClass creates attendance records for all students in a class for a date
-// Status is initially NULL (no remarks yet)
+// Status is initially set to 'absent' so teachers can mark who is present
 func (a *App) InitializeAttendanceForClass(classID int, date string, recordedBy int) error {
 	if a.db == nil {
 		return fmt.Errorf("database not connected")
@@ -3528,7 +3723,7 @@ func (a *App) InitializeAttendanceForClass(classID int, date string, recordedBy 
 			cl.class_id,
 			cl.student_user_id,
 			?,
-			NULL,
+			'absent',
 			CURRENT_TIMESTAMP
 		FROM classlist cl
 		WHERE cl.class_id = ? AND cl.status = 'active'

@@ -122,6 +122,10 @@ export function GetClassesByCreator(arg1) {
   return window['go']['main']['App']['GetClassesByCreator'](arg1);
 }
 
+export function GetClassesBySubjectCode(arg1) {
+  return window['go']['main']['App']['GetClassesBySubjectCode'](arg1);
+}
+
 export function GetDepartments() {
   return window['go']['main']['App']['GetDepartments']();
 }
@@ -132,6 +136,10 @@ export function GetFeedback() {
 
 export function GetPendingFeedback() {
   return window['go']['main']['App']['GetPendingFeedback']();
+}
+
+export function GetStudentClasses(arg1) {
+  return window['go']['main']['App']['GetStudentClasses'](arg1);
 }
 
 export function GetStudentDashboard(arg1) {
@@ -188,6 +196,10 @@ export function GetWorkingStudentID(arg1) {
 
 export function InitializeAttendanceForClass(arg1, arg2, arg3) {
   return window['go']['main']['App']['InitializeAttendanceForClass'](arg1, arg2, arg3);
+}
+
+export function JoinClassBySubjectCode(arg1, arg2) {
+  return window['go']['main']['App']['JoinClassBySubjectCode'](arg1, arg2);
 }
 
 export function Login(arg1, arg2) {
