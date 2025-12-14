@@ -40,6 +40,8 @@ export function ForwardFeedbackToAdmin(arg1:number,arg2:number,arg3:string):Prom
 
 export function ForwardMultipleFeedbackToAdmin(arg1:Array<number>,arg2:number,arg3:string):Promise<number>;
 
+export function GenerateAttendanceFromLogs(arg1:number,arg2:string,arg3:number):Promise<void>;
+
 export function GetAdminDashboard():Promise<main.AdminDashboard>;
 
 export function GetAllClasses():Promise<Array<main.CourseClass>>;

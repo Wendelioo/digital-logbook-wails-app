@@ -78,6 +78,10 @@ export function ForwardMultipleFeedbackToAdmin(arg1, arg2, arg3) {
   return window['go']['main']['App']['ForwardMultipleFeedbackToAdmin'](arg1, arg2, arg3);
 }
 
+export function GenerateAttendanceFromLogs(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GenerateAttendanceFromLogs'](arg1, arg2, arg3);
+}
+
 export function GetAdminDashboard() {
   return window['go']['main']['App']['GetAdminDashboard']();
 }

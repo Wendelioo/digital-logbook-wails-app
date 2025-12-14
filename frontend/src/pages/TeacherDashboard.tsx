@@ -45,7 +45,8 @@ import {
   CreateClass,
   CreateSubject,
   GetSubjects,
-  GetAllTeachers
+  GetAllTeachers,
+  GenerateAttendanceFromLogs
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
 import { main } from '../../wailsjs/go/models';
@@ -278,6 +279,10 @@ function ClassManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [entriesPerPage, setEntriesPerPage] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
+  const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [selectedClassId, setSelectedClassId] = useState<number | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [generateError, setGenerateError] = useState<string>('');
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -347,13 +352,22 @@ function ClassManagement() {
       <div className="flex-shrink-0 mb-4">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-gray-900">Class Management</h2>
-          <button
-            onClick={() => navigate('/teacher/create-classlist')}
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-          >
-            <Plus className="h-4 w-4 mr-1" />
-            ADD NEW
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowGenerateModal(true)}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+            >
+              <CalendarPlus className="h-4 w-4 mr-1" />
+              GENERATE ATTENDANCE
+            </button>
+            <button
+              onClick={() => navigate('/teacher/create-classlist')}
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            >
+              <Plus className="h-4 w-4 mr-1" />
+              ADD NEW
+            </button>
+          </div>
         </div>
       </div>
 
@@ -397,85 +411,87 @@ function ClassManagement() {
       </div>
 
       {/* Table Section */}
-      <div className="flex-1 bg-white shadow rounded-lg overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-blue-600">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Subject Code
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Subject Name
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Year Level
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Schedule
-              </th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {currentClasses.map((cls, index) => (
-              <tr key={cls.class_id} className="hover:bg-gray-50">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.subject_code || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.subject_name || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.year_level || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                  {cls.schedule || '-'}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleViewClassList(cls.class_id)}
-                      className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      title="View"
-                    >
-                      <Eye className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={() => navigate(`/teacher/class-management/${cls.class_id}?mode=edit`)}
-                      className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                      title="Edit"
-                    >
-                      <Edit className="h-3 w-3" />
-                    </button>
-                    <button
-                      onClick={async () => {
-                        if (window.confirm('Are you sure you want to delete this class?')) {
-                          try {
-                            await DeleteClass(cls.class_id);
-                            // Reload classes
-                            const data = await GetTeacherClassesByUserID(user?.id || 0);
-                            setClasses(data || []);
-                            setFilteredClasses(data || []);
-                            alert('Class deleted successfully!');
-                          } catch (error) {
-                            console.error('Failed to delete class:', error);
-                            alert('Failed to delete class. Please try again.');
-                          }
-                        }
-                      }}
-                      className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                      title="Delete"
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                </td>
+      <div className="flex-1 overflow-x-auto">
+        <div className="border-2 border-gray-300">
+          <table className="min-w-full border-collapse">
+            <thead className="bg-gray-100">
+              <tr>
+                <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                  Subject Code
+                </th>
+                <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                  Subject Name
+                </th>
+                <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                  Year Level
+                </th>
+                <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                  Schedule
+                </th>
+                <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                  Action
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="bg-white">
+              {currentClasses.map((cls, index) => (
+                <tr key={cls.class_id} className="hover:bg-gray-50">
+                  <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {cls.subject_code || '-'}
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {cls.subject_name || '-'}
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {cls.year_level || '-'}
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                    {cls.schedule || '-'}
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm font-medium">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleViewClassList(cls.class_id)}
+                        className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-blue-600 bg-blue-50 hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        title="View"
+                      >
+                        <Eye className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={() => navigate(`/teacher/class-management/${cls.class_id}?mode=edit`)}
+                        className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        title="Edit"
+                      >
+                        <Edit className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (window.confirm('Are you sure you want to delete this class?')) {
+                            try {
+                              await DeleteClass(cls.class_id);
+                              // Reload classes
+                              const data = await GetTeacherClassesByUserID(user?.id || 0);
+                              setClasses(data || []);
+                              setFilteredClasses(data || []);
+                              alert('Class deleted successfully!');
+                            } catch (error) {
+                              console.error('Failed to delete class:', error);
+                              alert('Failed to delete class. Please try again.');
+                            }
+                          }
+                        }}
+                        className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        title="Delete"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {/* Pagination Section */}
@@ -542,6 +558,112 @@ function ClassManagement() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* Generate Attendance Modal */}
+      {showGenerateModal && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center">
+          <div className="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h3 className="text-xl font-semibold text-gray-900">Generate Attendance</h3>
+              <button
+                onClick={() => {
+                  setShowGenerateModal(false);
+                  setSelectedClassId(null);
+                  setGenerateError('');
+                }}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="p-6">
+              {generateError && (
+                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+                  {generateError}
+                </div>
+              )}
+              
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Select Class
+                </label>
+                <select
+                  value={selectedClassId || ''}
+                  onChange={(e) => setSelectedClassId(Number(e.target.value) || null)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  disabled={generating}
+                >
+                  <option value="">-- Select a class --</option>
+                  {classes.map((cls) => (
+                    <option key={cls.class_id} value={cls.class_id}>
+                      {cls.subject_code} - {cls.subject_name} {cls.schedule ? `(${cls.schedule})` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Date
+                </label>
+                <input
+                  type="date"
+                  value={new Date().toISOString().split('T')[0]}
+                  disabled
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
+                />
+                <p className="mt-1 text-xs text-gray-500">Date is automatically set to today</p>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-6">
+                <button
+                  onClick={() => {
+                    setShowGenerateModal(false);
+                    setSelectedClassId(null);
+                    setGenerateError('');
+                  }}
+                  disabled={generating}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!selectedClassId) {
+                      setGenerateError('Please select a class');
+                      return;
+                    }
+
+                    setGenerating(true);
+                    setGenerateError('');
+                    
+                    try {
+                      const today = new Date().toISOString().split('T')[0];
+                      await GenerateAttendanceFromLogs(selectedClassId, today, user?.id || 0);
+                      
+                      // Close modal and navigate to attendance management list
+                      // The generated attendance will appear as an active attendance sheet
+                      setShowGenerateModal(false);
+                      setSelectedClassId(null);
+                      navigate('/teacher/attendance');
+                    } catch (error) {
+                      console.error('Failed to generate attendance:', error);
+                      setGenerateError('Failed to generate attendance. Please try again.');
+                    } finally {
+                      setGenerating(false);
+                    }
+                  }}
+                  disabled={generating || !selectedClassId}
+                  className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {generating ? 'Generating...' : 'Generate Attendance'}
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -1250,31 +1372,53 @@ function ClassManagementDetail() {
 
           <div className="border-t border-gray-200 pt-6">
             <h3 className="text-lg font-semibold text-gray-700 mb-4">Class Details</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">School Year:</span>
-                <span className="text-gray-900">{classInfo.school_year || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Semester:</span>
-                <span className="text-gray-900">{classInfo.semester || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Subject Name:</span>
-                <span className="text-gray-900">{classInfo.subject_name || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Schedule:</span>
-                <span className="text-gray-900">{classInfo.schedule || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Room:</span>
-                <span className="text-gray-900">{classInfo.room || 'N/A'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Teacher:</span>
-                <span className="text-gray-900">{classInfo.teacher_name || 'N/A'}</span>
-              </div>
+            <div className="border-2 border-gray-300">
+              <table className="min-w-full border-collapse">
+                <tbody className="bg-white">
+                  <tr>
+                    <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700 w-1/4">
+                      School Year:
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                      {classInfo.school_year || 'N/A'}
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700 w-1/4">
+                      Schedule:
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                      {classInfo.schedule || 'N/A'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                      Semester:
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                      {classInfo.semester || 'N/A'}
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                      Room:
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                      {classInfo.room || 'N/A'}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                      Subject Name:
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                      {classInfo.subject_name || 'N/A'}
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                      Teacher:
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                      {classInfo.teacher_name || 'N/A'}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1348,60 +1492,62 @@ function ClassManagementDetail() {
         </div>
         <div className="overflow-x-auto">
           {filteredStudents.length > 0 ? (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    #
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Student ID
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Full Name
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Email
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Contact Number
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredStudents.map((student, index) => (
-                  <tr key={student.student_user_id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {index + 1}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {student.student_code}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {student.last_name}, {student.first_name} {student.middle_name || ''}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {student.email || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {student.contact_number || 'N/A'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <button
-                        onClick={() => handleRemoveStudent(student.student_user_id, student.class_id)}
-                        className="text-red-600 hover:text-red-900 font-medium hover:underline transition-colors"
-                      >
-                        <Trash2 className="h-4 w-4 inline mr-1" />
-                        Remove
-                      </button>
-                    </td>
+            <div className="border-2 border-gray-300">
+              <table className="min-w-full border-collapse">
+                <thead className="bg-gray-100">
+                  <tr>
+                    <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                      #
+                    </th>
+                    <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                      Student ID
+                    </th>
+                    <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                      Full Name
+                    </th>
+                    <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                      Email
+                    </th>
+                    <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                      Contact Number
+                    </th>
+                    <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                      Actions
+                    </th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white">
+                  {filteredStudents.map((student, index) => (
+                    <tr key={student.student_user_id} className="hover:bg-gray-50">
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center font-medium">
+                        {index + 1}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {student.student_code}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {student.last_name}, {student.first_name} {student.middle_name || ''}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {student.email || 'N/A'}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {student.contact_number || 'N/A'}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm">
+                        <button
+                          onClick={() => handleRemoveStudent(student.student_user_id, student.class_id)}
+                          className="text-red-600 hover:text-red-900 font-medium hover:underline transition-colors"
+                        >
+                          <Trash2 className="h-4 w-4 inline mr-1" />
+                          Remove
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <div className="px-6 py-12 text-center">
               <p className="text-gray-500">No data available.</p>
@@ -1669,7 +1815,49 @@ function AttendanceClassSelection() {
   const [searchTerm, setSearchTerm] = useState('');
   const [entriesPerPage, setEntriesPerPage] = useState<number>(10);
   const [currentPage, setCurrentPage] = useState<number>(1);
-  
+  const [activeAttendanceMap, setActiveAttendanceMap] = useState<Map<number, string>>(new Map());
+  const [loadingAttendance, setLoadingAttendance] = useState(false);
+
+  // Check for active attendance sheets (attendance records for today or recent dates)
+  useEffect(() => {
+    const checkActiveAttendance = async () => {
+      if (!user?.id || classes.length === 0) return;
+
+      setLoadingAttendance(true);
+      const activeMap = new Map<number, string>();
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Check last 7 days for active attendance
+      const datesToCheck: string[] = [today];
+      for (let i = 1; i <= 7; i++) {
+        const date = new Date();
+        date.setDate(date.getDate() - i);
+        datesToCheck.push(date.toISOString().split('T')[0]);
+      }
+
+      for (const cls of classes) {
+        for (const date of datesToCheck) {
+          try {
+            const records = await GetClassAttendance(cls.class_id, date);
+            if (records && records.length > 0 && records.some(r => r.status)) {
+              // Found active attendance - use the most recent date
+              if (!activeMap.has(cls.class_id) || date > (activeMap.get(cls.class_id) || '')) {
+                activeMap.set(cls.class_id, date);
+              }
+              break; // Found attendance for this class, move to next class
+            }
+          } catch (err) {
+            continue;
+          }
+        }
+      }
+
+      setActiveAttendanceMap(activeMap);
+      setLoadingAttendance(false);
+    };
+
+    checkActiveAttendance();
+  }, [classes, user?.id]);
 
   useEffect(() => {
     const loadClasses = async () => {
@@ -1747,7 +1935,7 @@ function AttendanceClassSelection() {
     <div className="flex flex-col">
       {/* Header Section */}
       <div className="flex-shrink-0 mb-2">
-        <h2 className="text-xl font-bold text-gray-900">Select Class to Manage</h2>
+        <h2 className="text-xl font-bold text-gray-900">Attendance Management</h2>
       </div>
 
       {error && (
@@ -1788,56 +1976,100 @@ function AttendanceClassSelection() {
         </div>
       </div>
 
-      {/* Table Section */}
-      <div className="flex-1 bg-white shadow rounded-lg overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-blue-600">
-            <tr>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Subject Code
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Subject Name
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Year Level
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Schedule
-              </th>
-              <th scope="col" className="px-3 py-2 text-left text-xs font-medium text-white uppercase tracking-wider">
-                Action
-              </th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {currentClasses.map((cls, index) => (
-              <tr key={cls.class_id} className="hover:bg-gray-50">
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.subject_code || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.subject_name || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.year_level || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs text-gray-900">
-                  {cls.schedule || '-'}
-                </td>
-                <td className="px-3 py-2 whitespace-nowrap text-xs font-medium">
-                  <button
-                    onClick={() => navigate(`/teacher/attendance/${cls.class_id}`)}
-                    className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                  >
-                    SELECT
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {/* Classes Table */}
+      {filteredClasses.length > 0 && (
+        <div className="flex-1 overflow-auto">
+          <div className="border-2 border-gray-300">
+            <table className="min-w-full border-collapse">
+              <thead className="bg-gray-100">
+                <tr>
+                  <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                    Subject
+                  </th>
+                  <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                    Schedule
+                  </th>
+                  <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                    Room
+                  </th>
+                  <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                    Students
+                  </th>
+                  <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                    Status
+                  </th>
+                  <th className="border border-gray-400 px-4 py-3 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white">
+                {currentClasses.map((cls) => {
+                  const activeDate = activeAttendanceMap.get(cls.class_id);
+                  const hasActiveAttendance = !!activeDate;
+                  
+                  return (
+                    <tr 
+                      key={cls.class_id} 
+                      className={`hover:bg-gray-50 ${hasActiveAttendance ? 'bg-green-50' : ''}`}
+                    >
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap">
+                        <div className="text-sm font-medium text-gray-900">
+                          {cls.subject_code}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {cls.subject_name}
+                        </div>
+                        {cls.year_level && cls.section && (
+                          <div className="text-xs text-gray-400">
+                            {cls.year_level} - {cls.section}
+                          </div>
+                        )}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {cls.schedule || '-'}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                        {cls.room || '-'}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                        {cls.enrolled_count || 0}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm">
+                        {hasActiveAttendance ? (
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                            <span className="w-2 h-2 bg-green-400 rounded-full mr-1.5"></span>
+                            Active ({activeDate})
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800">
+                            No Active Sheet
+                          </span>
+                        )}
+                      </td>
+                      <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => navigate(`/teacher/attendance/${cls.class_id}${hasActiveAttendance ? `?date=${activeDate}` : ''}`)}
+                          className="inline-flex items-center gap-1.5 text-blue-600 hover:text-blue-900 font-medium"
+                        >
+                          {hasActiveAttendance ? (
+                            <>
+                              <Eye className="h-4 w-4" />
+                              View
+                            </>
+                          ) : (
+                            'Manage'
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Pagination Section */}
       {filteredClasses.length > 0 && (
@@ -2076,6 +2308,7 @@ function StoredAttendance() {
 function AttendanceManagementDetail() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [selectedClass, setSelectedClass] = useState<Class | null>(null);
   const [attendanceRecords, setAttendanceRecords] = useState<Attendance[]>([]);
@@ -2087,6 +2320,7 @@ function AttendanceManagementDetail() {
   const [showGenerateModal, setShowGenerateModal] = useState(false);
   const [pendingDate, setPendingDate] = useState<string>('');
   const [generating, setGenerating] = useState(false);
+  const [isGenerated, setIsGenerated] = useState(false);
 
   useEffect(() => {
     const loadClass = async () => {
@@ -2098,6 +2332,17 @@ function AttendanceManagementDetail() {
         const foundClass = classes.find(c => c.class_id === parseInt(id));
         setSelectedClass(foundClass || null);
         setError('');
+        
+        // Check if date is in query params (from attendance list or generated)
+        const dateParam = searchParams.get('date');
+        const generatedParam = searchParams.get('generated');
+        if (dateParam) {
+          setSelectedDate(dateParam);
+          setHasSelectedDate(true);
+          if (generatedParam === 'true') {
+            setIsGenerated(true);
+          }
+        }
       } catch (error) {
         console.error('Failed to load class:', error);
         setError('Unable to load class from server.');
@@ -2107,7 +2352,7 @@ function AttendanceManagementDetail() {
     };
 
     loadClass();
-  }, [id, user?.id]);
+  }, [id, user?.id, searchParams]);
 
   useEffect(() => {
     if (selectedClass && selectedDate && hasSelectedDate) {
@@ -2269,7 +2514,6 @@ function AttendanceManagementDetail() {
           >
             <ArrowLeft className="h-5 w-5 text-gray-600" />
           </button>
-          <h2 className="text-2xl font-bold text-gray-900">Class Attendance Management</h2>
         </div>
       </div>
 
@@ -2283,77 +2527,110 @@ function AttendanceManagementDetail() {
       {selectedClass && (
         <div className="bg-white shadow rounded-lg p-6 mb-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-4">Class Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-3">
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">School Year:</span>
-                <span className="text-gray-900">{selectedClass.school_year || '-'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Semester:</span>
-                <span className="text-gray-900">{selectedClass.semester || '-'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Offering Code:</span>
-                <span className="text-gray-900">{selectedClass.offering_code || '-'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Subject Name:</span>
-                <span className="text-gray-900">{selectedClass.subject_name || '-'}</span>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Schedule:</span>
-                <span className="text-gray-900">{selectedClass.schedule || '-'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Room:</span>
-                <span className="text-gray-900">{selectedClass.room || '-'}</span>
-              </div>
-              <div className="flex">
-                <span className="font-medium text-gray-700 w-32">Teacher:</span>
-                <span className="text-gray-900">{selectedClass.teacher_name || '-'}</span>
-              </div>
-            </div>
+          <div className="border-2 border-gray-300">
+            <table className="min-w-full border-collapse">
+              <tbody className="bg-white">
+                <tr>
+                  <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700 w-1/4">
+                    School Year:
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                    {selectedClass.school_year || '-'}
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700 w-1/4">
+                    Schedule:
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                    {selectedClass.schedule || '-'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                    Semester:
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                    {selectedClass.semester || '-'}
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                    Room:
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                    {selectedClass.room || '-'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                    Offering Code:
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                    {selectedClass.offering_code || '-'}
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                    Teacher:
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 text-gray-900">
+                    {selectedClass.teacher_name || '-'}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                    Subject Name:
+                  </td>
+                  <td className="border border-gray-400 px-4 py-3 text-gray-900" colSpan={3}>
+                    {selectedClass.subject_name || '-'}
+                  </td>
+                </tr>
+                {hasSelectedDate && selectedDate && (
+                  <tr>
+                    <td className="border border-gray-400 px-4 py-3 bg-gray-100 font-semibold text-gray-700">
+                      Date:
+                    </td>
+                    <td className="border border-gray-400 px-4 py-3 text-gray-900 font-medium" colSpan={3}>
+                      {new Date(selectedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
 
-      {/* Date of Class Section */}
-      <div className="bg-white shadow rounded-lg p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Date of Class</h3>
-        <div className="flex items-center gap-4">
-          <div className="relative flex-1 max-w-xs">
-            <input
-              type="date"
-              value={selectedDate}
-              onChange={(e) => handleDateChange(e.target.value)}
-              className="block w-full px-4 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
-              style={{ zIndex: 1 }}
-            />
-            <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" style={{ zIndex: 0 }} />
+      {/* Date of Class Section - Only show if date is not already set from query params */}
+      {!hasSelectedDate && (
+        <div className="bg-white shadow rounded-lg p-6 mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Date of Class</h3>
+          <div className="flex items-center gap-4">
+            <div className="relative flex-1 max-w-xs">
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="block w-full px-4 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base"
+                style={{ zIndex: 1 }}
+              />
+              <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" style={{ zIndex: 0 }} />
+            </div>
+            {selectedDate && (
+              <button
+                onClick={() => {
+                  setSelectedDate('');
+                  setHasSelectedDate(false);
+                  setAttendanceRecords([]);
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              >
+                Clear Date
+              </button>
+            )}
           </div>
-          {selectedDate && (
-            <button
-              onClick={() => {
-                setSelectedDate('');
-                setHasSelectedDate(false);
-                setAttendanceRecords([]);
-              }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
-            >
-              Clear Date
-            </button>
+          {!hasSelectedDate && (
+            <p className="mt-2 text-sm text-gray-500">Please select a date to generate attendance records.</p>
           )}
         </div>
-        {!hasSelectedDate && (
-          <p className="mt-2 text-sm text-gray-500">Please select a date to generate attendance records.</p>
-        )}
-        {hasSelectedDate && (
-          <p className="mt-2 text-sm text-green-600 font-medium">Date selected: {new Date(selectedDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
-        )}
-      </div>
+      )}
+      
+      
 
       {/* Attendance List Section - Only show after date is selected */}
       {selectedClass && hasSelectedDate && (
@@ -2373,61 +2650,77 @@ function AttendanceManagementDetail() {
                 <p className="mt-2 text-sm text-gray-500">Loading attendance records...</p>
               </div>
             ) : attendanceRecords.length > 0 ? (
-              <div>
-                <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50">
+              <div className="border-2 border-gray-300">
+                <table className="min-w-full border-collapse">
+                  <thead className="bg-gray-100">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
                         #
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
                         Student ID
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
                         Full Name
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        PC Number
+                      <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                        Time In
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Login Time
+                      <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                        Time Out
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
+                        Status
+                      </th>
+                      <th className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
                         Remarks
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white">
                     {attendanceRecords.map((record, index) => (
                       <tr key={`${record.class_id}-${record.student_user_id}-${record.date}`} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center font-medium">
                           {index + 1}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">
                           {record.student_code}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
                           {record.last_name}, {record.first_name} {record.middle_name || ''}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {record.pc_number || '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
                           {record.time_in ? (
                             <span className="text-green-600 font-medium">{record.time_in}</span>
                           ) : (
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-center">
+                          {record.time_out ? (
+                            <span className="text-blue-600 font-medium">{record.time_out}</span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-center">
                           {record.status ? (
-                            <span className={`px-3 py-1 text-xs font-semibold rounded-full ${getStatusColor(record.status)}`}>
-                              {record.status === 'present' ? 'Present' : record.status === 'absent' ? 'Absent' : record.status}
+                            <span className={`px-2 py-1 text-xs font-semibold rounded ${getStatusColor(record.status)}`}>
+                              {record.status === 'present' ? 'Present' : record.status === 'absent' ? 'Absent' : record.status === 'late' ? 'Late' : record.status}
                             </span>
                           ) : (
-                            <span className="px-3 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                            <span className="px-2 py-1 text-xs font-semibold rounded bg-gray-100 text-gray-600">
                               No Status
                             </span>
+                          )}
+                        </td>
+                        <td className="border border-gray-400 px-4 py-3 whitespace-nowrap text-sm text-gray-900">
+                          {record.remarks ? (
+                            <span className={record.remarks === 'Not yet logged in' ? 'text-orange-600 font-medium' : 'text-gray-700'}>
+                              {record.remarks}
+                            </span>
+                          ) : (
+                            <span className="text-gray-400">-</span>
                           )}
                         </td>
                       </tr>
@@ -2439,6 +2732,10 @@ function AttendanceManagementDetail() {
                     <div className="text-gray-600">
                       <span className="font-medium text-green-600">
                         Present: {attendanceRecords.filter(r => r.status === 'present').length}
+                      </span>
+                      {' | '}
+                      <span className="font-medium text-yellow-600">
+                        Late: {attendanceRecords.filter(r => r.status === 'late').length}
                       </span>
                       {' | '}
                       <span className="font-medium text-red-600">
@@ -2473,14 +2770,14 @@ function AttendanceManagementDetail() {
         </div>
       )}
 
-      {/* Save Button - Only show when date is selected */}
-      {selectedClass && hasSelectedDate && (
-        <div className="flex justify-center">
+      {/* Save Button - Show when date is selected or attendance is generated */}
+      {selectedClass && (hasSelectedDate || isGenerated) && attendanceRecords.length > 0 && (
+        <div className="flex justify-center mt-6">
           <button
             onClick={handleSaveAll}
-            className="inline-flex items-center px-8 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-8 py-3 border border-transparent rounded-md shadow-sm text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
           >
-            Save
+            Save Attendance
           </button>
         </div>
       )}

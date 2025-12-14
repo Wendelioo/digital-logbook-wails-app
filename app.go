@@ -2468,7 +2468,7 @@ func (a *App) GetTeacherDashboard(teacherID int) (TeacherDashboard, error) {
 	query := `
 		SELECT 
 			a.class_id, a.student_user_id, a.date, a.time_in, a.time_out, a.status, a.remarks,
-			vcl.class_id, vcl.student_user_id, vcl.student_code, 
+			vcl.class_id, vcl.student_user_id, vcl.student_number, 
 			vcl.first_name, vcl.middle_name, vcl.last_name,
 			vc.subject_code, vc.subject_name
 		FROM attendance a
@@ -3640,7 +3640,7 @@ func (a *App) GetClassAttendance(classID int, date string) ([]Attendance, error)
 			cl.class_id,
 			cl.student_user_id,
 			COALESCE(a.date, ?) as date,
-			vcl.student_code,
+			vcl.student_number,
 			vcl.first_name,
 			vcl.middle_name,
 			vcl.last_name,
@@ -3718,16 +3718,22 @@ func (a *App) InitializeAttendanceForClass(classID int, date string, recordedBy 
 	}
 
 	query := `
-		INSERT INTO attendance (class_id, student_user_id, date, status, created_at)
+		INSERT INTO attendance (class_id, student_user_id, date, status, remarks, created_at)
 		SELECT 
 			cl.class_id,
 			cl.student_user_id,
 			?,
 			'absent',
+			'Not yet logged in',
 			CURRENT_TIMESTAMP
 		FROM classlist cl
 		WHERE cl.class_id = ? AND cl.status = 'active'
-		ON DUPLICATE KEY UPDATE class_id=class_id
+		ON DUPLICATE KEY UPDATE 
+			remarks = CASE 
+				WHEN time_in IS NULL AND (remarks IS NULL OR remarks = '') THEN 'Not yet logged in'
+				ELSE remarks
+			END,
+			class_id=class_id
 	`
 
 	_, err := a.db.Exec(query, date, classID)
@@ -3784,13 +3790,18 @@ func (a *App) RecordStudentLogin(classID, studentID int, pcNumber string) error 
 	}
 
 	// Record attendance as present with login time using composite key
+	// Clear "Not yet logged in" remark when student logs in
 	query := `
-		INSERT INTO attendance (class_id, student_user_id, date, time_in, pc_number, status)
-		VALUES (?, ?, CURDATE(), CURTIME(), ?, 'present')
+		INSERT INTO attendance (class_id, student_user_id, date, time_in, pc_number, status, remarks)
+		VALUES (?, ?, CURDATE(), CURTIME(), ?, 'present', NULL)
 		ON DUPLICATE KEY UPDATE 
 			time_in = COALESCE(time_in, CURTIME()),
 			pc_number = VALUES(pc_number),
 			status = 'present',
+			remarks = CASE 
+				WHEN remarks = 'Not yet logged in' THEN NULL
+				ELSE remarks
+			END,
 			updated_at = CURRENT_TIMESTAMP
 	`
 
@@ -3813,7 +3824,7 @@ func (a *App) ExportAttendanceCSV(classID int) (string, error) {
 	query := `
 		SELECT 
 			a.class_id, a.student_user_id, a.date, a.time_in, a.time_out, a.status, a.remarks,
-			vcl.student_code, vcl.first_name, vcl.middle_name, vcl.last_name,
+			vcl.student_number, vcl.first_name, vcl.middle_name, vcl.last_name,
 			vc.subject_code, vc.subject_name
 		FROM attendance a
 		JOIN v_classlist_complete vcl ON a.class_id = vcl.class_id AND a.student_user_id = vcl.student_user_id
@@ -3906,6 +3917,192 @@ func (a *App) ExportAttendanceCSV(classID int) (string, error) {
 
 	log.Printf("✓ Attendance exported to CSV: %s", filename)
 	return filename, nil
+}
+
+// GenerateAttendanceFromLogs generates attendance records for a class based on login logs
+// It determines status: present (login before 10 min to scheduled time), late (login 10 min after scheduled time), absent (no login)
+func (a *App) GenerateAttendanceFromLogs(classID int, date string, recordedBy int) error {
+	if a.db == nil {
+		return fmt.Errorf("database not connected")
+	}
+
+	// Get class information including schedule
+	var schedule sql.NullString
+	err := a.db.QueryRow("SELECT schedule FROM classes WHERE class_id = ?", classID).Scan(&schedule)
+	if err != nil {
+		log.Printf("⚠ Failed to get class schedule: %v", err)
+		return fmt.Errorf("failed to get class schedule: %w", err)
+	}
+
+	if !schedule.Valid || schedule.String == "" {
+		return fmt.Errorf("class schedule not set")
+	}
+
+	// Parse schedule to get start time
+	scheduleStr := schedule.String
+	startTime, err := parseScheduleStartTime(scheduleStr)
+	if err != nil {
+		log.Printf("⚠ Failed to parse schedule: %v", err)
+		return fmt.Errorf("failed to parse schedule: %w", err)
+	}
+
+	// Get all enrolled students
+	students, err := a.GetClassStudents(classID)
+	if err != nil {
+		return fmt.Errorf("failed to get class students: %w", err)
+	}
+
+	// Validate the date format
+	_, err = time.Parse("2006-01-02", date)
+	if err != nil {
+		return fmt.Errorf("invalid date format: %w", err)
+	}
+
+	// For each student, check login logs and create attendance record
+	for _, student := range students {
+		// Get login logs for this student on the attendance date
+		query := `
+			SELECT login_time, logout_time, pc_number
+			FROM login_logs
+			WHERE user_id = ? 
+			AND DATE(login_time) = ?
+			AND login_status = 'success'
+			ORDER BY login_time ASC
+			LIMIT 1
+		`
+		var loginTime sql.NullTime
+		var logoutTime sql.NullTime
+		var pcNumber sql.NullString
+
+		err := a.db.QueryRow(query, student.StudentUserID, date).Scan(&loginTime, &logoutTime, &pcNumber)
+		
+		var status string
+		var timeInStr, timeOutStr string
+		var pcNumberStr string
+
+		if err == nil && loginTime.Valid {
+			// Student logged in - determine if present or late
+			loginDateTime := loginTime.Time
+			loginTimeOnly := time.Date(0, 1, 1, loginDateTime.Hour(), loginDateTime.Minute(), loginDateTime.Second(), 0, time.UTC)
+			
+			// Calculate 10 minutes after scheduled time (cutoff for late)
+			tenMinutesAfter := startTime.Add(10 * time.Minute)
+
+			timeInStr = loginDateTime.Format("15:04:05")
+			if logoutTime.Valid {
+				timeOutStr = logoutTime.Time.Format("15:04:05")
+			}
+			if pcNumber.Valid {
+				pcNumberStr = pcNumber.String
+			}
+
+			// Determine status based on login time
+			// Present: login within 10 minutes after scheduled time (allows 10 min before and 10 min after)
+			// Late: login more than 10 minutes after scheduled time
+			if loginTimeOnly.Before(tenMinutesAfter) || loginTimeOnly.Equal(tenMinutesAfter) {
+				// Login before or within 10 minutes after scheduled time = Present
+				status = "present"
+			} else {
+				// Login more than 10 minutes after scheduled time = Late
+				status = "late"
+			}
+		} else {
+			// No login found = Absent
+			status = "absent"
+		}
+
+		// Set remarks for students who haven't logged in yet
+		var remarksStr string
+		if status == "absent" {
+			remarksStr = "Not yet logged in"
+		}
+
+		// Insert or update attendance record
+		// If student has logged in (time_in exists), clear the "Not yet logged in" remark
+		insertQuery := `
+			INSERT INTO attendance (class_id, student_user_id, date, time_in, time_out, pc_number, status, remarks, created_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+			ON DUPLICATE KEY UPDATE
+				time_in = COALESCE(VALUES(time_in), time_in),
+				time_out = COALESCE(VALUES(time_out), time_out),
+				pc_number = COALESCE(VALUES(pc_number), pc_number),
+				status = VALUES(status),
+				remarks = CASE 
+					WHEN VALUES(time_in) IS NOT NULL AND (remarks = 'Not yet logged in' OR remarks IS NULL OR remarks = '') THEN NULL
+					WHEN VALUES(time_in) IS NOT NULL THEN remarks
+					WHEN VALUES(remarks) IS NOT NULL AND VALUES(remarks) != '' THEN VALUES(remarks)
+					WHEN remarks IS NULL OR remarks = '' THEN VALUES(remarks)
+					ELSE remarks
+				END,
+				updated_at = CURRENT_TIMESTAMP
+		`
+		_, err = a.db.Exec(insertQuery, classID, student.StudentUserID, date,
+			nullString(timeInStr), nullString(timeOutStr), nullString(pcNumberStr), status, nullString(remarksStr))
+		if err != nil {
+			log.Printf("⚠ Failed to create attendance for student %d: %v", student.StudentUserID, err)
+			continue
+		}
+	}
+
+	log.Printf("✓ Attendance generated from logs for class %d on %s", classID, date)
+	return nil
+}
+
+// parseScheduleStartTime parses a schedule string and returns the start time
+// Schedule format examples: "MWF 1:00-2:00 PM", "TTh 10:00-11:30 AM", "1:00-2:00 PM", "MWF 7:30 AM-8:30 AM"
+func parseScheduleStartTime(schedule string) (time.Time, error) {
+	// First try pattern with AM/PM after each time (e.g., "7:30 AM-8:30 AM")
+	timePattern1 := regexp.MustCompile(`(\d{1,2}):(\d{2})\s*(AM|PM)\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)`)
+	matches := timePattern1.FindStringSubmatch(schedule)
+	
+	if len(matches) == 7 {
+		// 12-hour format with AM/PM after each time
+		startHour, _ := strconv.Atoi(matches[1])
+		startMin, _ := strconv.Atoi(matches[2])
+		startPeriod := matches[3]
+
+		// Convert to 24-hour format
+		if startPeriod == "PM" && startHour != 12 {
+			startHour += 12
+		}
+		if startPeriod == "AM" && startHour == 12 {
+			startHour = 0
+		}
+
+		return time.Date(0, 1, 1, startHour, startMin, 0, 0, time.UTC), nil
+	}
+
+	// Try pattern with AM/PM at the end (e.g., "1:00-2:00 PM" or "10:00-11:30 AM")
+	timePattern2 := regexp.MustCompile(`(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})\s*(AM|PM)`)
+	matches = timePattern2.FindStringSubmatch(schedule)
+	
+	if len(matches) == 6 {
+		// 12-hour format with AM/PM at the end
+		startHour, _ := strconv.Atoi(matches[1])
+		startMin, _ := strconv.Atoi(matches[2])
+		period := matches[5]
+
+		// Convert to 24-hour format
+		if period == "PM" && startHour != 12 {
+			startHour += 12
+		}
+		if period == "AM" && startHour == 12 {
+			startHour = 0
+		}
+
+		return time.Date(0, 1, 1, startHour, startMin, 0, 0, time.UTC), nil
+	}
+
+	// Try simpler pattern without AM/PM (24-hour format)
+	timePattern3 := regexp.MustCompile(`(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})`)
+	matches = timePattern3.FindStringSubmatch(schedule)
+	if len(matches) == 5 {
+		startHour, _ := strconv.Atoi(matches[1])
+		startMin, _ := strconv.Atoi(matches[2])
+		return time.Date(0, 1, 1, startHour, startMin, 0, 0, time.UTC), nil
+	}
+
+	return time.Time{}, fmt.Errorf("could not parse schedule time from: %s", schedule)
 }
 
 // ==============================================================================
