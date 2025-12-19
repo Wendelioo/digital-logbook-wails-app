@@ -74,6 +74,14 @@ export function ForwardFeedbackToAdmin(arg1, arg2, arg3) {
   return window['go']['main']['App']['ForwardFeedbackToAdmin'](arg1, arg2, arg3);
 }
 
+export function ForwardMultipleFeedbackToAdmin(arg1, arg2, arg3) {
+  return window['go']['main']['App']['ForwardMultipleFeedbackToAdmin'](arg1, arg2, arg3);
+}
+
+export function GenerateAttendanceFromLogs(arg1, arg2, arg3) {
+  return window['go']['main']['App']['GenerateAttendanceFromLogs'](arg1, arg2, arg3);
+}
+
 export function GetAdminDashboard() {
   return window['go']['main']['App']['GetAdminDashboard']();
 }
@@ -118,6 +126,10 @@ export function GetClassesByCreator(arg1) {
   return window['go']['main']['App']['GetClassesByCreator'](arg1);
 }
 
+export function GetClassesBySubjectCode(arg1) {
+  return window['go']['main']['App']['GetClassesBySubjectCode'](arg1);
+}
+
 export function GetDepartments() {
   return window['go']['main']['App']['GetDepartments']();
 }
@@ -128,6 +140,10 @@ export function GetFeedback() {
 
 export function GetPendingFeedback() {
   return window['go']['main']['App']['GetPendingFeedback']();
+}
+
+export function GetStudentClasses(arg1) {
+  return window['go']['main']['App']['GetStudentClasses'](arg1);
 }
 
 export function GetStudentDashboard(arg1) {
@@ -186,6 +202,10 @@ export function InitializeAttendanceForClass(arg1, arg2, arg3) {
   return window['go']['main']['App']['InitializeAttendanceForClass'](arg1, arg2, arg3);
 }
 
+export function JoinClassBySubjectCode(arg1, arg2) {
+  return window['go']['main']['App']['JoinClassBySubjectCode'](arg1, arg2);
+}
+
 export function Login(arg1, arg2) {
   return window['go']['main']['App']['Login'](arg1, arg2);
 }
@@ -222,12 +242,12 @@ export function UnenrollStudentFromClassByIDs(arg1, arg2) {
   return window['go']['main']['App']['UnenrollStudentFromClassByIDs'](arg1, arg2);
 }
 
-export function UpdateAttendanceRecord(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['UpdateAttendanceRecord'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function UpdateAttendanceRecord(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['UpdateAttendanceRecord'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
 }
 
-export function UpdateAttendanceTime(arg1, arg2, arg3) {
-  return window['go']['main']['App']['UpdateAttendanceTime'](arg1, arg2, arg3);
+export function UpdateAttendanceTime(arg1, arg2, arg3, arg4, arg5) {
+  return window['go']['main']['App']['UpdateAttendanceTime'](arg1, arg2, arg3, arg4, arg5);
 }
 
 export function UpdateClass(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {

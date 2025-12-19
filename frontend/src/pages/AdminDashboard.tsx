@@ -68,6 +68,7 @@ interface User {
   photo_url?: string;
   email?: string;
   contact_number?: string;
+  department_code?: string;
   created: string;
 }
 
@@ -75,6 +76,7 @@ interface LoginLog {
   id: number;
   user_id: number;
   user_name: string;
+  user_id_number: string;
   user_type: string;
   pc_number?: string;
   login_time: string;
@@ -223,9 +225,6 @@ function UserManagement() {
     firstName: '',
     middleName: '',
     lastName: '',
-    gender: '',
-    birthdate: '',
-    address: '',
     role: 'teacher',
     employeeId: '',
     studentId: '',
@@ -233,7 +232,7 @@ function UserManagement() {
     section: '',
     email: '',
     contactNumber: '',
-    departmentId: 0
+    departmentCode: ''
   });
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -386,13 +385,9 @@ function UserManagement() {
         return;
       }
 
-      if (formData.role === 'working_student') {
+      if (formData.role === 'working_student' || formData.role === 'student') {
         if (!formData.studentId) {
-          showNotification('error', 'Student ID is required for Working Students');
-          return;
-        }
-        if (!formData.gender) {
-          showNotification('error', 'Gender is required for Working Students');
+          showNotification('error', `Student ID is required for ${formData.role === 'student' ? 'Students' : 'Working Students'}`);
           return;
         }
       } else if (formData.role === 'teacher') {
@@ -426,20 +421,19 @@ function UserManagement() {
         firstName: formData.firstName,
         lastName: formData.lastName,
         middleName: formData.middleName,
-        gender: formData.gender,
         employeeId: formData.employeeId,
         studentId: formData.studentId,
         year: formData.year,
         section: formData.section
       });
 
-      const departmentId = formData.role === 'teacher' ? formData.departmentId : 0;
+      const departmentCode = formData.role === 'teacher' ? formData.departmentCode : '';
       
       if (editingUser) {
-        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
+        await UpdateUser(editingUser.id, fullName, formData.firstName, formData.middleName, formData.lastName, '', formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentCode);
         showNotification('success', 'User updated successfully!');
       } else {
-        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, formData.gender, formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentId);
+        await CreateUser(password_to_pass, fullName, formData.firstName, formData.middleName, formData.lastName, '', formData.role, formData.employeeId, formData.studentId, '', '', formData.email, formData.contactNumber, departmentCode);
         
         // Show specific notification based on user role
         const roleMessages = {
@@ -454,7 +448,7 @@ function UserManagement() {
       
       setShowForm(false);
       setEditingUser(null);
-      setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+      setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentCode: '' });
       setAvatarFile(null);
       setAvatarPreview(null);
       loadUsers();
@@ -474,17 +468,14 @@ function UserManagement() {
       firstName: user.first_name || '',
       middleName: user.middle_name || '',
       lastName: user.last_name || '',
-      gender: user.gender || '',
-      birthdate: '',
-      address: '',
       role: user.role,
       employeeId: user.employee_id || '',
       studentId: user.student_id || '',
       year: user.year || '',
       section: user.section || '',
-      email: '',
-      contactNumber: '',
-      departmentId: 0
+      email: user.email || '',
+      contactNumber: user.contact_number || '',
+      departmentCode: user.department_code || ''
     });
     setAvatarFile(null);
     setAvatarPreview(null);
@@ -637,7 +628,7 @@ function UserManagement() {
             if (e.target === e.currentTarget) {
               setShowForm(false);
               setEditingUser(null);
-              setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+              setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentCode: '' });
               setAvatarFile(null);
               setAvatarPreview(null);
             }
@@ -650,7 +641,7 @@ function UserManagement() {
               onClick={() => {
                 setShowForm(false);
                 setEditingUser(null);
-                setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+                setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentCode: '' });
                 setAvatarFile(null);
                 setAvatarPreview(null);
               }}
@@ -663,7 +654,7 @@ function UserManagement() {
             <div className="p-4 pb-3 flex-shrink-0 border-b border-gray-200">
               <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
                 <Plus className="h-5 w-5" />
-                {editingUser ? `Edit ${formData.role === 'teacher' ? 'Teacher' : 'Working Student'}` : `Add ${formData.role === 'teacher' ? 'Teacher' : 'Working Student'}`}
+                {editingUser ? `Edit ${formData.role === 'teacher' ? 'Teacher' : formData.role === 'student' ? 'Student' : 'Working Student'}` : `Add ${formData.role === 'teacher' ? 'Teacher' : formData.role === 'student' ? 'Student' : 'Working Student'}`}
               </h3>
             </div>
             
@@ -685,6 +676,7 @@ function UserManagement() {
                       className="w-full max-w-xs px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     >
                       <option value="teacher">Teacher</option>
+                      <option value="student">Student</option>
                       <option value="working_student">Working Student</option>
                     </select>
                   </div>
@@ -708,6 +700,16 @@ function UserManagement() {
                     </div>
 
                     <div>
+                      <label className="block text-xs font-medium text-gray-700 mb-1">Middle Name</label>
+                      <input
+                        type="text"
+                        value={formData.middleName}
+                        onChange={(e) => setFormData({ ...formData, middleName: e.target.value })}
+                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      />
+                    </div>
+
+                    <div>
                       <label className="block text-xs font-medium text-gray-700 mb-1">Last Name</label>
                       <input
                         type="text"
@@ -716,33 +718,6 @@ function UserManagement() {
                         className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         required
                       />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Gender</label>
-                      <select
-                        value={formData.gender}
-                        onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        required
-                      >
-                        <option value="">Please Select Here</option>
-                        <option value="Male">Male</option>
-                        <option value="Female">Female</option>
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Birthdate</label>
-                      <div className="relative">
-                        <input
-                          type="date"
-                          value={formData.birthdate}
-                          onChange={(e) => setFormData({ ...formData, birthdate: e.target.value })}
-                          className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        />
-                        <Calendar className="absolute right-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
-                      </div>
                     </div>
 
                     <div>
@@ -755,16 +730,6 @@ function UserManagement() {
                         placeholder="09789436123"
                       />
                     </div>
-
-                    <div>
-                      <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
-                      <textarea
-                        value={formData.address}
-                        onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                        className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                        rows={2}
-                      />
-                    </div>
                   </div>
 
                   {/* Right Column - Account Information and Avatar */}
@@ -775,13 +740,13 @@ function UserManagement() {
                       <div>
                         <label className="block text-xs font-medium text-gray-700 mb-1">Department</label>
                         <select
-                          value={formData.departmentId}
-                          onChange={(e) => setFormData({ ...formData, departmentId: Number(e.target.value) })}
+                          value={formData.departmentCode}
+                          onChange={(e) => setFormData({ ...formData, departmentCode: e.target.value })}
                           className="w-full px-2.5 py-1.5 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                         >
-                          <option value={0}>Please Select Here</option>
+                          <option value="">Please Select Here</option>
                           {departments.filter(dept => dept.is_active).map((dept) => (
-                            <option key={dept.id} value={dept.id}>
+                            <option key={dept.department_code} value={dept.department_code}>
                               {dept.department_code} - {dept.department_name}
                             </option>
                           ))}
@@ -899,7 +864,7 @@ function UserManagement() {
                   onClick={() => {
                     setShowForm(false);
                     setEditingUser(null);
-                    setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', gender: '', birthdate: '', address: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentId: 0 });
+                    setFormData({ password: '', confirmPassword: '', name: '', firstName: '', middleName: '', lastName: '', role: 'teacher', employeeId: '', studentId: '', year: '', section: '', email: '', contactNumber: '', departmentCode: '' });
                     setAvatarFile(null);
                     setAvatarPreview(null);
                   }}
@@ -1157,24 +1122,12 @@ function ViewUserDetailsModal({ user, isOpen, onClose, departmentName }: ViewUse
                 <span className="text-sm text-gray-900 ml-2">{getFullName()}</span>
               </div>
               <div>
-                <span className="text-sm font-semibold text-gray-700">Gender:</span>
-                <span className="text-sm text-gray-900 ml-2">{user.gender || 'N/A'}</span>
-              </div>
-              <div>
-                <span className="text-sm font-semibold text-gray-700">Birthday:</span>
-                <span className="text-sm text-gray-900 ml-2">N/A</span>
-              </div>
-              <div>
                 <span className="text-sm font-semibold text-gray-700">Contact:</span>
                 <span className="text-sm text-gray-900 ml-2">{user.contact_number || 'N/A'}</span>
               </div>
               <div>
                 <span className="text-sm font-semibold text-gray-700">Email:</span>
                 <span className="text-sm text-gray-900 ml-2">{user.email || ''}</span>
-              </div>
-              <div>
-                <span className="text-sm font-semibold text-gray-700">Address:</span>
-                <span className="text-sm text-gray-900 ml-2">N/A</span>
               </div>
               <div>
                 <span className="text-sm font-semibold text-gray-700">
@@ -1274,6 +1227,7 @@ function ViewLogs() {
     
     const matchesSearch = searchQuery === '' || 
       log.user_name.toLowerCase().includes(searchLower) ||
+      (log.user_id_number || '').toLowerCase().includes(searchLower) ||
       log.user_type.toLowerCase().includes(searchLower) ||
       (log.pc_number || '').toLowerCase().includes(searchLower) ||
       logDate.includes(searchLower) ||
@@ -1416,6 +1370,9 @@ function ViewLogs() {
               <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ID Number
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Full Name
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -1439,6 +1396,9 @@ function ViewLogs() {
                 {filteredLogs.length > 0 ? (
                   filteredLogs.map((log) => (
                     <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {log.user_id_number || log.user_name}
+                      </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {log.user_name}
                       </td>
@@ -1481,7 +1441,7 @@ function ViewLogs() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={7} className="px-6 py-12 text-center">
                       <p className="text-gray-500 font-medium">No logs found</p>
                     </td>
                   </tr>
@@ -2008,7 +1968,6 @@ function Reports() {
 }
 
 interface Department {
-  id: number;
   department_code: string;
   department_name: string;
   description?: string;
@@ -2066,7 +2025,7 @@ function DepartmentManagement() {
       }
 
       if (editingDepartment) {
-        await UpdateDepartment(editingDepartment.id, formData.departmentCode, formData.departmentName, formData.description, formData.isActive);
+        await UpdateDepartment(editingDepartment.department_code, formData.departmentCode, formData.departmentName, formData.description, formData.isActive);
         showNotification('success', 'Department updated successfully!');
       } else {
         await CreateDepartment(formData.departmentCode, formData.departmentName, formData.description);
@@ -2095,10 +2054,10 @@ function DepartmentManagement() {
     setShowForm(true);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (departmentCode: string) => {
     if (confirm('Are you sure you want to delete this department?')) {
       try {
-        await DeleteDepartment(id);
+        await DeleteDepartment(departmentCode);
         showNotification('success', 'Department deleted successfully!');
         loadDepartments();
       } catch (error) {
@@ -2358,7 +2317,7 @@ function DepartmentManagement() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {pagedDepartments.map((dept, index) => (
-                <tr key={dept.id} className="hover:bg-gray-50">
+                <tr key={dept.department_code} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {startIndex + index + 1}
                   </td>
@@ -2378,18 +2337,20 @@ function DepartmentManagement() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center space-x-2">
+                    <div className="flex items-center gap-2">
                       <button
                         onClick={() => handleEdit(dept)}
-                        className="text-blue-600 hover:text-blue-900 font-medium"
+                        className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                        title="Edit"
                       >
-                        Edit
+                        <Edit className="h-3 w-3" />
                       </button>
                       <button
-                        onClick={() => handleDelete(dept.id)}
-                        className="text-red-600 hover:text-red-900 font-medium"
+                        onClick={() => handleDelete(dept.department_code)}
+                        className="inline-flex items-center justify-center px-2 py-1 text-xs font-medium rounded text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                        title="Delete"
                       >
-                        Delete
+                        <Trash2 className="h-3 w-3" />
                       </button>
                     </div>
                   </td>

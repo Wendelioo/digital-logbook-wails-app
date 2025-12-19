@@ -86,36 +86,49 @@ function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left Section - Background Image with Title and Text */}
-      <div 
-        className="w-1/2 relative flex flex-col justify-center items-start p-12"
-        style={{
-          backgroundImage: `url(${backgroundImage})`,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-          backgroundRepeat: 'no-repeat'
-        }}
-      >
-        {/* Dark Overlay for readability */}
-        <div className="absolute inset-0 bg-black/40"></div>
+      <div className="w-1/2 relative flex flex-col justify-center items-start p-16 overflow-hidden">
+        {/* Blurred Background Image */}
+        <div 
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `url(${backgroundImage})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            filter: 'blur(4px)',
+            transform: 'scale(1.1)'
+          }}
+        ></div>
+        {/* Gradient Overlay for better contrast and visual appeal */}
+        <div className="absolute inset-0 bg-gradient-to-br from-black/60 via-black/50 to-teal-900/40"></div>
+        
+        {/* Decorative Accent Line */}
+        <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-teal-400 via-teal-500 to-teal-600"></div>
         
         {/* Content Container */}
-        <div className="relative z-10 max-w-xl">
-          {/* Title */}
-          <div className="mb-12">
-            <h1 className="text-6xl font-bold text-white mb-4 tracking-tight leading-tight">
-              Digital Logbook
-            </h1>
-            <div className="w-24 h-1.5 bg-teal-400 rounded-full"></div>
-          </div>
-          
+        <div className="relative z-10 max-w-2xl">
           {/* Text Content */}
-          <div className="space-y-5">
-            <p className="text-white text-lg leading-relaxed font-normal">
-              Track your computer laboratory attendance and activity with our Digital Logbook.
+          <div className="space-y-8">
+            {/* Decorative element before heading */}
+            <div className="flex items-center gap-4 mb-2">
+              <div className="w-12 h-1 bg-gradient-to-r from-teal-400 to-teal-600 rounded-full"></div>
+              <div className="w-2 h-2 bg-teal-400 rounded-full"></div>
+            </div>
+            
+            <h2 className="text-5xl font-extrabold text-white leading-[1.1] tracking-[-0.02em] drop-shadow-2xl mb-4">
+              Track Your Lab Attendance
+            </h2>
+            
+            <p className="text-white/95 text-xl leading-[1.7] font-normal max-w-xl drop-shadow-lg pl-1">
+              Log in with your account to view your records and monitor your computer lab history.
             </p>
-            <p className="text-white/95 text-base leading-relaxed font-normal">
-              Log in with your school credentials to view your records and access the system made for all IT students and staff.
-            </p>
+            
+            {/* Decorative dots */}
+            <div className="flex items-center gap-2 pt-2">
+              <div className="w-2 h-2 bg-teal-400/80 rounded-full"></div>
+              <div className="w-2 h-2 bg-teal-400/60 rounded-full"></div>
+              <div className="w-2 h-2 bg-teal-400/40 rounded-full"></div>
+            </div>
           </div>
         </div>
       </div>

@@ -11,13 +11,23 @@ import {
   AlertCircle,
   SlidersHorizontal,
   X,
-  Search
+  Search,
+  BookOpen,
+  Plus,
+  Loader2,
+  Users,
+  LogIn,
+  MapPin,
+  Library
 } from 'lucide-react';
 import { 
   GetStudentDashboard,
   RecordAttendance,
   GetStudentFeedback,
-  GetStudentLoginLogs
+  GetStudentLoginLogs,
+  GetStudentClasses,
+  GetClassesBySubjectCode,
+  JoinClassBySubjectCode
 } from '../../wailsjs/go/main/App';
 import { useAuth } from '../contexts/AuthContext';
 import { main } from '../../wailsjs/go/models';
@@ -26,6 +36,7 @@ import { main } from '../../wailsjs/go/models';
 type Attendance = main.Attendance;
 type StudentDashboardData = main.StudentDashboard;
 type Feedback = main.Feedback;
+type CourseClass = main.CourseClass;
 
 // LoginLog interface matching the JSON structure from backend
 interface LoginLog {
@@ -44,6 +55,7 @@ function DashboardOverview() {
     attendance: [],
     today_log: undefined
   }));
+  const [lastLogin, setLastLogin] = useState<LoginLog | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -53,6 +65,20 @@ function DashboardOverview() {
       try {
         const data = await GetStudentDashboard(user.id);
         setDashboardData(data);
+        
+        // Fetch last login log
+        try {
+          const loginLogs = await GetStudentLoginLogs(user.id);
+          if (loginLogs && loginLogs.length > 0) {
+            // Get the most recent completed login (one that has been logged out)
+            // If no completed login exists, use the most recent login
+            const completedLogs = loginLogs.filter(log => log.logout_time);
+            const lastLog = completedLogs.length > 0 ? completedLogs[0] : loginLogs[0];
+            setLastLogin(lastLog);
+          }
+        } catch (error) {
+          console.error('Failed to load last login:', error);
+        }
       } catch (error) {
         console.error('Failed to load student dashboard:', error);
       } finally {
@@ -71,134 +97,169 @@ function DashboardOverview() {
     );
   }
 
+  const presentCount = (dashboardData.attendance || []).filter(a => a.status === 'Present').length;
+  const absentCount = (dashboardData.attendance || []).filter(a => a.status === 'Absent').length;
+  const seatInCount = (dashboardData.attendance || []).filter(a => a.status === 'Seat-in').length;
+  const totalAttendance = dashboardData.attendance?.length || 0;
+
   return (
-    <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold text-gray-900">Welcome, {user?.first_name || user?.name}!</h2>
+    <div className="space-y-6">
+      {/* Welcome Header */}
+      <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-lg shadow-lg p-6 text-white">
+        <h1 className="text-3xl font-bold mb-2">Welcome back, {user?.first_name || user?.name}!</h1>
+        <p className="text-blue-100">Here's an overview of your attendance and activity</p>
       </div>
 
-      {/* Today's Log */}
-      <div className="mb-8">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Today's Log</h3>
-        {dashboardData.today_log ? (
-          <div className="bg-white shadow rounded-lg p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <div className={`w-4 h-4 rounded-full mr-3 ${
-                  dashboardData.today_log.status === 'Present' ? 'bg-green-500' :
-                  dashboardData.today_log.status === 'Absent' ? 'bg-red-500' : 'bg-yellow-500'
-                }`}></div>
-                <div>
-                  <p className="text-lg font-medium text-gray-900">
-                    Status: {dashboardData.today_log.status}
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Time In: {dashboardData.today_log.time_in || '-'} | Time Out: {dashboardData.today_log.time_out || '-'}
+      {/* Last Login Information */}
+      {lastLogin && (
+        <div className="bg-white shadow-md rounded-lg border border-gray-200 overflow-hidden">
+          <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h2 className="text-lg font-semibold text-gray-900">Account Information</h2>
+          </div>
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Clock className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-1">Last Login</p>
+                  <p className="text-base font-semibold text-gray-900">
+                    {lastLogin.login_time ? new Date(lastLogin.login_time).toLocaleString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
+                    }) : 'N/A'}
                   </p>
                 </div>
               </div>
-              <span className={`px-3 py-1 text-sm font-medium rounded-full ${
-                dashboardData.today_log.status === 'Present' ? 'bg-green-100 text-green-800' :
-                dashboardData.today_log.status === 'Absent' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-              }`}>
-                {dashboardData.today_log.status}
-              </span>
+              <div className="flex items-start space-x-4">
+                <div className="flex-shrink-0">
+                  <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <svg className="h-6 w-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-gray-500 uppercase tracking-wide mb-1">Last PC Used</p>
+                  <p className="text-base font-semibold text-gray-900">
+                    {lastLogin.pc_number || 'Unknown'}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        ) : (
-          <div className="bg-white shadow rounded-lg p-6 text-center">
-            <Clock className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* Attendance Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-green-500 rounded-md flex items-center justify-center">
-                  <CheckCircle className="h-5 w-5 text-white" />
+      <div className="bg-white shadow-md rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Attendance Summary</h2>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 rounded-lg p-6 border border-green-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-green-500 rounded-lg flex items-center justify-center shadow-md">
+                  <CheckCircle className="h-7 w-7 text-white" />
                 </div>
               </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Present
-                  </dt>
-                  <dd className="text-3xl font-bold text-gray-900">
-                    {(dashboardData.attendance || []).filter(a => a.status === 'Present').length}
-                  </dd>
-                </dl>
+              <dl>
+                <dt className="text-sm font-medium text-green-700 uppercase tracking-wide mb-1">
+                  Present
+                </dt>
+                <dd className="text-4xl font-bold text-green-900">
+                  {presentCount}
+                </dd>
+              </dl>
+            </div>
+
+            <div className="bg-gradient-to-br from-red-50 to-red-100 rounded-lg p-6 border border-red-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-red-500 rounded-lg flex items-center justify-center shadow-md">
+                  <XCircle className="h-7 w-7 text-white" />
+                </div>
               </div>
+              <dl>
+                <dt className="text-sm font-medium text-red-700 uppercase tracking-wide mb-1">
+                  Absent
+                </dt>
+                <dd className="text-4xl font-bold text-red-900">
+                  {absentCount}
+                </dd>
+              </dl>
+            </div>
+
+            <div className="bg-gradient-to-br from-yellow-50 to-yellow-100 rounded-lg p-6 border border-yellow-200">
+              <div className="flex items-center justify-between mb-4">
+                <div className="w-12 h-12 bg-yellow-500 rounded-lg flex items-center justify-center shadow-md">
+                  <AlertCircle className="h-7 w-7 text-white" />
+                </div>
+              </div>
+              <dl>
+                <dt className="text-sm font-medium text-yellow-700 uppercase tracking-wide mb-1">
+                  Seat-in
+                </dt>
+                <dd className="text-4xl font-bold text-yellow-900">
+                  {seatInCount}
+                </dd>
+              </dl>
             </div>
           </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
-                  <XCircle className="h-5 w-5 text-white" />
-                </div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Absent
-                  </dt>
-                  <dd className="text-3xl font-bold text-gray-900">
-                    {(dashboardData.attendance || []).filter(a => a.status === 'Absent').length}
-                  </dd>
-                </dl>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white overflow-hidden shadow rounded-lg">
-          <div className="p-5">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <div className="w-8 h-8 bg-yellow-500 rounded-md flex items-center justify-center">
-                  <AlertCircle className="h-5 w-5 text-white" />
-                </div>
-              </div>
-              <div className="ml-5 w-0 flex-1">
-                <dl>
-                  <dt className="text-sm font-medium text-gray-500 truncate">
-                    Seat-in
-                  </dt>
-                  <dd className="text-3xl font-bold text-gray-900">
-                    {(dashboardData.attendance || []).filter(a => a.status === 'Seat-in').length}
-                  </dd>
-                </dl>
-              </div>
+          
+          {/* Total Records */}
+          <div className="pt-6 border-t border-gray-200">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-gray-600">Total Records</span>
+              <span className="text-lg font-semibold text-gray-900">{totalAttendance}</span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="bg-white shadow rounded-lg p-6">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Actions</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <Link
-            to="attendance"
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <ClipboardList className="h-6 w-6 text-primary-600 mr-3" />
-            <span className="text-gray-900">View Login History</span>
-          </Link>
-          <Link
-            to="feedback"
-            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-          >
-            <MessageSquare className="h-6 w-6 text-primary-600 mr-3" />
-            <span className="text-gray-900">View Feedback History</span>
-          </Link>
+      <div className="bg-white shadow-md rounded-lg border border-gray-200 overflow-hidden">
+        <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
+          <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Link
+              to="attendance"
+              className="group flex items-center p-5 bg-white border-2 border-gray-200 rounded-lg hover:border-blue-500 hover:shadow-md transition-all duration-200"
+            >
+              <div className="flex-shrink-0 w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-500 transition-colors duration-200">
+                <ClipboardList className="h-6 w-6 text-blue-600 group-hover:text-white transition-colors duration-200" />
+              </div>
+              <div className="ml-4 flex-1">
+                <h3 className="text-base font-semibold text-gray-900 group-hover:text-blue-600 transition-colors duration-200">
+                  View Login History
+                </h3>
+                <p className="text-sm text-gray-500 mt-0.5">View your complete login and logout records</p>
+              </div>
+            </Link>
+            <Link
+              to="feedback"
+              className="group flex items-center p-5 bg-white border-2 border-gray-200 rounded-lg hover:border-purple-500 hover:shadow-md transition-all duration-200"
+            >
+              <div className="flex-shrink-0 w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-500 transition-colors duration-200">
+                <MessageSquare className="h-6 w-6 text-purple-600 group-hover:text-white transition-colors duration-200" />
+              </div>
+              <div className="ml-4 flex-1">
+                <h3 className="text-base font-semibold text-gray-900 group-hover:text-purple-600 transition-colors duration-200">
+                  View Feedback History
+                </h3>
+                <p className="text-sm text-gray-500 mt-0.5">Review your equipment feedback submissions</p>
+              </div>
+            </Link>
+          </div>
         </div>
       </div>
     </div>
@@ -213,8 +274,7 @@ function LoginHistory() {
   const [error, setError] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   useEffect(() => {
     const loadLoginLogs = async () => {
@@ -251,23 +311,20 @@ function LoginHistory() {
     loadLoginLogs();
   }, [user]);
 
-  // Filter logs based on date range and search
+  // Filter logs based on date and search
   useEffect(() => {
     let filtered = loginLogs;
 
-    // Apply date filters
-    if (startDate || endDate) {
+    // Apply date filter
+    if (selectedDate) {
       filtered = filtered.filter(log => {
         if (!log.login_time) return false;
         
         const logDate = new Date(log.login_time);
-        const start = startDate ? new Date(startDate) : null;
-        const end = endDate ? new Date(endDate) : null;
+        const selected = new Date(selectedDate);
         
-        if (start && logDate < start) return false;
-        if (end && logDate > end) return false;
-        
-        return true;
+        // Compare only the date part (ignore time)
+        return logDate.toDateString() === selected.toDateString();
       });
     }
 
@@ -281,15 +338,14 @@ function LoginHistory() {
     }
     
     setFilteredLogs(filtered);
-  }, [loginLogs, startDate, endDate, searchQuery]);
+  }, [loginLogs, selectedDate, searchQuery]);
 
   const clearFilters = () => {
-    setStartDate('');
-    setEndDate('');
+    setSelectedDate(null);
     setSearchQuery('');
   };
 
-  const activeFilterCount = (startDate ? 1 : 0) + (endDate ? 1 : 0);
+  const activeFilterCount = selectedDate ? 1 : 0;
 
   if (loading) {
     return (
@@ -308,7 +364,7 @@ function LoginHistory() {
       {/* Search and Filter Controls */}
       <div className="mb-6 bg-white shadow rounded-lg p-4">
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 w-64">
+          <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
@@ -344,41 +400,32 @@ function LoginHistory() {
               )}
             </button>
             
-            {/* Dropdown Filters Panel */}
+            {/* Dropdown with Date Picker */}
             {showFilters && (
               <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium text-gray-700">Filter by Date Range:</label>
+                    <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Start Date</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
+                      <label className="block text-xs text-gray-600 mb-1">Select Date</label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={selectedDate ? selectedDate.toISOString().split('T')[0] : ''}
+                          onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+                          max={new Date().toISOString().split('T')[0]}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">End Date</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    {(startDate || endDate) && (
+                    {selectedDate && (
                       <button
-                        onClick={() => {
-                          setStartDate('');
-                          setEndDate('');
-                        }}
+                        onClick={() => setSelectedDate(null)}
                         className="w-full text-xs text-gray-600 hover:text-gray-900 underline text-left"
                       >
-                        Clear Date Filters
+                        Clear Date Filter
                       </button>
                     )}
                   </div>
@@ -386,7 +433,7 @@ function LoginHistory() {
               </div>
             )}
           </div>
-          {(searchQuery || startDate || endDate) && (
+          {(searchQuery || selectedDate) && (
             <button
               onClick={clearFilters}
               className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -507,8 +554,7 @@ function FeedbackHistory() {
   const [error, setError] = useState<string>('');
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
-  const [startDate, setStartDate] = useState<string>('');
-  const [endDate, setEndDate] = useState<string>('');
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
 
   useEffect(() => {
     const loadFeedback = async () => {
@@ -530,23 +576,20 @@ function FeedbackHistory() {
     loadFeedback();
   }, [user]);
 
-  // Filter feedback based on date range and search
+  // Filter feedback based on date and search
   useEffect(() => {
     let filtered = feedbackList;
 
-    // Apply date filters
-    if (startDate || endDate) {
+    // Apply date filter
+    if (selectedDate) {
       filtered = filtered.filter(feedback => {
         if (!feedback.date_submitted) return false;
         
         const feedbackDate = new Date(feedback.date_submitted);
-        const start = startDate ? new Date(startDate) : null;
-        const end = endDate ? new Date(endDate) : null;
+        const selected = new Date(selectedDate);
         
-        if (start && feedbackDate < start) return false;
-        if (end && feedbackDate > end) return false;
-        
-        return true;
+        // Compare only the date part (ignore time)
+        return feedbackDate.toDateString() === selected.toDateString();
       });
     }
 
@@ -561,15 +604,14 @@ function FeedbackHistory() {
     }
     
     setFilteredFeedback(filtered);
-  }, [feedbackList, startDate, endDate, searchQuery]);
+  }, [feedbackList, selectedDate, searchQuery]);
 
   const clearFilters = () => {
-    setStartDate('');
-    setEndDate('');
+    setSelectedDate(null);
     setSearchQuery('');
   };
 
-  const activeFilterCount = (startDate ? 1 : 0) + (endDate ? 1 : 0);
+  const activeFilterCount = selectedDate ? 1 : 0;
 
   if (loading) {
     return (
@@ -588,7 +630,7 @@ function FeedbackHistory() {
       {/* Search and Filter Controls */}
       <div className="mb-6 bg-white shadow rounded-lg p-4">
         <div className="flex items-center gap-3">
-          <div className="relative flex-1 w-64">
+          <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
@@ -624,41 +666,32 @@ function FeedbackHistory() {
               )}
             </button>
             
-            {/* Dropdown Filters Panel */}
+            {/* Dropdown with Date Picker */}
             {showFilters && (
               <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
                 <div className="p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <label className="text-sm font-medium text-gray-700">Filter by Date Range:</label>
+                    <label className="text-sm font-medium text-gray-700">Filter by Date:</label>
                   </div>
                   <div className="space-y-3">
                     <div>
-                      <label className="block text-xs text-gray-600 mb-1">Start Date</label>
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
+                      <label className="block text-xs text-gray-600 mb-1">Select Date</label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={selectedDate ? selectedDate.toISOString().split('T')[0] : ''}
+                          onChange={(e) => setSelectedDate(e.target.value ? new Date(e.target.value) : null)}
+                          max={new Date().toISOString().split('T')[0]}
+                          className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                        />
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">End Date</label>
-                      <input
-                        type="date"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                        className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      />
-                    </div>
-                    {(startDate || endDate) && (
+                    {selectedDate && (
                       <button
-                        onClick={() => {
-                          setStartDate('');
-                          setEndDate('');
-                        }}
+                        onClick={() => setSelectedDate(null)}
                         className="w-full text-xs text-gray-600 hover:text-gray-900 underline text-left"
                       >
-                        Clear Date Filters
+                        Clear Date Filter
                       </button>
                     )}
                   </div>
@@ -666,7 +699,7 @@ function FeedbackHistory() {
               </div>
             )}
           </div>
-          {(searchQuery || startDate || endDate) && (
+          {(searchQuery || selectedDate) && (
             <button
               onClick={clearFilters}
               className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
@@ -811,11 +844,267 @@ function FeedbackHistory() {
   );
 }
 
+function MyClasses() {
+  const { user } = useAuth();
+  const [classes, setClasses] = useState<CourseClass[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string>('');
+  const [subjectCode, setSubjectCode] = useState('');
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState<string>('');
+  const [joinSuccess, setJoinSuccess] = useState<string>('');
+  const [showJoinForm, setShowJoinForm] = useState(false);
+
+  useEffect(() => {
+    loadClasses();
+  }, [user]);
+
+  const loadClasses = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const data = await GetStudentClasses(user.id);
+      setClasses(data || []);
+      setError('');
+    } catch (error) {
+      console.error('Failed to load classes:', error);
+      setError('Unable to load your classes from server.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleJoinClass = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!user || !subjectCode.trim()) {
+      setJoinError('Please enter a subject code.');
+      return;
+    }
+
+    setJoining(true);
+    setJoinError('');
+    setJoinSuccess('');
+
+    try {
+      // First check if classes exist for this subject code
+      const availableClasses = await GetClassesBySubjectCode(subjectCode.trim().toUpperCase());
+      
+      if (availableClasses.length === 0) {
+        setJoinError('No classes found.');
+        setJoining(false);
+        return;
+      }
+
+      // Join the class
+      await JoinClassBySubjectCode(user.id, subjectCode.trim().toUpperCase());
+      setJoinSuccess('Successfully joined the class!');
+      
+      // Reload classes to show the new enrollment
+      await loadClasses();
+      
+      // Close modal and clear form after 1.5 seconds
+      setTimeout(() => {
+        setShowJoinForm(false);
+        setSubjectCode('');
+        setJoinSuccess('');
+      }, 1500);
+    } catch (error: any) {
+      console.error('Failed to join class:', error);
+      const errorMessage = error.message || 'Failed to join class. Please try again.';
+      if (errorMessage.includes('already enrolled')) {
+        setJoinError('You are already enrolled in this class.');
+      } else if (errorMessage.includes('no classes found')) {
+        setJoinError('No classes found.');
+      } else {
+        setJoinError(errorMessage);
+      }
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary-500"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <div className="mb-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-bold text-gray-900">My Classes</h2>
+          <button
+            onClick={() => {
+              setShowJoinForm(true);
+              setSubjectCode('');
+              setJoinError('');
+              setJoinSuccess('');
+            }}
+            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700"
+          >
+            Join Class
+          </button>
+        </div>
+      </div>
+
+      {/* Join Class Modal */}
+      {showJoinForm && (
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowJoinForm(false);
+              setSubjectCode('');
+              setJoinError('');
+              setJoinSuccess('');
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md mx-4 relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowJoinForm(false);
+                setSubjectCode('');
+                setJoinError('');
+                setJoinSuccess('');
+              }}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-700 text-2xl font-bold transition-colors z-10"
+            >
+              ×
+            </button>
+            
+            <div className="p-6">
+              <div className="mb-6">
+                <h3 className="text-2xl font-bold text-gray-900 mb-2">Join a Class</h3>
+                <p className="text-sm text-gray-600">Enter the Subject Code to join a class</p>
+              </div>
+              
+              <form onSubmit={handleJoinClass} className="space-y-4">
+                <div>
+                  <label htmlFor="subjectCode" className="block text-sm font-medium text-gray-700 mb-2">
+                    Subject Code
+                  </label>
+                  <input
+                    id="subjectCode"
+                    type="text"
+                    value={subjectCode}
+                    onChange={(e) => setSubjectCode(e.target.value.toUpperCase())}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    required
+                    autoFocus
+                  />
+                </div>
+                
+                {joinError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+                    {joinError}
+                  </div>
+                )}
+                
+                {joinSuccess && (
+                  <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+                    {joinSuccess}
+                  </div>
+                )}
+                
+                <div className="flex gap-3 pt-4">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowJoinForm(false);
+                      setSubjectCode('');
+                      setJoinError('');
+                      setJoinSuccess('');
+                    }}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={joining}
+                    className="flex-1 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {joining ? 'Joining...' : 'Join Class'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="mb-6 bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      {classes.length === 0 ? (
+        <div className="bg-white shadow rounded-lg p-12 text-center">
+          <Library className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+          <p className="text-gray-500 font-medium">No classes enrolled</p>
+          <p className="text-gray-400 text-sm mt-2">Join a class using a Subject Code to get started.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {classes.map((cls) => (
+            <div 
+              key={cls.class_id} 
+              className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
+            >
+              <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
+                <h3 className="text-white font-semibold text-lg">{cls.subject_name || cls.subject_code}</h3>
+                <p className="text-white text-sm opacity-90">{cls.subject_code}</p>
+              </div>
+              
+              <div className="px-4 py-4 bg-white">
+                <div className="space-y-2 text-sm">
+                  {cls.teacher_name && (
+                    <div className="flex items-center text-gray-600">
+                      <Users className="h-4 w-4 mr-2 text-gray-400" />
+                      <span className="font-medium">Teacher:</span>
+                      <span className="ml-2">{cls.teacher_name}</span>
+                    </div>
+                  )}
+                  {cls.schedule && (
+                    <div className="flex items-center text-gray-600">
+                      <Clock className="h-4 w-4 mr-2 text-gray-400" />
+                      <span>{cls.schedule}</span>
+                    </div>
+                  )}
+                  {cls.room && (
+                    <div className="flex items-center text-gray-600">
+                      <MapPin className="h-4 w-4 mr-2 text-gray-400" />
+                      <span>{cls.room}</span>
+                    </div>
+                  )}
+                  {cls.section && (
+                    <div className="text-gray-600">
+                      <span className="font-medium">Section:</span> {cls.section}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function StudentDashboard() {
   const location = useLocation();
   
   const navigationItems = [
     { name: 'Dashboard', href: '/student', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/student' },
+    { name: 'My Classes', href: '/student/classes', icon: <Library className="h-5 w-5" />, current: location.pathname === '/student/classes' },
     { name: 'Login History', href: '/student/attendance', icon: <ClipboardList className="h-5 w-5" />, current: location.pathname === '/student/attendance' },
     { name: 'Feedback History', href: '/student/feedback', icon: <MessageSquare className="h-5 w-5" />, current: location.pathname === '/student/feedback' },
   ];
@@ -824,6 +1113,7 @@ function StudentDashboard() {
     <Layout navigationItems={navigationItems} title="Student Dashboard">
       <Routes>
         <Route index element={<DashboardOverview />} />
+        <Route path="classes" element={<MyClasses />} />
         <Route path="attendance" element={<LoginHistory />} />
         <Route path="feedback" element={<FeedbackHistory />} />
       </Routes>

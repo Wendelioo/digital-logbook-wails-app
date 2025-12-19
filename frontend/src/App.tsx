@@ -8,29 +8,29 @@ import StudentDashboard from './pages/StudentDashboard';
 import WorkingStudentDashboard from './pages/WorkingStudentDashboard';
 import './style.css';
 
-// Protected Route component - must be inside AuthProvider
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user } = useAuth();
-  return user ? <>{children}</> : <Navigate to="/login" />;
-}
-
-// Role-based route protection - must be inside AuthProvider
-function RoleRoute({ allowedRoles, children }: { allowedRoles: string[], children: React.ReactNode }) {
-  const { user } = useAuth();
-  
-  if (!user) {
-    return <Navigate to="/login" />;
-  }
-  
-  if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/login" />;
-  }
-  
-  return <>{children}</>;
-}
-
-// Inner app component that uses the auth context
+// Inner routes component that uses auth context
 function AppRoutes() {
+  // Protected Route component - must be inside AuthProvider
+  function ProtectedRoute({ children }: { children: React.ReactNode }) {
+    const { user } = useAuth();
+    return user ? <>{children}</> : <Navigate to="/login" />;
+  }
+
+  // Role-based route protection - must be inside AuthProvider
+  function RoleRoute({ allowedRoles, children }: { allowedRoles: string[], children: React.ReactNode }) {
+    const { user } = useAuth();
+    
+    if (!user) {
+      return <Navigate to="/login" />;
+    }
+    
+    if (!allowedRoles.includes(user.role)) {
+      return <Navigate to="/login" />;
+    }
+    
+    return <>{children}</>;
+  }
+
   return (
     <Router>
       <div className="min-h-screen bg-gray-50">
