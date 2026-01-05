@@ -4,7 +4,7 @@
 Quick Overview:
 
 **Digital Logbook – Wails App**
--A modern desktop application for monitoring and managing student computer laboratory usage. This system is built with Go and Wails, designed to help schools replace traditional logbooks with a secure and efficient digital solution.
+-A modern desktop application for monitoring and managing student computer laboratory usage. This system is built with Go and Wails.
 
 -The project focuses on accurate attendance tracking, role-based access, and easy reporting for administrators and teachers.
 
