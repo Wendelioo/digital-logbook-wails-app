@@ -20,6 +20,7 @@ MySQL database integration
 
 **Prerequisites:**
 -Before running the application in development mode, make sure the following tools are installed on your machine.
+
 **Node.js**
 -Download and install Node.js (LTS version recommended) from:
 [https://nodejs.org/en/download](https://nodejs.org/en/download)
