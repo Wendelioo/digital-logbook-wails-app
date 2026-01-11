@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { 
-  LayoutDashboard, 
-  Users, 
-  ClipboardList, 
+import {
+  LayoutDashboard,
+  Users,
+  ClipboardList,
   FileText,
   BookOpen,
   CheckCircle,
@@ -27,7 +27,7 @@ import {
   X,
   Archive
 } from 'lucide-react';
-import { 
+import {
   GetTeacherClassesByUserID,
   GetClassStudents,
   GetClassAttendance,
@@ -63,7 +63,7 @@ type Subject = main.Subject;
 function getSubjectIconAndColor(subjectCode: string, subjectName: string) {
   const code = subjectCode.toLowerCase();
   const name = subjectName.toLowerCase();
-  
+
   if (code.includes('math') || name.includes('math')) {
     return {
       icon: <Calculator className="h-6 w-6" />,
@@ -113,14 +113,14 @@ function DashboardOverview() {
         console.log('No teacher ID available');
         return;
       }
-      
+
       setLoading(true);
       try {
         // Note: user.id should be the teacher's database ID from teachers table
         console.log('Loading classes for teacher ID:', user.id);
         const classesData = await GetTeacherClassesByUserID(user.id);
         console.log('Classes data received:', classesData);
-        
+
         if (classesData) {
           setClasses(classesData);
         }
@@ -211,8 +211,8 @@ function DashboardOverview() {
             {classes.map((cls) => {
               const { icon, headerColor, iconColor } = getSubjectIconAndColor(cls.subject_code, cls.subject_name);
               return (
-                <div 
-                  key={cls.class_id} 
+                <div
+                  key={cls.class_id}
                   className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                   onClick={() => navigate(`/teacher/class-management/${cls.class_id}`)}
                 >
@@ -228,7 +228,7 @@ function DashboardOverview() {
                       </div>
                     )}
                   </div>
-                  
+
                   {/* Card Body */}
                   <div className="px-4 py-4 bg-white">
                     <div className="flex items-center mb-3">
@@ -256,7 +256,7 @@ function DashboardOverview() {
           </div>
         </div>
       )}
-      
+
       {!loading && classes.length === 0 && (
         <div className="bg-white shadow rounded-lg p-12 text-center">
           <h3 className="mt-4 text-lg font-medium text-gray-900">No classes found</h3>
@@ -417,7 +417,7 @@ function ClassManagement() {
             <thead className="bg-gray-100">
               <tr>
                 <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
-                  Subject Code
+                  EDP Code
                 </th>
                 <th scope="col" className="border border-gray-400 px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider bg-gray-200">
                   Subject Name
@@ -578,14 +578,14 @@ function ClassManagement() {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <div className="p-6">
               {generateError && (
                 <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
                   {generateError}
                 </div>
               )}
-              
+
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Select Class
@@ -639,11 +639,11 @@ function ClassManagement() {
 
                     setGenerating(true);
                     setGenerateError('');
-                    
+
                     try {
                       const today = new Date().toISOString().split('T')[0];
                       await GenerateAttendanceFromLogs(selectedClassId, today, user?.id || 0);
-                      
+
                       // Close modal and navigate to attendance management list
                       // The generated attendance will appear as an active attendance sheet
                       setShowGenerateModal(false);
@@ -690,7 +690,7 @@ function CreateClasslist() {
   });
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
-  const [notification, setNotification] = useState<{type: 'success' | 'error', message: string} | null>(null);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error', message: string } | null>(null);
 
   const toggleDay = (day: string) => {
     setFormData(prev => {
@@ -719,13 +719,13 @@ function CreateClasslist() {
 
   const formatSchedule = (days: string[], startHour: string, startMinute: string, startAmPm: string, endHour: string, endMinute: string, endAmPm: string): string => {
     if (!days.length) return '';
-    
+
     // Sort days in order
     const dayOrder = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     const sortedDays = [...days].sort((a, b) => {
       return dayOrder.indexOf(a) - dayOrder.indexOf(b);
     });
-    
+
     // Format days (Mon, Tue -> MW or Mon, Wed, Fri -> MWF)
     const dayAbbrs: Record<string, string> = {
       'Mon': 'M',
@@ -736,17 +736,17 @@ function CreateClasslist() {
       'Sat': 'SAT',
       'Sun': 'SUN'
     };
-    
+
     let dayString = '';
     if (sortedDays.length === 2 && sortedDays.includes('Tue') && sortedDays.includes('Thu')) {
       dayString = 'TTH';
     } else {
       dayString = sortedDays.map(d => dayAbbrs[d] || d).join('');
     }
-    
+
     const startTimeStr = formatTimeDisplay(startHour, startMinute, startAmPm);
     const endTimeStr = formatTimeDisplay(endHour, endMinute, endAmPm);
-    
+
     return `${dayString} ${startTimeStr}-${endTimeStr}`;
   };
 
@@ -758,7 +758,7 @@ function CreateClasslist() {
     try {
       // Validate required fields
       if (!formData.subjectCode) {
-        setMessage('Subject Code is required.');
+        setMessage('EDP Code is required.');
         setLoading(false);
         return;
       }
@@ -813,7 +813,7 @@ function CreateClasslist() {
 
       setNotification({ type: 'success', message: 'Class created successfully!' });
       setMessage('Class created successfully!');
-      
+
       setTimeout(() => {
         navigate('/teacher/class-management');
       }, 2000);
@@ -833,9 +833,8 @@ function CreateClasslist() {
     <>
       {/* Notification */}
       {notification && (
-        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${
-          notification.type === 'success' ? 'border-l-4 border-green-400' : 'border-l-4 border-red-400'
-        }`}>
+        <div className={`fixed top-4 right-4 z-50 max-w-sm w-full bg-white shadow-lg rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden transform transition-all duration-300 ease-in-out ${notification.type === 'success' ? 'border-l-4 border-green-400' : 'border-l-4 border-red-400'
+          }`}>
           <div className="p-4">
             <div className="flex items-start">
               <div className="flex-shrink-0">
@@ -850,9 +849,8 @@ function CreateClasslist() {
                 )}
               </div>
               <div className="ml-3 w-0 flex-1 pt-0.5">
-                <p className={`text-sm font-medium ${
-                  notification.type === 'success' ? 'text-green-800' : 'text-red-800'
-                }`}>
+                <p className={`text-sm font-medium ${notification.type === 'success' ? 'text-green-800' : 'text-red-800'
+                  }`}>
                   {notification.message}
                 </p>
               </div>
@@ -872,7 +870,7 @@ function CreateClasslist() {
         </div>
       )}
 
-      <div 
+      <div
         className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4"
         onClick={(e) => {
           if (e.target === e.currentTarget) {
@@ -888,7 +886,7 @@ function CreateClasslist() {
           >
             ×
           </button>
-          
+
           <div className="p-3 pb-2 flex-shrink-0 border-b">
             <h2 className="text-lg font-bold text-gray-800">
               Class Information
@@ -936,7 +934,7 @@ function CreateClasslist() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="subjectCode" className="block text-sm font-medium text-gray-700 mb-1">
-                      Subject Code
+                      EDP Code
                     </label>
                     <input
                       type="text"
@@ -984,11 +982,10 @@ function CreateClasslist() {
                           key={day.value}
                           type="button"
                           onClick={() => toggleDay(day.value)}
-                          className={`min-w-[40px] h-10 px-2 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors ${
-                            formData.selectedDays.includes(day.value)
-                              ? 'bg-blue-600 text-white border-blue-600'
-                              : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
-                          }`}
+                          className={`min-w-[40px] h-10 px-2 rounded-full flex items-center justify-center text-xs font-medium border-2 transition-colors ${formData.selectedDays.includes(day.value)
+                            ? 'bg-blue-600 text-white border-blue-600'
+                            : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+                            }`}
                         >
                           {day.label}
                         </button>
@@ -1106,9 +1103,8 @@ function CreateClasslist() {
               </div>
 
               {message && (
-                <div className={`mt-4 p-4 rounded-md ${
-                  message.includes('successfully') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
-                }`}>
+                <div className={`mt-4 p-4 rounded-md ${message.includes('successfully') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+                  }`}>
                   {message}
                 </div>
               )}
@@ -1167,12 +1163,12 @@ function ClassManagementDetail() {
 
   const loadClassDetails = async () => {
     if (!id) return;
-    
+
     setLoading(true);
     try {
       const classes = await GetTeacherClassesCreatedByWorkingStudents(user?.id || 0);
       const selectedClass = classes.find(c => c.class_id === parseInt(id));
-      
+
       if (selectedClass) {
         setClassInfo(selectedClass);
         setEditFormData({
@@ -1187,7 +1183,7 @@ function ClassManagementDetail() {
 
       const studentsData = await GetClassStudents(parseInt(id));
       setStudents(studentsData || []);
-      
+
       setError('');
     } catch (error) {
       console.error('Failed to load class details:', error);
@@ -1218,7 +1214,7 @@ function ClassManagementDetail() {
 
   const handleAddStudent = async () => {
     if (!id) return;
-    
+
     try {
       const available = await GetAllStudentsForEnrollment(parseInt(id));
       setAvailableStudents(available || []);
@@ -1238,7 +1234,7 @@ function ClassManagementDetail() {
     try {
       const studentIds = Array.from(selectedStudents);
       await EnrollMultipleStudents(studentIds, parseInt(id), user?.id || 0);
-      
+
       setShowAddModal(false);
       await loadClassDetails();
       alert(`Successfully enrolled ${selectedStudents.size} student(s)!`);
@@ -1479,7 +1475,7 @@ function ClassManagementDetail() {
             <div className="relative">
               <input
                 type="text"
-                placeholder="Search"
+                placeholder=""
                 value={studentSearchTerm}
                 onChange={(e) => setStudentSearchTerm(e.target.value)}
                 className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -1558,7 +1554,7 @@ function ClassManagementDetail() {
 
       {/* Add Student Modal */}
       {showAddModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -1574,7 +1570,7 @@ function ClassManagementDetail() {
             >
               ×
             </button>
-            
+
             <div className="text-center p-8 pb-4 flex-shrink-0">
               <h2 className="text-2xl font-bold text-blue-600 mb-2">Add Students to Class</h2>
               <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
@@ -1594,7 +1590,7 @@ function ClassManagementDetail() {
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:placeholder-gray-400 focus:ring-1 focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="Search students..."
+                    placeholder=""
                   />
                 </div>
               </div>
@@ -1638,8 +1634,8 @@ function ClassManagementDetail() {
                     </thead>
                     <tbody className="bg-white divide-y divide-gray-200">
                       {filteredAvailableStudents.map((student) => (
-                        <tr 
-                          key={student.id} 
+                        <tr
+                          key={student.id}
                           className={`hover:bg-gray-50 cursor-pointer ${selectedStudents.has(student.id) ? 'bg-blue-50' : ''}`}
                           onClick={() => toggleStudentSelection(student.id)}
                         >
@@ -1697,7 +1693,7 @@ function ClassManagementDetail() {
 
       {/* Edit Class Modal */}
       {showEditModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -1713,7 +1709,7 @@ function ClassManagementDetail() {
             >
               ×
             </button>
-            
+
             <div className="text-center p-8 pb-4 flex-shrink-0">
               <h2 className="text-2xl font-bold text-blue-600 mb-2">Edit Class</h2>
               <div className="w-24 h-0.5 bg-blue-600 mx-auto"></div>
@@ -1826,7 +1822,7 @@ function AttendanceClassSelection() {
       setLoadingAttendance(true);
       const activeMap = new Map<number, string>();
       const today = new Date().toISOString().split('T')[0];
-      
+
       // Check last 7 days for active attendance
       const datesToCheck: string[] = [today];
       for (let i = 1; i <= 7; i++) {
@@ -2007,10 +2003,10 @@ function AttendanceClassSelection() {
                 {currentClasses.map((cls) => {
                   const activeDate = activeAttendanceMap.get(cls.class_id);
                   const hasActiveAttendance = !!activeDate;
-                  
+
                   return (
-                    <tr 
-                      key={cls.class_id} 
+                    <tr
+                      key={cls.class_id}
                       className={`hover:bg-gray-50 ${hasActiveAttendance ? 'bg-green-50' : ''}`}
                     >
                       <td className="border border-gray-400 px-4 py-3 whitespace-nowrap">
@@ -2184,7 +2180,7 @@ function StoredAttendance() {
       const allRecords: (Attendance & { classSubjectName?: string })[] = [];
       const today = new Date();
       const datesToCheck: string[] = [];
-      
+
       for (let i = 0; i < 90; i++) {
         const date = new Date(today);
         date.setDate(date.getDate() - i);
@@ -2234,7 +2230,7 @@ function StoredAttendance() {
   return (
     <div className="p-6">
       <h2 className="text-xl font-bold text-gray-900 mb-4">Archive</h2>
-      
+
       <div className="bg-white shadow rounded-lg overflow-hidden">
         <div className="overflow-x-auto">
           {loadingAttendance ? (
@@ -2332,7 +2328,7 @@ function AttendanceManagementDetail() {
         const foundClass = classes.find(c => c.class_id === parseInt(id));
         setSelectedClass(foundClass || null);
         setError('');
-        
+
         // Check if date is in query params (from attendance list or generated)
         const dateParam = searchParams.get('date');
         const generatedParam = searchParams.get('generated');
@@ -2400,18 +2396,18 @@ function AttendanceManagementDetail() {
 
   const handleGenerateAttendance = async () => {
     if (!selectedClass || !pendingDate || !user?.id) return;
-    
+
     setGenerating(true);
     try {
       // Initialize attendance for the selected date
       await InitializeAttendanceForClass(selectedClass.class_id, pendingDate, user.id);
-      
+
       // Set the date and load attendance
       setSelectedDate(pendingDate);
       setHasSelectedDate(true);
       setShowGenerateModal(false);
       setPendingDate('');
-      
+
       // Load attendance records
       await loadAttendance();
     } catch (error) {
@@ -2473,17 +2469,17 @@ function AttendanceManagementDetail() {
   const handleSaveAll = async () => {
     // Save all attendance records
     if (!selectedClass || !selectedDate) return;
-    
+
     try {
       // Initialize attendance if not already done
       if (attendanceRecords.length === 0) {
         await InitializeAttendanceForClass(selectedClass.class_id, selectedDate, user?.id || 0);
         await loadAttendance();
       }
-      
+
       // Small delay to ensure save completes
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Navigate to stored attendance page
       navigate('/teacher/stored-attendance', { replace: true });
     } catch (error) {
@@ -2504,7 +2500,7 @@ function AttendanceManagementDetail() {
            (Only appears after a date is selected)
         5. Save Button - Appears when date is selected
       */}
-      
+
       {/* Header */}
       <div className="mb-6">
         <div className="flex items-center mb-4">
@@ -2629,8 +2625,8 @@ function AttendanceManagementDetail() {
           )}
         </div>
       )}
-      
-      
+
+
 
       {/* Attendance List Section - Only show after date is selected */}
       {selectedClass && hasSelectedDate && (
@@ -2784,7 +2780,7 @@ function AttendanceManagementDetail() {
 
       {/* Generate Attendance Modal */}
       {showGenerateModal && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -2800,7 +2796,7 @@ function AttendanceManagementDetail() {
             >
               <X className="h-5 w-5" />
             </button>
-            
+
             <div className="p-6">
               <div className="flex items-center mb-4">
                 <div className="flex-shrink-0">
@@ -2827,10 +2823,10 @@ function AttendanceManagementDetail() {
                   <div className="flex justify-between">
                     <span className="text-gray-600">Date:</span>
                     <span className="font-medium text-gray-900">
-                      {pendingDate ? new Date(pendingDate).toLocaleDateString('en-US', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
+                      {pendingDate ? new Date(pendingDate).toLocaleDateString('en-US', {
+                        year: 'numeric',
+                        month: 'long',
+                        day: 'numeric'
                       }) : '-'}
                     </span>
                   </div>
@@ -2845,7 +2841,7 @@ function AttendanceManagementDetail() {
                 <div className="flex items-start">
                   <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
                   <p className="text-sm text-blue-800">
-                    This will create attendance records for all enrolled students on the selected date. 
+                    This will create attendance records for all enrolled students on the selected date.
                     All students will initially be marked as absent.
                   </p>
                 </div>
@@ -2889,7 +2885,7 @@ function AttendanceManagementDetail() {
 
 function TeacherDashboard() {
   const location = useLocation();
-  
+
   const navigationItems = [
     { name: 'Dashboard', href: '/teacher', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/teacher' },
     { name: 'Class Management', href: '/teacher/class-management', icon: <Library className="h-5 w-5" />, current: location.pathname.startsWith('/teacher/class-management') },

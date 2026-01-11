@@ -772,6 +772,23 @@ func (a *App) CreateUser(password, name, firstName, middleName, lastName, gender
 		}
 	}
 
+	// Check for duplicate registration (username already exists)
+	var existingUserID int
+	var existingRole string
+	checkQuery := `SELECT id, user_type FROM users WHERE username = ?`
+	err := a.db.QueryRow(checkQuery, username).Scan(&existingUserID, &existingRole)
+	if err == nil {
+		// User already exists - return warning message
+		if role == "student" || role == "working_student" {
+			return fmt.Errorf("⚠️ This Student ID is already registered. If you already have an account, please use the login form instead")
+		}
+		return fmt.Errorf("⚠️ This %s ID is already registered in the system", role)
+	} else if err != sql.ErrNoRows {
+		// Database error (not just "no rows")
+		log.Printf("Error checking for duplicate user: %v", err)
+		return fmt.Errorf("failed to check existing registration: %w", err)
+	}
+
 	// Insert into users table
 	query := `INSERT INTO users (username, password, user_type) VALUES (?, ?, ?)`
 	result, err := a.db.Exec(query, username, password, role)

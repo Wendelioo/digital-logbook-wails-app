@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Routes, Route, Link, useLocation } from 'react-router-dom';
 import Layout from '../components/Layout';
-import { 
-  LayoutDashboard, 
-  ClipboardList, 
+import {
+  LayoutDashboard,
+  ClipboardList,
   MessageSquare,
   Clock,
   CheckCircle,
@@ -20,7 +20,7 @@ import {
   MapPin,
   Library
 } from 'lucide-react';
-import { 
+import {
   GetStudentDashboard,
   RecordAttendance,
   GetStudentFeedback,
@@ -61,11 +61,11 @@ function DashboardOverview() {
   useEffect(() => {
     const loadDashboard = async () => {
       if (!user) return;
-      
+
       try {
         const data = await GetStudentDashboard(user.id);
         setDashboardData(data);
-        
+
         // Fetch last login log
         try {
           const loginLogs = await GetStudentLoginLogs(user.id);
@@ -213,7 +213,7 @@ function DashboardOverview() {
               </dl>
             </div>
           </div>
-          
+
           {/* Total Records */}
           <div className="pt-6 border-t border-gray-200">
             <div className="flex items-center justify-between">
@@ -282,13 +282,13 @@ function LoginHistory() {
         setLoading(false);
         return;
       }
-      
+
       try {
         console.log('Loading login logs for user ID:', user.id);
         const data = await GetStudentLoginLogs(user.id);
         console.log('Received login logs data:', data);
         console.log('Number of logs:', data?.length || 0);
-        
+
         if (data && Array.isArray(data)) {
           setLoginLogs(data);
           setFilteredLogs(data);
@@ -319,10 +319,10 @@ function LoginHistory() {
     if (selectedDate) {
       filtered = filtered.filter(log => {
         if (!log.login_time) return false;
-        
+
         const logDate = new Date(log.login_time);
         const selected = new Date(selectedDate);
-        
+
         // Compare only the date part (ignore time)
         return logDate.toDateString() === selected.toDateString();
       });
@@ -336,7 +336,7 @@ function LoginHistory() {
         (log.login_time && new Date(log.login_time).toLocaleString().toLowerCase().includes(query))
       );
     }
-    
+
     setFilteredLogs(filtered);
   }, [loginLogs, selectedDate, searchQuery]);
 
@@ -368,7 +368,7 @@ function LoginHistory() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder=""
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -385,11 +385,10 @@ function LoginHistory() {
           <div className="relative">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
-                showFilters
-                  ? 'bg-primary-50 border-primary-500 text-primary-700'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${showFilters
+                ? 'bg-primary-50 border-primary-500 text-primary-700'
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
             >
               <SlidersHorizontal className="h-5 w-5" />
               Filters
@@ -399,7 +398,7 @@ function LoginHistory() {
                 </span>
               )}
             </button>
-            
+
             {/* Dropdown with Date Picker */}
             {showFilters && (
               <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
@@ -495,20 +494,20 @@ function LoginHistory() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {log.login_time ? new Date(log.login_time).toLocaleTimeString('en-US', { 
-                        hour: '2-digit', 
+                      {log.login_time ? new Date(log.login_time).toLocaleTimeString('en-US', {
+                        hour: '2-digit',
                         minute: '2-digit',
                         second: '2-digit',
-                        hour12: true 
+                        hour12: true
                       }) : '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {log.logout_time ? (
-                        new Date(log.logout_time).toLocaleTimeString('en-US', { 
-                          hour: '2-digit', 
+                        new Date(log.logout_time).toLocaleTimeString('en-US', {
+                          hour: '2-digit',
                           minute: '2-digit',
                           second: '2-digit',
-                          hour12: true 
+                          hour12: true
                         })
                       ) : (
                         <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -559,7 +558,7 @@ function FeedbackHistory() {
   useEffect(() => {
     const loadFeedback = async () => {
       if (!user) return;
-      
+
       try {
         const data = await GetStudentFeedback(user.id);
         setFeedbackList(data || []);
@@ -584,10 +583,10 @@ function FeedbackHistory() {
     if (selectedDate) {
       filtered = filtered.filter(feedback => {
         if (!feedback.date_submitted) return false;
-        
+
         const feedbackDate = new Date(feedback.date_submitted);
         const selected = new Date(selectedDate);
-        
+
         // Compare only the date part (ignore time)
         return feedbackDate.toDateString() === selected.toDateString();
       });
@@ -602,7 +601,7 @@ function FeedbackHistory() {
         (feedback.date_submitted && new Date(feedback.date_submitted).toLocaleString().toLowerCase().includes(query))
       );
     }
-    
+
     setFilteredFeedback(filtered);
   }, [feedbackList, selectedDate, searchQuery]);
 
@@ -634,7 +633,7 @@ function FeedbackHistory() {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search..."
+              placeholder=""
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-10 pr-10 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -651,11 +650,10 @@ function FeedbackHistory() {
           <div className="relative">
             <button
               onClick={() => setShowFilters(!showFilters)}
-              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${
-                showFilters
-                  ? 'bg-primary-50 border-primary-500 text-primary-700'
-                  : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
-              }`}
+              className={`flex items-center gap-2 px-4 py-2.5 border rounded-lg text-sm font-medium transition-colors ${showFilters
+                ? 'bg-primary-50 border-primary-500 text-primary-700'
+                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                }`}
             >
               <SlidersHorizontal className="h-5 w-5" />
               Filters
@@ -665,7 +663,7 @@ function FeedbackHistory() {
                 </span>
               )}
             </button>
-            
+
             {/* Dropdown with Date Picker */}
             {showFilters && (
               <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-10">
@@ -781,46 +779,42 @@ function FeedbackHistory() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        feedback.equipment_condition === 'Good'
-                          ? 'bg-green-100 text-green-800'
-                          : feedback.equipment_condition === 'Minor Issue'
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${feedback.equipment_condition === 'Good'
+                        ? 'bg-green-100 text-green-800'
+                        : feedback.equipment_condition === 'Minor Issue'
                           ? 'bg-yellow-100 text-yellow-800'
                           : 'bg-red-100 text-red-800'
-                      }`}>
+                        }`}>
                         {feedback.equipment_condition}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        feedback.mouse_condition === 'Good'
-                          ? 'bg-green-100 text-green-800'
-                          : feedback.mouse_condition === 'Minor Issue'
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${feedback.mouse_condition === 'Good'
+                        ? 'bg-green-100 text-green-800'
+                        : feedback.mouse_condition === 'Minor Issue'
                           ? 'bg-yellow-100 text-yellow-800'
                           : 'bg-red-100 text-red-800'
-                      }`}>
+                        }`}>
                         {feedback.mouse_condition}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        feedback.keyboard_condition === 'Good'
-                          ? 'bg-green-100 text-green-800'
-                          : feedback.keyboard_condition === 'Minor Issue'
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${feedback.keyboard_condition === 'Good'
+                        ? 'bg-green-100 text-green-800'
+                        : feedback.keyboard_condition === 'Minor Issue'
                           ? 'bg-yellow-100 text-yellow-800'
                           : 'bg-red-100 text-red-800'
-                      }`}>
+                        }`}>
                         {feedback.keyboard_condition}
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        feedback.monitor_condition === 'Good'
-                          ? 'bg-green-100 text-green-800'
-                          : feedback.monitor_condition === 'Minor Issue'
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${feedback.monitor_condition === 'Good'
+                        ? 'bg-green-100 text-green-800'
+                        : feedback.monitor_condition === 'Minor Issue'
                           ? 'bg-yellow-100 text-yellow-800'
                           : 'bg-red-100 text-red-800'
-                      }`}>
+                        }`}>
                         {feedback.monitor_condition}
                       </span>
                     </td>
@@ -861,7 +855,7 @@ function MyClasses() {
 
   const loadClasses = async () => {
     if (!user) return;
-    
+
     setLoading(true);
     try {
       const data = await GetStudentClasses(user.id);
@@ -878,7 +872,7 @@ function MyClasses() {
   const handleJoinClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !subjectCode.trim()) {
-      setJoinError('Please enter a subject code.');
+      setJoinError('Please enter an EDP code.');
       return;
     }
 
@@ -889,7 +883,7 @@ function MyClasses() {
     try {
       // First check if classes exist for this subject code
       const availableClasses = await GetClassesBySubjectCode(subjectCode.trim().toUpperCase());
-      
+
       if (availableClasses.length === 0) {
         setJoinError('No classes found.');
         setJoining(false);
@@ -899,10 +893,10 @@ function MyClasses() {
       // Join the class
       await JoinClassBySubjectCode(user.id, subjectCode.trim().toUpperCase());
       setJoinSuccess('Successfully joined the class!');
-      
+
       // Reload classes to show the new enrollment
       await loadClasses();
-      
+
       // Close modal and clear form after 1.5 seconds
       setTimeout(() => {
         setShowJoinForm(false);
@@ -953,7 +947,7 @@ function MyClasses() {
 
       {/* Join Class Modal */}
       {showJoinForm && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 overflow-y-auto h-full w-full z-50 flex items-center justify-center"
           onClick={(e) => {
             if (e.target === e.currentTarget) {
@@ -977,17 +971,17 @@ function MyClasses() {
             >
               ×
             </button>
-            
+
             <div className="p-6">
               <div className="mb-6">
                 <h3 className="text-2xl font-bold text-gray-900 mb-2">Join a Class</h3>
-                <p className="text-sm text-gray-600">Enter the Subject Code to join a class</p>
+                <p className="text-sm text-gray-600">Enter the EDP Code to join a class</p>
               </div>
-              
+
               <form onSubmit={handleJoinClass} className="space-y-4">
                 <div>
                   <label htmlFor="subjectCode" className="block text-sm font-medium text-gray-700 mb-2">
-                    Subject Code
+                    EDP Code
                   </label>
                   <input
                     id="subjectCode"
@@ -999,19 +993,19 @@ function MyClasses() {
                     autoFocus
                   />
                 </div>
-                
+
                 {joinError && (
                   <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
                     {joinError}
                   </div>
                 )}
-                
+
                 {joinSuccess && (
                   <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
                     {joinSuccess}
                   </div>
                 )}
-                
+
                 <div className="flex gap-3 pt-4">
                   <button
                     type="button"
@@ -1049,20 +1043,19 @@ function MyClasses() {
         <div className="bg-white shadow rounded-lg p-12 text-center">
           <Library className="mx-auto h-12 w-12 text-gray-400 mb-4" />
           <p className="text-gray-500 font-medium">No classes enrolled</p>
-          <p className="text-gray-400 text-sm mt-2">Join a class using a Subject Code to get started.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {classes.map((cls) => (
-            <div 
-              key={cls.class_id} 
+            <div
+              key={cls.class_id}
               className="bg-white rounded-lg shadow-md overflow-hidden hover:shadow-lg transition-shadow"
             >
               <div className="bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-3">
                 <h3 className="text-white font-semibold text-lg">{cls.subject_name || cls.subject_code}</h3>
                 <p className="text-white text-sm opacity-90">{cls.subject_code}</p>
               </div>
-              
+
               <div className="px-4 py-4 bg-white">
                 <div className="space-y-2 text-sm">
                   {cls.teacher_name && (
@@ -1101,7 +1094,7 @@ function MyClasses() {
 
 function StudentDashboard() {
   const location = useLocation();
-  
+
   const navigationItems = [
     { name: 'Dashboard', href: '/student', icon: <LayoutDashboard className="h-5 w-5" />, current: location.pathname === '/student' },
     { name: 'My Classes', href: '/student/classes', icon: <Library className="h-5 w-5" />, current: location.pathname === '/student/classes' },
